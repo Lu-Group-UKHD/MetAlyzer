@@ -31,7 +31,7 @@ ui <- fluidPage(
                              column(width = 6, actionButton('resetFiltering', 'Reset', width = '100%'))
                            ),
                            tags$br(),
-                           tags$h4('Log₂(FC) computation', style = 'color:steelblue;font-weight: bold'),
+                           tags$h4('Log₂(FC) visualization', style = 'color:steelblue;font-weight: bold'),
                            fluidRow(
                              column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
                                                            choices = 'Not available', multiple = F)),
@@ -41,8 +41,13 @@ ui <- fluidPage(
                              column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
                                                            choices = character(0), multiple = F))
                            ),
-                           checkboxGroupInput('plotLog2FC', 'Visualize:',
-                                              choices = c('Volcano plot', 'Scatter plot'))
+                           fluidRow(
+                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
+                           ),
+                           tags$br(),
+                           checkboxGroupInput('plotLog2FC', 'Visualize through:',
+                                              choices = c('Volcano plot', 'Scatter plot', 'Network plot'),
+                                              inline = T)
           )
         ),
         mainPanel(
@@ -52,7 +57,8 @@ ui <- fluidPage(
           ),
           tableOutput('outputId'),
           plotOutput('plotVolcano'),
-          plotOutput('plotScatter')
+          plotOutput('plotScatter'),
+          plotOutput('plotNetwork')
         )
       )
     ),
@@ -259,30 +265,41 @@ server <- function(input, output, session) {
       regexSuffix <- paste0(' \\(', selectedChoiceGp, '\\)')
       smpChoices <- stringr::str_remove(smpChoices, regexSuffix)
     }
-    # Turn NULL into empty vector, or choices will not be updated, i.e., previous
-    # choices are shown
+    # Turn NULL (when selectedChoiceGp is 'Not available') into empty vector, or
+    # choices will not be updated, i.e., previous choices are shown
     if (length(smpChoices) == 0) {
       smpChoices <- character(0)
     }
     updateSelectInput(session, 'smpChoicesLog2FC_1', choices = smpChoices)
     updateSelectInput(session, 'smpChoicesLog2FC_2', choices = smpChoices, selected = smpChoices[2])
   })
-  # Compute log2(FC) of features
-  observe({
-    req(input$plotLog2FC)
-    selectedChoiceGp <- input$smpChoiceGpsLog2FC
-    selectedChoices <- c(input$smpChoicesLog2FC_1, input$smpChoicesLog2FC_2)
-    if (!'NA' %in% selectedChoices) {
-      metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
-                                            .data[[selectedChoiceGp]] %in% selectedChoices)
-    } else {
-      metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
-                                            is.na(.data[[selectedChoiceGp]]) |
+  # Compute log2(FC)
+  observeEvent(input$computeLog2FC, {
+    if (input$smpChoicesLog2FC_1 != input$smpChoicesLog2FC_2) {
+      selectedChoiceGp <- input$smpChoiceGpsLog2FC
+      selectedChoices <- c(input$smpChoicesLog2FC_1, input$smpChoicesLog2FC_2)
+      if (!'NA' %in% selectedChoices) {
+        metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
                                               .data[[selectedChoiceGp]] %in% selectedChoices)
+      } else {
+        metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
+                                              is.na(.data[[selectedChoiceGp]]) |
+                                                .data[[selectedChoiceGp]] %in% selectedChoices)
+      }
+      # Use do.call to prepare arguments to be passed due to design of function:
+      # deparse(substitute(categorical))
+      log2FCTab <- do.call(MetAlyzer::calculate_log2FC, list(metalyzer_se = metabObj,
+                                                             categorical = as.symbol(selectedChoiceGp),
+                                                             perc_of_min = 0.2, impute_NA = T))
+      reactLog2FCTab(log2FCTab)
+    } else {
+      showModal(modalDialog(
+        title = 'Log₂(FC) computation failed...',
+        'Please select two sample groups.',
+        easyClose = T,
+        footer = NULL
+      ))
     }
-    log2FCTab <- MetAlyzer::calculate_log2FC(metabObj, .data[[selectedChoiceGp]],
-                                             perc_of_min = 0.2, impute_NA = T)
-    reactLog2FCTab(log2FCTab)
   })
   
   
@@ -298,6 +315,28 @@ server <- function(input, output, session) {
   
   output$outputId <- renderTable({
     dim(reactMetabObj$metabObj)
+  })
+  
+  # Visualize log2(FC)
+  output$plotVolcano <- renderPlot({
+    req(reactLog2FCTab())
+    if ('Volcano plot' %in% input$plotLog2FC) {
+      MetAlyzer::plot_log2FC(reactLog2FCTab(), hide_labels_for = reactLog2FCTab()$Metabolite,
+                             vulcano = T)
+    }
+  })
+  output$plotScatter <- renderPlot({
+    req(reactLog2FCTab())
+    if ('Scatter plot' %in% input$plotLog2FC) {
+      MetAlyzer::plot_log2FC(reactLog2FCTab(), hide_labels_for = reactLog2FCTab()$Metabolite,
+                             vulcano = F)
+    }
+  })
+  output$plotNetwork <- renderPlot({
+    req(reactLog2FCTab())
+    if ('Network plot' %in% input$plotLog2FC) {
+      MetAlyzer::plot_network(reactLog2FCTab())
+    }
   })
 }
 
