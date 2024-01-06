@@ -290,7 +290,7 @@ server <- function(input, output, session) {
       # deparse(substitute(categorical))
       log2FCTab <- do.call(MetAlyzer::calculate_log2FC, list(metalyzer_se = metabObj,
                                                              categorical = as.symbol(selectedChoiceGp),
-                                                             perc_of_min = 0.2, impute_NA = T))
+                                                             impute_perc_of_min = 0.2, impute_NA = T))
       reactLog2FCTab(log2FCTab)
     } else {
       showModal(modalDialog(
