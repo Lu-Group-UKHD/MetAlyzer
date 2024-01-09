@@ -1,5 +1,4 @@
-
-log2FCTab <- calculate_log2FC(metalyzer_se, categorical, impute_perc_of_min = 0.2, impute_NA = TRUE)
+Log2FCTab <- calculate_log2FC(metalyzer_se, Method, impute_perc_of_min = 0.2, impute_NA = TRUE)
 
 ### Server Side Data Wrangling
 ## Background: Define colors for significance 
@@ -26,20 +25,20 @@ names(class_colors) <- levels(polarity_df$Class)
 ## Background: Define LC and FIA classes with color
 lc_polarity_df <- filter(polarity_df,
                          .data$Polarity == 'LC',
-                         .data$Class %in% log2FCTab$Class)
+                         .data$Class %in% Log2FCTab$Class)
 lc_colors <- class_colors[which(names(class_colors) %in% lc_polarity_df$Class)]
 fia_polarity_df <- filter(polarity_df,
                           .data$Polarity == 'FIA',
-                          .data$Class %in% log2FCTab$Class)
+                          .data$Class %in% Log2FCTab$Class)
 fia_colors <- class_colors[which(names(class_colors) %in% fia_polarity_df$Class)]
 
 ## Data: Replace NAs
-log2FCTab$log2FC[is.na(log2FCTab$log2FC)] <- 0
-log2FCTab$qval[is.na(log2FCTab$qval)] <- 1
+Log2FCTab$log2FC[is.na(Log2FCTab$log2FC)] <- 0
+Log2FCTab$qval[is.na(Log2FCTab$qval)] <- 1
 
 
 ## Data: Add color to data based on significance
-log2FCTab$signif_color <- sapply(log2FCTab$qval, function(q_val) {
+Log2FCTab$signif_color <- sapply(Log2FCTab$qval, function(q_val) {
   for (t in signif_colors) {
     if (q_val <= t) {
       color <- names(signif_colors)[which(signif_colors == t)]
@@ -51,7 +50,7 @@ log2FCTab$signif_color <- sapply(log2FCTab$qval, function(q_val) {
 ## Data: Add pseudo x-value to data as a order of metabolites
 ordered_classes <- c(names(lc_colors), names(fia_colors))
 p_data <- lapply(ordered_classes, function(class) {
-  log2FCTab %>%
+  Log2FCTab %>%
     filter(.data$Class == class) %>%
     bind_rows(data.frame(Class = rep(NA, 5)))
 }) %>%
@@ -165,30 +164,12 @@ p_fc <- ggplot(p_data,
   labs(x = 'Metabolites')
 
 ## Interactive: Create interactive plot
-p <- ggplotly(p_fc, tooltip = "text")
+p <- ggplotly(p_fc, tooltip = "text", showlegend = FALSE)
+p <- hide_legend(p)
+p
 
-sig <- list("1 ≥ q-value > 0.1",
-           "0.1 ≥ q-value > 0.05",
-           "0.05 ≥ q-value > 0.01",
-           "0.01 ≥ q-value")
-
-for (i in seq_along(p$x$data)) {
-  if (!is.null(p$x$data[[i]]$name)) {
-    cleaned_name <- gsub("\\(", "", str_split(p$x$data[[i]]$name, ",")[[1]][1])
-    if (cleaned_name %in% names(signif_colors)) {
-      label_index <- which(names(signif_colors) == cleaned_name)
-      print(label_index)
-      p$x$data[[i]]$name <- sig[[label_index]]
-      #p$x$data[[i]]$legendgroup <- "group2"
-    } else {
-      p$x$data[[i]]$name <- cleaned_name
-      #p$x$data[[i]]$legendgroup <- "group1"
-    }
-  }
-}
-
-
-#df <- data.frame(id = seq_along(p$x$data), legend_entries = unlist(lapply(p$x$data, `[[`, "name")))
-#df$legend_group <- gsub("^(.*?),.*", "\\1", df$legend_entries)
-#df$is_first <- !duplicated(df$legend_group)
-#df$is_bool <- ifelse(grepl("TRUE|FALSE", df$legend_group), TRUE, FALSE)
+# Grab Legend ggplot
+tmp <- ggplot_gtable(ggplot_build(p_fc))
+leg <- which(sapply(tmp$grobs, function(x) x$name) ==  "guide-box")
+legend <- tmp$grobs[[leg]]
+legend <- grid.arrange(legend, ncol=1)
