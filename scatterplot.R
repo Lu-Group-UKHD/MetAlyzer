@@ -1,10 +1,5 @@
 
-observe({
-categorical <- input$categoricalInput
-reactObjs$fil_metabObj <- filterMetaData(reactObjs$metabObj, categorical %in% input$selectFeatures)
-})
-
-log2FCTab <- calculate_log2FC(reactObjs$fil_metabObj, categorical, impute_perc_of_min = 0.2, impute_NA = TRUE)
+log2FCTab <- calculate_log2FC(metalyzer_se, categorical, impute_perc_of_min = 0.2, impute_NA = TRUE)
 
 ### Server Side Data Wrangling
 ## Background: Define colors for significance 
@@ -90,27 +85,8 @@ for (i in seq_along(signif_colors)) {
   signif_labels[[i]] <- label
 }
 
-## Legend: Manage breaks and values for background rects
-len_diff <- length(lc_colors) - length(fia_colors)
-if (len_diff != 0) {
-  blank_names <- sapply(1:abs(len_diff), function(i) {
-    paste(rep(' ', i), collapse = '')
-  })
-  extension <- rep("white", abs(len_diff))
-  names(extension) <- blank_names
-  if (len_diff > 0) {
-    # more classes from lc than fia
-    # -> extend fia colors
-    fia_colors <- c(fia_colors, extension)
-  } else if (len_diff < 0) {
-    # more classes from fia than lc
-    # -> extend lc colors
-    lc_colors <- c(lc_colors, extension)
-  }
-}
-
-breaks <- c('LC:', names(lc_colors), 'FIA:', names(fia_colors))
-values <- c('white', lc_colors, 'white', fia_colors)
+breaks <- c(names(lc_colors), names(fia_colors))
+values <- c(lc_colors,fia_colors)
 names(values) <- NULL
 
 ## Background: Create data for background rects
@@ -163,7 +139,10 @@ p_fc <- ggplot(p_data,
   geom_vline(xintercept = 0, linewidth = 0.5, color = 'black') +
   geom_vline(xintercept = lc_fia_border+3, linewidth = 0.5, color = 'black', linetype="dotted") +
   geom_hline(yintercept = 0, linewidth = 0.5, color = 'black') +
-  geom_point(size = 0.5, aes(text = paste0(Metabolite, "\nClass: ", Class, "\nlog2 Fold Change: ", round(log2FC, digits=5), "\np-value: ", round(pval, digits=5)))) +
+  geom_point(size = 0.5, aes(text = paste0(Metabolite, 
+                                           "\nClass: ", Class, 
+                                           "\nlog2 Fold Change: ", round(log2FC, digits=5),  
+                                           "\np-value: ", round(pval, digits=5)))) + 
   scale_color_manual(paste0('Significance\n(linear model fit with FDR correction)'),
                      labels = signif_labels,
                      values = names(signif_colors),
@@ -188,4 +167,28 @@ p_fc <- ggplot(p_data,
 ## Interactive: Create interactive plot
 p <- ggplotly(p_fc, tooltip = "text")
 
-#htmlwidgets::saveWidget(p, file = 'example_plot.html', selfcontained = FALSE, libdir= "lib/")
+sig <- list("1 ≥ q-value > 0.1",
+           "0.1 ≥ q-value > 0.05",
+           "0.05 ≥ q-value > 0.01",
+           "0.01 ≥ q-value")
+
+for (i in seq_along(p$x$data)) {
+  if (!is.null(p$x$data[[i]]$name)) {
+    cleaned_name <- gsub("\\(", "", str_split(p$x$data[[i]]$name, ",")[[1]][1])
+    if (cleaned_name %in% names(signif_colors)) {
+      label_index <- which(names(signif_colors) == cleaned_name)
+      print(label_index)
+      p$x$data[[i]]$name <- sig[[label_index]]
+      #p$x$data[[i]]$legendgroup <- "group2"
+    } else {
+      p$x$data[[i]]$name <- cleaned_name
+      #p$x$data[[i]]$legendgroup <- "group1"
+    }
+  }
+}
+
+
+#df <- data.frame(id = seq_along(p$x$data), legend_entries = unlist(lapply(p$x$data, `[[`, "name")))
+#df$legend_group <- gsub("^(.*?),.*", "\\1", df$legend_entries)
+#df$is_first <- !duplicated(df$legend_group)
+#df$is_bool <- ifelse(grepl("TRUE|FALSE", df$legend_group), TRUE, FALSE)
