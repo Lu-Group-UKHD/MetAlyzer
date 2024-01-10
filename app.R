@@ -51,14 +51,20 @@ ui <- fluidPage(
           )
         ),
         mainPanel(
-          fluidRow(
-            column(width = 7, verbatimTextOutput('textConcSumm')),
-            column(width = 5, verbatimTextOutput('textQuanSumm'))
-          ),
-          tableOutput('outputId'),
-          plotOutput('plotVolcano'),
-          plotOutput('plotScatter'),
-          plotOutput('plotNetwork')
+          conditionalPanel(condition = "output.ifValidUploadedFile",
+                           # fluidRow(
+                           #   column(width = 7, verbatimTextOutput('textConcSumm')),
+                           #   column(width = 5, verbatimTextOutput('textQuanSumm'))
+                           # ),
+                           tags$h4('Data distribution', style = 'color:Black;font-weight: bold'),
+                           plotOutput('plotDatDist'),
+                           tags$h4('Sample metadata', style = 'color:Black;font-weight: bold'),
+                           DT::dataTableOutput('tblSmpMetadat'),
+                           tags$h4('Data missingness', style = 'color:Black;font-weight: bold'),
+                           plotOutput('plotVolcano'),
+                           plotOutput('plotScatter'),
+                           plotOutput('plotNetwork')
+          )
         )
       )
     ),
@@ -99,6 +105,25 @@ server <- function(input, output, session) {
       reactMetabObj$metabObj <- NULL
       reactMetabObj$ori_metabObj <- NULL
     }
+  })
+  
+  # Retrieve abundance data and sample metadata for showing data overviews
+  datOverviewTbls <- reactive({
+    req(reactMetabObj$metabObj)
+    metabAggreDat <- metadata(reactMetabObj$metabObj)$aggregated_data %>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(ID = paste0('Smp', ID))
+    metabSmpMetadat <- colData(reactMetabObj$metabObj) %>%
+      tibble::as_tibble(rownames = 'ID') %>%
+      dplyr::mutate(ID = paste0('Smp', ID))
+    # Use original column names whose spaces are not replaced with '.'
+    colnames(metabSmpMetadat) <- c('ID', colnames(colData(reactMetabObj$metabObj)))
+    # Prepare ID levels for displaying samples in order
+    idLevels <- rownames(colData(reactMetabObj$metabObj))
+    metabAggreDat <- dplyr::left_join(metabAggreDat, metabSmpMetadat, by = 'ID') %>%
+      dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
+    
+    return(list(metabAggreDat = metabAggreDat, metabSmpMetadat = metabSmpMetadat))
   })
   
   
@@ -303,18 +328,38 @@ server <- function(input, output, session) {
   })
   
   
-  # Show statistics of data concentration values and quantification statuses 
-  output$textConcSumm <- renderPrint({
-    req(reactMetabObj$metabObj)
-    MetAlyzer::summarizeConcValues(reactMetabObj$metabObj)
-  })
-  output$textQuanSumm <- renderPrint({
-    req(reactMetabObj$metabObj)
-    MetAlyzer::summarizeQuantData(reactMetabObj$metabObj)
-  })
+  # Set plot theme
+  th <- theme_bw(base_size = 15) +
+    theme(axis.title = element_text(face = 'bold'),
+          axis.text = element_text(face = 'bold'),
+          axis.ticks = element_line(linewidth = 0.8),
+          legend.text = element_text(size = 15))
   
-  output$outputId <- renderTable({
-    dim(reactMetabObj$metabObj)
+  # Show statistics of data concentration values and quantification statuses 
+  # output$textConcSumm <- renderPrint({
+  #   req(reactMetabObj$metabObj)
+  #   MetAlyzer::summarizeConcValues(reactMetabObj$metabObj)
+  # })
+  # output$textQuanSumm <- renderPrint({
+  #   req(reactMetabObj$metabObj)
+  #   MetAlyzer::summarizeQuantData(reactMetabObj$metabObj)
+  # })
+  
+  # Show data overviews
+  output$plotDatDist <- renderPlot({
+    req(datOverviewTbls()$metabAggreDat)
+    metabAggreDat <- datOverviewTbls()$metabAggreDat
+    ggplot(metabAggreDat, aes(x=ID, y=Concentration)) +
+      geom_boxplot() +
+      scale_y_log10() +
+      labs(x = 'Sample', y = 'Metabolite abundance') +
+      th + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  })
+  output$tblSmpMetadat <- DT::renderDataTable({
+    req(datOverviewTbls()$metabSmpMetadat)
+    metabSmpMetadat <- datOverviewTbls()$metabSmpMetadat
+    DT::datatable(metabSmpMetadat, rownames = F, filter = list(position = 'top', clear = T, plain = F),
+                  selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
   
   # Visualize log2(FC)
