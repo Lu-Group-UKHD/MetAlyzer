@@ -2,7 +2,7 @@ library(shiny)
 library(MetAlyzer)
 library(SummarizedExperiment)
 library(tidyverse)
-source("plotly_log2FC.R")
+source("utils.R")
 
 # setwd('/Users/qianwu/Desktop/RShiny_Biocrates_DataAnalysis')
 # metabObj <- MetAlyzer_dataset(file_path = './data/extraction_data.xlsx', silent = T)
