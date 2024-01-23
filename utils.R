@@ -258,5 +258,3 @@ if(vulcano == FALSE && scatter == FALSE) {
   return(plots)
 }
 }
-
-

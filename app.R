@@ -66,6 +66,7 @@ ui <- fluidPage(
                            tags$h4('Sample metadata', style = 'color:Black;font-weight: bold'),
                            DT::dataTableOutput('tblSmpMetadat'),
                            tags$h4('Data missingness', style = 'color:Black;font-weight: bold'),
+                           plotlyOutput('plotDatMiss'),
                            fluidRow(
                                 column(width = 7, verbatimTextOutput('textConcSumm')),
                                 column(width = 5, verbatimTextOutput('textQuanSumm'))
@@ -135,7 +136,6 @@ server <- function(input, output, session) {
     idLevels <- rownames(colData(reactMetabObj$metabObj))
     metabAggreDat <- dplyr::left_join(metabAggreDat, metabSmpMetadat, by = 'ID') %>%
       dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
-    
     return(list(metabAggreDat = metabAggreDat, metabSmpMetadat = metabSmpMetadat))
   })
   
@@ -228,7 +228,8 @@ server <- function(input, output, session) {
     } else {
       #### Some features will still be filtered out
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = NULL)
+                                                             drop_metabolites = NULL,
+                                                             drop_NA_concentration = NULL)
     }
   })
   # Do sample filtering
@@ -404,6 +405,31 @@ server <- function(input, output, session) {
     DT::datatable(metabSmpMetadat, rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
+  output$plotDatMiss <- renderPlotly({
+  req(datOverviewTbls()$metabAggreDat)
+  metabAggreDat <- datOverviewTbls()$metabAggreDat %>%
+    dplyr::group_by(ID, Status) %>%
+    dplyr::summarise(Count = n())
+
+  # Prepare colors for plot
+  colors <- c(Valid = '#1f78b4', Invalid = '#33a02c', LOQ = '#e31a1c', LOD = '#ff7f00') # Choose better colors
+  stack_col <- sapply(names(colors), function(x) {
+   ifelse(x %in% metabAggreDat$Status, colors[x], NA)
+  })
+  stack_col <- na.omit(stack_col)
+  
+  # Plot
+  ggplotly(
+    ggplot(metabAggreDat, aes(x = ID, y = Count, fill = Status)) +
+      geom_col(position = "stack") +
+      labs(title = "",
+          x = "Sample",
+          y = "Count") +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+      scale_fill_manual('Status',
+                        values = stack_col)
+  )
+})
   
   # Visualize log2(FC)
   output$plotVolcano <- renderPlotly({
