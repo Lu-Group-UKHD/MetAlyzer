@@ -2,6 +2,7 @@ library(shiny)
 library(MetAlyzer)
 library(SummarizedExperiment)
 library(tidyverse)
+library(shinycssloaders)
 source("utils.R")
 
 # setwd('/Users/qianwu/Desktop/RShiny_Biocrates_DataAnalysis')
@@ -31,28 +32,6 @@ ui <- fluidPage(
                              column(width = 6, actionButton('updateFiltering', 'Filter', width = '100%')),
                              column(width = 6, actionButton('resetFiltering', 'Reset', width = '100%'))
                            ),
-                           tags$br(),
-                           tags$h4('Log₂(FC) visualization', style = 'color:steelblue;font-weight: bold'),
-                           fluidRow(
-                             column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
-                                                           choices = 'Not available', multiple = F)),
-                             column(width = 3, selectInput('smpChoicesLog2FC_1', 'Group1',
-                                                           choices = character(0), multiple = F),
-                                    offset = 1),
-                             column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
-                                                           choices = character(0), multiple = F))
-                           ),
-                           fluidRow(
-                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
-                           ),
-                           tags$br(),
-                           checkboxGroupInput('plotLog2FC', 'Visualize through:',
-                                              choices = c('Volcano plot', 'Scatter plot', 'Network plot'),
-                                              inline = T),
-                           fluidRow(
-                             column(width = 5, selectInput('metaboliteChoicesHighlight', 'Select metabolite(s) to highlight:',
-                                                            choices = character(0), multiple = T))
-                           ),
           )
         ),
         mainPanel(
@@ -62,29 +41,79 @@ ui <- fluidPage(
                            #   column(width = 5, verbatimTextOutput('textQuanSumm'))
                            # ),
                            tags$h4('Data distribution', style = 'color:Black;font-weight: bold'),
-                           plotOutput('plotDatDist'),
+                           plotOutput('plotDatDist')  %>%
+                             withSpinner(color="#56070C"),
+                           
                            tags$h4('Sample metadata', style = 'color:Black;font-weight: bold'),
-                           DT::dataTableOutput('tblSmpMetadat'),
+                           DT::dataTableOutput('tblSmpMetadat')  %>%
+                             withSpinner(color="#56070C"),
+                           
                            tags$h4('Data missingness', style = 'color:Black;font-weight: bold'),
-                           plotlyOutput('plotDatMiss'),
+                           plotlyOutput('plotDatMiss')  %>%
+                             withSpinner(color="#56070C"),
+                           
                            fluidRow(
-                                column(width = 7, verbatimTextOutput('textConcSumm')),
-                                column(width = 5, verbatimTextOutput('textQuanSumm'))
+                                column(width = 7, verbatimTextOutput('textConcSumm')  %>%
+                                                    withSpinner(color="#56070C")),
+                                column(width = 5, verbatimTextOutput('textQuanSumm')  %>%
+                                                    withSpinner(color="#56070C"))
                            ),
                            tableOutput('outputId'),
-                           plotlyOutput('plotVolcano'),
-                           fluidRow(
-                            column(width = 8, plotlyOutput('plotScatter')),
-                            column(width = 4, plotOutput('plotScatterLegend'))
-                           ),
-                           plotOutput('plotNetwork')
           )
         )
       )
     ),
     tabPanel(
-      'Something',
-      tags$h4('Could be a section for something else')
+      'Visualisations',
+      sidebarLayout(
+        sidebarPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile",
+                          tags$h4('Log₂(FC) visualization', style = 'color:steelblue;font-weight: bold'),
+                          fluidRow(
+                            column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
+                                                          choices = 'Not available', multiple = F)),
+                            column(width = 3, selectInput('smpChoicesLog2FC_1', 'Group1',
+                                                          choices = character(0), multiple = F),
+                                    offset = 1),
+                            column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
+                                                          choices = character(0), multiple = F))
+                          ),
+                          fluidRow(
+                            column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
+                          ),
+                          tags$br(),
+                          checkboxGroupInput('plotLog2FC', 'Visualize through:',
+                                              choices = c('Volcano plot', 'Scatter plot', 'Network plot'),
+                                              inline = T),
+                          fluidRow(
+                            style = "display: flex; align-items: center;",
+                            column(width = 7, selectInput('metaboliteChoicesHighlight', 'Select metabolite(s) to highlight:',
+                                                            choices = character(0), multiple = T)),
+                            column(width = 5, checkboxInput('highlightMetabolites', 'Highlight', value = FALSE, width = '100%'))
+                          ),
+          )
+        ),
+        mainPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile",
+                          conditionalPanel(condition = "input.plotLog2FC.indexOf('Volcano plot') !== -1",
+                                           plotlyOutput('plotVolcano') %>%
+                                           withSpinner(color="#56070C")
+                          ),
+                          conditionalPanel(condition = "input.plotLog2FC.indexOf('Scatter plot') !== -1",
+                                           fluidRow(
+                                             column(width = 9, plotlyOutput('plotScatter') %>%
+                                                                 withSpinner(color="#56070C")),
+                                             column(width = 3, plotOutput('plotScatterLegend') %>%
+                                                                 withSpinner(color="#56070C"))
+                                           )
+                          ),
+                          conditionalPanel(condition = "input.plotLog2FC.indexOf('Network plot') !== -1",
+                                           plotOutput('plotNetwork') %>%
+                                             withSpinner(color="#56070C")
+                          ),
+          )
+        )
+      )
     )
   )
 )
@@ -93,6 +122,7 @@ server <- function(input, output, session) {
   # Create reactive objects for storing up-to-date data
   reactMetabObj <- reactiveValues(metabObj = NULL, ori_metabObj = NULL)
   reactLog2FCTab <- reactiveVal()
+  reactHighlight <- reactiveVal()
   
   # Initialize MetAlyzer SE object
   observeEvent(input$uploadedFile, {
@@ -353,22 +383,35 @@ server <- function(input, output, session) {
   })
 
   # Create new column for highlighting metabolites
-  observeEvent(input$metaboliteChoicesHighlight, {
+  observeEvent(input$highlightMetabolites, {
     req(reactLog2FCTab())
-    if (!is.null(reactLog2FCTab())) {
-      # Continue with the rest of the code only if reactLog2FCTab() is not NULL
-      
+    if (input$highlightMetabolites) {
       if (!is.null(input$metaboliteChoicesHighlight)) {
         highlight_metabolites <- input$metaboliteChoicesHighlight
         metaObjHighlight <- reactLog2FCTab()
+        
         metaObjHighlight$highlight_metabolites <-"Other Metabolites"
         metaObjHighlight$highlight_metabolites[which(metaObjHighlight$Metabolite %in% highlight_metabolites)] <- "Highlighted Metabolite(s)"
         metaObjHighlight$highlight_metabolites <- as.factor(metaObjHighlight$highlight_metabolites)
-        reactLog2FCTab(metaObjHighlight)
+        
+        reactHighlight(metaObjHighlight)
       }
-    } else {
-      # Handle the case where reactLog2FCTab() is NULL or not properly initialized
-      cat("reactLog2FCTab() is NULL or not properly initialized.\n")
+    }
+  })
+  
+  observeEvent(input$metaboliteChoicesHighlight, {
+    req(reactLog2FCTab())
+    if (input$highlightMetabolites) {
+      if (!is.null(input$metaboliteChoicesHighlight)) {
+        highlight_metabolites <- input$metaboliteChoicesHighlight
+        metaObjHighlight <- reactLog2FCTab()
+        
+        metaObjHighlight$highlight_metabolites <-"Other Metabolites"
+        metaObjHighlight$highlight_metabolites[which(metaObjHighlight$Metabolite %in% highlight_metabolites)] <- "Highlighted Metabolite(s)"
+        metaObjHighlight$highlight_metabolites <- as.factor(metaObjHighlight$highlight_metabolites)
+        
+        reactHighlight(metaObjHighlight)
+      }
     }
   })
   
@@ -435,12 +478,13 @@ server <- function(input, output, session) {
   output$plotVolcano <- renderPlotly({
     req(reactLog2FCTab())
     if ('Volcano plot' %in% input$plotLog2FC) {
-      if (is.null(input$metaboliteChoicesHighlight)) {
-        plots <- plotly_log2FC(reactLog2FCTab(), vulcano = T, scatter = F)
-        plots$VulcanoPlot
+      if (input$highlightMetabolites) {
+        req(reactHighlight())
+        plots <- plotly_log2FC(reactHighlight(), vulcano = T, scatter = F)
+        plots$HighlightedVulcanoPlot
       } else {
         plots <- plotly_log2FC(reactLog2FCTab(), vulcano = T, scatter = F)
-        plots$HighlightedVulcanoPlot
+        plots$VulcanoPlot
       }
     }
   })
