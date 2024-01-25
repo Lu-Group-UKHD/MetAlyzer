@@ -134,15 +134,8 @@ if(vulcano == FALSE && scatter == FALSE) {
       select(.data$x) %>%
       max()
     
-    ## Plot: Pre-plot to determine ylims
-    pre_plot <- ggplot(p_data,
-                       aes(x = .data$x,
-                           y = .data$log2FC,
-                           color = .data$signif_color)) +
-      geom_point(size = 0.5)
-    
-    ylims <- ggplot_build(pre_plot)$layout$panel_params[[1]]$y.range
-    
+    ylims <- c(min(Log2FCTab$log2FC) - 0.75, max(Log2FCTab$log2FC) + 0,75)
+
     ## Plot: Create ggplot object
     p_fc_scatter <- ggplot(p_data,
                            aes(x = .data$x,

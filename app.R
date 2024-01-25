@@ -82,9 +82,11 @@ ui <- fluidPage(
                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
                           ),
                           tags$br(),
-                          checkboxGroupInput('plotLog2FC', 'Visualize through:',
-                                              choices = c('Volcano plot', 'Scatter plot', 'Network plot'),
-                                              inline = T),
+                          fluidRow(
+                            column(width = 4, checkboxInput('plotVulcanoLog2FC', 'Vulcano Plot', value = FALSE, width = '100%')),
+                            column(width = 4, checkboxInput('plotScatterLog2FC', 'Scatter Plot', value = FALSE, width = '100%')),
+                            column(width = 4, checkboxInput('plotNetworkLog2FC', 'Network Plot', value = FALSE, width = '100%'))
+                          ),
                           fluidRow(
                             style = "display: flex; align-items: center;",
                             column(width = 7, selectInput('metaboliteChoicesHighlight', 'Select metabolite(s) to highlight:',
@@ -95,19 +97,19 @@ ui <- fluidPage(
         ),
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
-                          conditionalPanel(condition = "input.plotLog2FC.indexOf('Volcano plot') !== -1",
+                          conditionalPanel(condition = "input.plotVulcanoLog2FC",
                                            plotlyOutput('plotVolcano') %>%
-                                           withSpinner(color="#56070C")
+                                           withSpinner(color="#56070C"),
                           ),
-                          conditionalPanel(condition = "input.plotLog2FC.indexOf('Scatter plot') !== -1",
+                          conditionalPanel(condition = "input.plotScatterLog2FC",
                                            fluidRow(
                                              column(width = 9, plotlyOutput('plotScatter') %>%
                                                                  withSpinner(color="#56070C")),
                                              column(width = 3, plotOutput('plotScatterLegend') %>%
                                                                  withSpinner(color="#56070C"))
-                                           )
+                                           ),
                           ),
-                          conditionalPanel(condition = "input.plotLog2FC.indexOf('Network plot') !== -1",
+                          conditionalPanel(condition = "input.plotNetworkLog2FC",
                                            plotOutput('plotNetwork') %>%
                                              withSpinner(color="#56070C")
                           ),
@@ -123,6 +125,7 @@ server <- function(input, output, session) {
   reactMetabObj <- reactiveValues(metabObj = NULL, ori_metabObj = NULL)
   reactLog2FCTab <- reactiveVal()
   reactHighlight <- reactiveVal()
+  reactScatter <- reactiveVal()
   
   # Initialize MetAlyzer SE object
   observeEvent(input$uploadedFile, {
@@ -254,7 +257,8 @@ server <- function(input, output, session) {
       #### Probably add slider for 'min_percent_valid' and options for 'per_group'
       #### to filter unmet features out by threshold of valid values
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = input$featChoicesFiltering)
+                                                             drop_metabolites = input$featChoicesFiltering,
+                                                             drop_NA_concentration = NULL)
     } else {
       #### Some features will still be filtered out
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
@@ -390,7 +394,7 @@ server <- function(input, output, session) {
         highlight_metabolites <- input$metaboliteChoicesHighlight
         metaObjHighlight <- reactLog2FCTab()
         
-        metaObjHighlight$highlight_metabolites <-"Other Metabolites"
+        metaObjHighlight$highlight_metabolites <- "Other Metabolites"
         metaObjHighlight$highlight_metabolites[which(metaObjHighlight$Metabolite %in% highlight_metabolites)] <- "Highlighted Metabolite(s)"
         metaObjHighlight$highlight_metabolites <- as.factor(metaObjHighlight$highlight_metabolites)
         
@@ -406,7 +410,7 @@ server <- function(input, output, session) {
         highlight_metabolites <- input$metaboliteChoicesHighlight
         metaObjHighlight <- reactLog2FCTab()
         
-        metaObjHighlight$highlight_metabolites <-"Other Metabolites"
+        metaObjHighlight$highlight_metabolites <- "Other Metabolites"
         metaObjHighlight$highlight_metabolites[which(metaObjHighlight$Metabolite %in% highlight_metabolites)] <- "Highlighted Metabolite(s)"
         metaObjHighlight$highlight_metabolites <- as.factor(metaObjHighlight$highlight_metabolites)
         
@@ -477,7 +481,7 @@ server <- function(input, output, session) {
   # Visualize log2(FC)
   output$plotVolcano <- renderPlotly({
     req(reactLog2FCTab())
-    if ('Volcano plot' %in% input$plotLog2FC) {
+    if (input$plotVulcanoLog2FC) {
       if (input$highlightMetabolites) {
         req(reactHighlight())
         plots <- plotly_log2FC(reactHighlight(), vulcano = T, scatter = F)
@@ -490,21 +494,21 @@ server <- function(input, output, session) {
   })
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTab())
-    if ('Scatter plot' %in% input$plotLog2FC) {
+    if (input$plotScatterLog2FC) {
       plot <- plotly_log2FC(reactLog2FCTab(), vulcano = F, scatter = T)
       plot$Scatterplot$Plot
     }
   })
   output$plotScatterLegend <- renderPlot({
     req(reactLog2FCTab())
-    if ('Scatter plot' %in% input$plotLog2FC) {
+    if (input$plotScatterLog2FC) {
       plot <- plotly_log2FC(reactLog2FCTab(), vulcano = F, scatter=T)
       plot$Scatterplot$Legend
     }
   })
   output$plotNetwork <- renderPlot({
     req(reactLog2FCTab())
-    if ('Network plot' %in% input$plotLog2FC) {
+    if (input$plotNetworkLog2FC) {
       MetAlyzer::plot_network(reactLog2FCTab())
     }
   })
