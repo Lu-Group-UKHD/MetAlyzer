@@ -97,13 +97,14 @@ ui <- fluidPage(
                            #### Can spinner be moved?
                            conditionalPanel(condition = "input.plotScatterLog2FC",
                                             fluidRow(
-                                              column(width = 9, plotlyOutput('plotScatter') %>%
+                                              column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
                                                        shinycssloaders::withSpinner(color="#56070C")),
-                                              column(width = 3, plotOutput('plotScatterLegend'))
+                                              column(width = 3, style = "margin-left: -175px; z-index:1;",
+                                                     imageOutput('plotScatterLegend'))
                                             ),
                            ),
                            conditionalPanel(condition = "input.plotNetworkLog2FC",
-                                            plotOutput('plotNetwork') %>%
+                                            plotlyOutput('plotNetwork') %>%
                                               shinycssloaders::withSpinner(color="#56070C")
                            ),
           )
@@ -462,11 +463,9 @@ server <- function(input, output, session) {
     if (input$plotVulcanoLog2FC) {
       if (input$highlightVulcano) {
         req(reactVulcanoHighlight())
-        plots <- plotly_log2FC(reactVulcanoHighlight(), vulcano = T, scatter = F)
-        plots$HighlightedVulcanoPlot
+        plotly_vulcano(reactVulcanoHighlight())
       } else {
-        plots <- plotly_log2FC(reactLog2FCTbl(), vulcano = T, scatter = F)
-        plots$VulcanoPlot
+        plotly_vulcano(reactLog2FCTbl())
       }
     }
   })
@@ -474,22 +473,34 @@ server <- function(input, output, session) {
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTbl())
     if (input$plotScatterLog2FC) {
-      plot <- plotly_log2FC(reactLog2FCTbl(), vulcano = F, scatter = T)
-      plot$Scatterplot$Plot
+      plot <- plotly_scatter(reactLog2FCTbl())
+      plot$Plot
     }
   })
-  output$plotScatterLegend <- renderPlot({
+  output$plotScatterLegend <- renderImage({
     req(reactLog2FCTbl())
     if (input$plotScatterLog2FC) {
-      plot <- plotly_log2FC(reactLog2FCTbl(), vulcano = F, scatter=T)
-      plot$Scatterplot$Legend
+      plot <- plotly_scatter(reactLog2FCTbl())
+      legend <- plot$Legend
+      # A temp file to save the output.
+      # This file will be removed later by renderImage
+
+      outfile <- tempfile(fileext='.svg')
+      ggsave(file=outfile, plot=legend)
+
+      # Return a list containing the filename
+      list(src = normalizePath(outfile),
+          contentType = 'image/svg+xml',
+          width = 571.675,
+          height = 400,
+          alt = "My svg Histogram")
     }
   })
   # Network plot
   output$plotNetwork <- renderPlotly({
     req(reactLog2FCTbl())
     if (input$plotNetworkLog2FC) {
-      MetAlyzer::plot_network(reactLog2FCTbl())
+      plotly_network(reactLog2FCTbl())
     }
   })
 }
