@@ -1,4 +1,5 @@
 library(shiny)
+library(shinyBS)
 library(shinycssloaders)
 library(MetAlyzer)
 library(SummarizedExperiment)
@@ -32,28 +33,7 @@ ui <- fluidPage(
                              column(width = 6, actionButton('updateFiltering', 'Filter', width = '100%')),
                              column(width = 6, actionButton('resetFiltering', 'Reset', width = '100%'))
                            ),
-          )
-        ),
-        mainPanel(
-          conditionalPanel(condition = "output.ifValidUploadedFile",
-                           tags$h4('Data distribution', style = 'color:Black;font-weight:bold'),
-                           plotlyOutput('plotDatDist')  %>%
-                             shinycssloaders::withSpinner(color="#56070C"),
-                           tags$h4('Sample metadata', style = 'color:Black;font-weight:bold'),
-                           DT::dataTableOutput('tblSmpMetadat')  %>%
-                             shinycssloaders::withSpinner(color="#56070C"),
-                           tags$h4('Quantification status', style = 'color:Black;font-weight:bold'),
-                           plotlyOutput('plotQuanStatus')  %>%
-                             shinycssloaders::withSpinner(color="#56070C"),
-          )
-        )
-      )
-    ),
-    tabPanel(
-      'Visualisation',
-      sidebarLayout(
-        sidebarPanel(
-          conditionalPanel(condition = "output.ifValidUploadedFile",
+                           tags$br(),
                            tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
                              column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
@@ -67,7 +47,48 @@ ui <- fluidPage(
                            fluidRow(
                              column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
                            ),
-                           tags$br(),
+          )
+        ),
+        mainPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile",
+                           bsCollapse(
+                             open = 'Data distribution',
+                             multiple = T,
+                             bsCollapsePanel('Sample metadata',
+                                             DT::dataTableOutput('tblSmpMetadat') %>%
+                                               withSpinner(color="#56070C"),
+                                             style = 'info'),
+                             bsCollapsePanel('Data distribution',
+                                             plotlyOutput('plotDatDist') %>%
+                                               withSpinner(color="#56070C"),
+                                             style = 'primary'),
+                             bsCollapsePanel('Data missingness',
+                                             bsCollapsePanel('Hint',
+                                                             textOutput('summDatMiss',
+                                                                        container = strong),
+                                                             style = 'success'),
+                                             plotlyOutput('plotDatMiss') %>%
+                                               withSpinner(color="#56070C"),
+                                             style = 'primary'),
+                             bsCollapsePanel('Quantification status',
+                                             #### Adjust tab size
+                                             bsCollapsePanel('Hint',
+                                                             textOutput('summQuanStatus',
+                                                                        container = strong),
+                                                             style = 'success'),
+                                             plotlyOutput('plotQuanStatus') %>%
+                                               withSpinner(color="#56070C"),
+                                             style = 'primary')
+                           ),
+          )
+        )
+      )
+    ),
+    tabPanel(
+      'Visualisation',
+      sidebarLayout(
+        sidebarPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
                              column(width = 4, checkboxInput('plotVulcanoLog2FC', 'Vulcano Plot',
@@ -92,19 +113,19 @@ ui <- fluidPage(
                            # Use conditionalPanel to make selected plot always shown at top
                            conditionalPanel(condition = "input.plotVulcanoLog2FC",
                                             plotlyOutput('plotVolcano') %>%
-                                              shinycssloaders::withSpinner(color="#56070C"),
+                                              withSpinner(color="#56070C"),
                            ),
                            #### Can spinner be moved?
                            conditionalPanel(condition = "input.plotScatterLog2FC",
                                             fluidRow(
                                               column(width = 9, plotlyOutput('plotScatter') %>%
-                                                       shinycssloaders::withSpinner(color="#56070C")),
+                                                       withSpinner(color="#56070C")),
                                               column(width = 3, plotOutput('plotScatterLegend'))
                                             ),
                            ),
                            conditionalPanel(condition = "input.plotNetworkLog2FC",
                                             plotOutput('plotNetwork') %>%
-                                              shinycssloaders::withSpinner(color="#56070C")
+                                              withSpinner(color="#56070C")
                            ),
           )
         )
@@ -251,13 +272,18 @@ server <- function(input, output, session) {
       #### to filter unmet features out by threshold of valid values
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
                                                              drop_metabolites = input$featChoicesFiltering,
-                                                             drop_NA_concentration = NULL)
-    } else {
-      #### Some features will still be filtered out
-      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = NULL,
-                                                             drop_NA_concentration = NULL)
+                                                             drop_NA_concentration = NULL,
+                                                             min_percent_valid = NULL,
+                                                             valid_status = c('Valid', 'LOQ'),
+                                                             per_group = NULL)
     }
+    # else {
+    #   #### Some features will still be filtered out due to 'drop_NA_concentration'.
+    #   #### Set it to NULL, instead of FALSE
+    #   reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
+    #                                                          drop_metabolites = NULL,
+    #                                                          drop_NA_concentration = NULL)
+    # }
   })
   # Do sample filtering
   observeEvent(input$updateFiltering, {
@@ -425,6 +451,7 @@ server <- function(input, output, session) {
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     )
   })
+  
   # Sample metadata
   output$tblSmpMetadat <- DT::renderDataTable({
     req(datOverviewTbls()$metabSmpMetadat)
@@ -432,21 +459,80 @@ server <- function(input, output, session) {
     DT::datatable(metabSmpMetadat, rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
+  
+  # Data missingness
+  # Compute missingness level of each metabolite for filtering hint
+  datMissLevel <- reactive({
+    req(datOverviewTbls()$metabAggreDat)
+    datOverviewTbls()$metabAggreDat %>%
+      dplyr::filter(Concentration %in% c(0, NA)) %>%
+      dplyr::group_by(Metabolite, Concentration) %>%
+      dplyr::summarise(MissCount = dplyr::n()) %>%
+      dplyr::summarise(MissCount = sum(MissCount)) %>%
+      dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj),
+                    MissRatio = MissCount/TotalCount)
+  })
+  output$summDatMiss <- renderText({
+    req(datMissLevel())
+    paste(sum(datMissLevel()$MissRatio > 0.2), 'out of', nrow(reactMetabObj$metabObj),
+          'metabolites do not follow 80% rule, meaning that more than 20% measurements',
+          'are missing, which is recommended filtering out. Check ...',
+          'Besides, is there any sample containing mostly missing values?')
+  })
+  output$plotDatMiss <- renderPlotly({
+    req(datOverviewTbls()$metabAggreDat)
+    datMissCount <- datOverviewTbls()$metabAggreDat %>%
+      dplyr::mutate(Missingness = dplyr::case_when(Concentration %in% c(0, NA) ~ 'Missing',
+                                                   !Concentration %in% c(0, NA) ~ 'Present'),
+                    Missingness = factor(Missingness, levels = c('Present', 'Missing'))) %>%
+      dplyr::group_by(ID, Missingness) %>%
+      dplyr::summarise(Count = dplyr::n()) %>%
+      dplyr::ungroup()
+    ggplotly(
+      ggplot(datMissCount, aes(x=ID, y=Count, fill=Missingness)) +
+        geom_col(position = 'stack') +
+        scale_fill_manual(values = c('grey', 'black')) +
+        labs(x = 'Sample') +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    )
+  })
+  
   # Quantification status
+  # Compute validity level of each metabolite for filtering hint
+  #### Valid status (Valid and LOQ) and validity cutoff (67%) could be options to users
+  quanStatusValid <- reactive({
+    req(datOverviewTbls()$metabAggreDat)
+    datOverviewTbls()$metabAggreDat %>%
+      dplyr::filter(Status %in% c('Valid', 'LOQ')) %>%
+      dplyr::group_by(Metabolite, Status) %>%
+      dplyr::summarise(ValidCount = dplyr::n()) %>%
+      dplyr::summarise(ValidCount = sum(ValidCount)) %>%
+      dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj),
+                    ValidRatio = ValidCount/TotalCount)
+  })
+  output$summQuanStatus <- renderText({
+    req(quanStatusValid())
+    paste(sum(quanStatusValid()$ValidRatio < 0.67), 'out of', nrow(reactMetabObj$metabObj),
+          'metabolites do not have 67% measurements with valid status (Valid, LOQ),',
+          'which is recommended filtering out. Check ...',
+          'Besides, is there any sample barely containing valid measurements?')
+  })
   output$plotQuanStatus <- renderPlotly({
     req(datOverviewTbls()$metabAggreDat)
-    metabAggreDat <- datOverviewTbls()$metabAggreDat %>%
+    quanStatusCount <- datOverviewTbls()$metabAggreDat %>%
       dplyr::group_by(ID, Status) %>%
-      dplyr::summarise(Count = dplyr::n())
+      dplyr::summarise(Count = dplyr::n()) %>%
+      dplyr::ungroup()
     # Prepare colors for quantification statuses
     #### Choose better colors and add color for NA quantification status
     quanStatus2Color <- c(Valid = '#1f78b4', LOQ = '#e31a1c', LOD = '#ff7f00', Invalid = '#33a02c')
-    quanStatusCols <- quanStatus2Color[names(quanStatus2Color) %in% unique(metabAggreDat$Status)]
+    quanStatusCols <- quanStatus2Color[names(quanStatus2Color) %in% unique(quanStatusCount$Status)]
     ggplotly(
-      ggplot(metabAggreDat, aes(x = ID, y = Count, fill = Status)) +
+      ggplot(quanStatusCount, aes(x = ID, y = Count, fill = Status)) +
         geom_col(position = "stack") +
-        scale_fill_manual('Status', values = quanStatusCols) +
-        labs(x = "Sample", y = "Count") +
+        scale_fill_manual(values = quanStatusCols) +
+        labs(x = "Sample") +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     )
@@ -470,6 +556,7 @@ server <- function(input, output, session) {
       }
     }
   })
+  
   # Scatter plot
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTbl())
@@ -485,6 +572,7 @@ server <- function(input, output, session) {
       plot$Scatterplot$Legend
     }
   })
+  
   # Network plot
   output$plotNetwork <- renderPlot({
     req(reactLog2FCTbl())
