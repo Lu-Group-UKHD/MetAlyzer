@@ -1,8 +1,8 @@
 library(shiny)
+library(shinycssloaders)
 library(MetAlyzer)
 library(SummarizedExperiment)
 library(tidyverse)
-library(shinycssloaders)
 source("utils.R")
 
 # setwd('/Users/qianwu/Desktop/RShiny_Biocrates_DataAnalysis')
@@ -18,13 +18,13 @@ ui <- fluidPage(
       'Preprocessing',
       sidebarLayout(
         sidebarPanel(
-          tags$h4('Data uploading', style = 'color:steelblue;font-weight: bold'),
+          tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
           fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
                     placeholder = 'No .xlsx file selected'),
           # Show filtering options only after file is uploaded
           conditionalPanel(condition = "output.ifValidUploadedFile",
-                           tags$h4('Data filtering', style = 'color:steelblue;font-weight: bold'),
-                           selectInput('featChoicesFiltering', 'Select feature(s) to remove:',
+                           tags$h4('Data filtering', style = 'color:steelblue;font-weight:bold'),
+                           selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
                                        choices = character(0), multiple = T),
                            selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
                                        choices = character(0), multiple = T),
@@ -36,83 +36,76 @@ ui <- fluidPage(
         ),
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
-                           # fluidRow(
-                           #   column(width = 7, verbatimTextOutput('textConcSumm')),
-                           #   column(width = 5, verbatimTextOutput('textQuanSumm'))
-                           # ),
-                           tags$h4('Data distribution', style = 'color:Black;font-weight: bold'),
-                           plotOutput('plotDatDist')  %>%
-                             withSpinner(color="#56070C"),
-                           
-                           tags$h4('Sample metadata', style = 'color:Black;font-weight: bold'),
+                           tags$h4('Data distribution', style = 'color:Black;font-weight:bold'),
+                           plotlyOutput('plotDatDist')  %>%
+                             shinycssloaders::withSpinner(color="#56070C"),
+                           tags$h4('Sample metadata', style = 'color:Black;font-weight:bold'),
                            DT::dataTableOutput('tblSmpMetadat')  %>%
-                             withSpinner(color="#56070C"),
-                           
-                           tags$h4('Data missingness', style = 'color:Black;font-weight: bold'),
-                           plotlyOutput('plotDatMiss')  %>%
-                             withSpinner(color="#56070C"),
-                           
-                           fluidRow(
-                                column(width = 7, verbatimTextOutput('textConcSumm')  %>%
-                                                    withSpinner(color="#56070C")),
-                                column(width = 5, verbatimTextOutput('textQuanSumm')  %>%
-                                                    withSpinner(color="#56070C"))
-                           ),
-                           tableOutput('outputId'),
+                             shinycssloaders::withSpinner(color="#56070C"),
+                           tags$h4('Quantification status', style = 'color:Black;font-weight:bold'),
+                           plotlyOutput('plotQuanStatus')  %>%
+                             shinycssloaders::withSpinner(color="#56070C"),
           )
         )
       )
     ),
     tabPanel(
-      'Visualisations',
+      'Visualisation',
       sidebarLayout(
         sidebarPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
-                          tags$h4('Log₂(FC) visualization', style = 'color:steelblue;font-weight: bold'),
-                          fluidRow(
-                            column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
-                                                          choices = 'Not available', multiple = F)),
-                            column(width = 3, selectInput('smpChoicesLog2FC_1', 'Group1',
-                                                          choices = character(0), multiple = F),
+                           tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
+                           fluidRow(
+                             column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
+                                                           choices = 'Not available', multiple = F)),
+                             column(width = 3, selectInput('smpChoicesLog2FC_1', 'Group1',
+                                                           choices = character(0), multiple = F),
                                     offset = 1),
-                            column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
-                                                          choices = character(0), multiple = F))
-                          ),
-                          fluidRow(
-                            column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
-                          ),
-                          tags$br(),
-                          fluidRow(
-                            column(width = 4, checkboxInput('plotVulcanoLog2FC', 'Vulcano Plot', value = FALSE, width = '100%')),
-                            column(width = 4, checkboxInput('plotScatterLog2FC', 'Scatter Plot', value = FALSE, width = '100%')),
-                            column(width = 4, checkboxInput('plotNetworkLog2FC', 'Network Plot', value = FALSE, width = '100%'))
-                          ),
-                          fluidRow(
-                            style = "display: flex; align-items: center;",
-                            column(width = 7, selectInput('metaboliteChoicesHighlight', 'Select metabolite(s) to highlight:',
-                                                            choices = character(0), multiple = T)),
-                            column(width = 5, checkboxInput('highlightMetabolites', 'Highlight', value = FALSE, width = '100%'))
-                          ),
+                             column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
+                                                           choices = character(0), multiple = F))
+                           ),
+                           fluidRow(
+                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
+                           ),
+                           tags$br(),
+                           tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
+                           fluidRow(
+                             column(width = 4, checkboxInput('plotVulcanoLog2FC', 'Vulcano Plot',
+                                                             value = FALSE, width = '100%')),
+                             column(width = 4, checkboxInput('plotScatterLog2FC', 'Scatter Plot',
+                                                             value = FALSE, width = '100%')),
+                             column(width = 4, checkboxInput('plotNetworkLog2FC', 'Network Plot',
+                                                             value = FALSE, width = '100%'))
+                           ),
+                           fluidRow(
+                             style = "display: flex; align-items: center;",
+                             column(width = 7, selectInput('metabChoicesVulcano',
+                                                           'Select metabolite(s) to highlight:',
+                                                           choices = character(0), multiple = T)),
+                             column(width = 5, checkboxInput('highlightVulcano', 'Highlight',
+                                                             value = FALSE, width = '100%'))
+                           ),
           )
         ),
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
-                          conditionalPanel(condition = "input.plotVulcanoLog2FC",
-                                           plotlyOutput('plotVolcano') %>%
-                                           withSpinner(color="#56070C"),
-                          ),
-                          conditionalPanel(condition = "input.plotScatterLog2FC",
-                                           fluidRow(
-                                             column(width = 9, plotlyOutput('plotScatter') %>%
-                                                                 withSpinner(color="#56070C")),
-                                             column(width = 3, plotOutput('plotScatterLegend') %>%
-                                                                 withSpinner(color="#56070C"))
-                                           ),
-                          ),
-                          conditionalPanel(condition = "input.plotNetworkLog2FC",
-                                           plotlyOutput('plotNetwork', height = "auto") %>%
-                                             withSpinner(color="#56070C")
-                          ),
+                           # Use conditionalPanel to make selected plot always shown at top
+                           conditionalPanel(condition = "input.plotVulcanoLog2FC",
+                                            plotlyOutput('plotVolcano') %>%
+                                              shinycssloaders::withSpinner(color="#56070C"),
+                           ),
+                           #### Can spinner be moved?
+                           conditionalPanel(condition = "input.plotScatterLog2FC",
+                                            fluidRow(
+                                              column(width = 9, plotlyOutput('plotScatter') %>%
+                                                       shinycssloaders::withSpinner(color="#56070C")),
+                                              column(width = 3, plotOutput('plotScatterLegend'))
+                                            ),
+                           ),
+                           conditionalPanel(condition = "input.plotNetworkLog2FC",
+                                            plotOutput('plotNetwork') %>%
+                                              shinycssloaders::withSpinner(color="#56070C")
+                           ),
           )
         )
       )
@@ -123,9 +116,8 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   # Create reactive objects for storing up-to-date data
   reactMetabObj <- reactiveValues(metabObj = NULL, ori_metabObj = NULL)
-  reactLog2FCTab <- reactiveVal()
-  reactHighlight <- reactiveVal()
-  reactScatter <- reactiveVal()
+  reactLog2FCTbl <- reactiveVal()
+  reactVulcanoHighlight <- reactiveVal()
   
   # Initialize MetAlyzer SE object
   observeEvent(input$uploadedFile, {
@@ -169,6 +161,7 @@ server <- function(input, output, session) {
     idLevels <- rownames(colData(reactMetabObj$metabObj))
     metabAggreDat <- dplyr::left_join(metabAggreDat, metabSmpMetadat, by = 'ID') %>%
       dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
+    
     return(list(metabAggreDat = metabAggreDat, metabSmpMetadat = metabSmpMetadat))
   })
   
@@ -361,154 +354,142 @@ server <- function(input, output, session) {
       }
       # Use do.call to prepare arguments to be passed due to design of function:
       # deparse(substitute(categorical))
-      log2FCTab <- do.call(MetAlyzer::calculate_log2FC, list(metalyzer_se = metabObj,
+      log2FCTbl <- do.call(MetAlyzer::calculate_log2FC, list(metalyzer_se = metabObj,
                                                              categorical = as.symbol(selectedChoiceGp),
                                                              impute_perc_of_min = 0.2, impute_NA = T))
-      reactLog2FCTab(log2FCTab)
+      reactLog2FCTbl(log2FCTbl)
     } else {
       showModal(modalDialog(
         title = 'Log₂(FC) computation failed...',
-        'Please select two sample groups.',
+        'Please select two different sample groups.',
         easyClose = T,
         footer = NULL
       ))
     }
   })
 
-  # Prepare choices for metabolite higlighting
-  metaboliteChoices <- reactive({
-    req(reactMetabObj$metabObj)
-    list(Metabolite = as.list(rownames(reactMetabObj$metabObj)))
-  })
+  
   # Update choices for metabolite highlighting
   observe({
-    req(metaboliteChoices())
-    updateSelectInput(session, 'metaboliteChoicesHighlight', choices = metaboliteChoices())
+    req(featChoices())
+    updateSelectInput(session, 'metabChoicesVulcano', choices = featChoices())
   })
-
   # Create new column for highlighting metabolites
-  observeEvent(input$highlightMetabolites, {
-    req(reactLog2FCTab())
-    if (input$highlightMetabolites) {
-      if (!is.null(input$metaboliteChoicesHighlight)) {
-        highlight_metabolites <- input$metaboliteChoicesHighlight
-        metaObjHighlight <- reactLog2FCTab()
-        
-        metaObjHighlight$highlight_metabolites <- "Other Metabolites"
-        metaObjHighlight$highlight_metabolites[which(metaObjHighlight$Metabolite %in% highlight_metabolites)] <- "Highlighted Metabolite(s)"
-        metaObjHighlight$highlight_metabolites <- as.factor(metaObjHighlight$highlight_metabolites)
-        
-        reactHighlight(metaObjHighlight)
-      }
+  #### Probably better change 'highlight_metabolites' to 'highlight'
+  observeEvent(input$highlightVulcano, {
+    req(reactLog2FCTbl())
+    if (!is.null(input$metabChoicesVulcano)) {
+      selectedChoices <- input$metabChoicesVulcano
+      highlightTbl <- reactLog2FCTbl()
+      
+      highlightTbl$highlight_metabolites <- "Other Metabolites"
+      highlightTbl$highlight_metabolites[highlightTbl$Metabolite %in% selectedChoices] <- "Highlighted Metabolite(s)"
+      highlightTbl$highlight_metabolites <- as.factor(highlightTbl$highlight_metabolites)
+      
+      reactVulcanoHighlight(highlightTbl)
+    }
+  })
+  observeEvent(input$metabChoicesVulcano, {
+    req(reactLog2FCTbl())
+    if (input$highlightVulcano) {
+      selectedChoices <- input$metabChoicesVulcano
+      highlightTbl <- reactLog2FCTbl()
+      
+      highlightTbl$highlight_metabolites <- "Other Metabolites"
+      highlightTbl$highlight_metabolites[highlightTbl$Metabolite %in% selectedChoices] <- "Highlighted Metabolite(s)"
+      highlightTbl$highlight_metabolites <- as.factor(highlightTbl$highlight_metabolites)
+      
+      reactVulcanoHighlight(highlightTbl)
     }
   })
   
-  observeEvent(input$metaboliteChoicesHighlight, {
-    req(reactLog2FCTab())
-    if (input$highlightMetabolites) {
-      if (!is.null(input$metaboliteChoicesHighlight)) {
-        highlight_metabolites <- input$metaboliteChoicesHighlight
-        metaObjHighlight <- reactLog2FCTab()
-        
-        metaObjHighlight$highlight_metabolites <- "Other Metabolites"
-        metaObjHighlight$highlight_metabolites[which(metaObjHighlight$Metabolite %in% highlight_metabolites)] <- "Highlighted Metabolite(s)"
-        metaObjHighlight$highlight_metabolites <- as.factor(metaObjHighlight$highlight_metabolites)
-        
-        reactHighlight(metaObjHighlight)
-      }
-    }
-  })
   
   # Set plot theme
-  th <- theme_bw(base_size = 15) +
-    theme(axis.title = element_text(face = 'bold'),
-          axis.text = element_text(face = 'bold'),
-          axis.ticks = element_line(linewidth = 0.8),
-          legend.text = element_text(size = 15))
-  
-  # Show statistics of data concentration values and quantification statuses 
-  # output$textConcSumm <- renderPrint({
-  #   req(reactMetabObj$metabObj)
-  #   MetAlyzer::summarizeConcValues(reactMetabObj$metabObj)
-  # })
-  # output$textQuanSumm <- renderPrint({
-  #   req(reactMetabObj$metabObj)
-  #   MetAlyzer::summarizeQuantData(reactMetabObj$metabObj)
-  # })
+  # th <- theme_bw(base_size = 15) +
+  #   theme(axis.title = element_text(face = 'bold'),
+  #         axis.text = element_text(face = 'bold'),
+  #         axis.ticks = element_line(linewidth = 0.8),
+  #         legend.text = element_text(size = 15))
   
   # Show data overviews
-  output$plotDatDist <- renderPlot({
+  # Data distribution
+  output$plotDatDist <- renderPlotly({
     req(datOverviewTbls()$metabAggreDat)
     metabAggreDat <- datOverviewTbls()$metabAggreDat
-    ggplot(metabAggreDat, aes(x=ID, y=Concentration)) +
-      geom_boxplot() +
-      scale_y_log10() +
-      labs(x = 'Sample', y = 'Metabolite abundance') +
-      th + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    ggplotly(
+      ggplot(metabAggreDat, aes(x=ID, y=Concentration)) +
+        geom_boxplot() +
+        scale_y_log10() +
+        labs(x = 'Sample', y = 'Metabolite abundance') +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    )
   })
+  # Sample metadata
   output$tblSmpMetadat <- DT::renderDataTable({
     req(datOverviewTbls()$metabSmpMetadat)
     metabSmpMetadat <- datOverviewTbls()$metabSmpMetadat
     DT::datatable(metabSmpMetadat, rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
-  output$plotDatMiss <- renderPlotly({
-  req(datOverviewTbls()$metabAggreDat)
-  metabAggreDat <- datOverviewTbls()$metabAggreDat %>%
-    dplyr::group_by(ID, Status) %>%
-    dplyr::summarise(Count = n())
-
-  # Prepare colors for plot
-  colors <- c(Valid = '#1f78b4', Invalid = '#33a02c', LOQ = '#e31a1c', LOD = '#ff7f00') # Choose better colors
-  stack_col <- sapply(names(colors), function(x) {
-   ifelse(x %in% metabAggreDat$Status, colors[x], NA)
+  # Quantification status
+  output$plotQuanStatus <- renderPlotly({
+    req(datOverviewTbls()$metabAggreDat)
+    metabAggreDat <- datOverviewTbls()$metabAggreDat %>%
+      dplyr::group_by(ID, Status) %>%
+      dplyr::summarise(Count = dplyr::n())
+    # Prepare colors for quantification statuses
+    #### Choose better colors and add color for NA quantification status
+    quanStatus2Color <- c(Valid = '#1f78b4', LOQ = '#e31a1c', LOD = '#ff7f00', Invalid = '#33a02c')
+    quanStatusCols <- quanStatus2Color[names(quanStatus2Color) %in% unique(metabAggreDat$Status)]
+    ggplotly(
+      ggplot(metabAggreDat, aes(x = ID, y = Count, fill = Status)) +
+        geom_col(position = "stack") +
+        scale_fill_manual('Status', values = quanStatusCols) +
+        labs(x = "Sample", y = "Count") +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    )
   })
-  stack_col <- na.omit(stack_col)
-  
-  # Plot
-  ggplotly(
-    ggplot(metabAggreDat, aes(x = ID, y = Count, fill = Status)) +
-      geom_col(position = "stack") +
-      labs(title = "",
-          x = "Sample",
-          y = "Count") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
-      scale_fill_manual('Status',
-                        values = stack_col)
-  )
-})
   
   # Visualize log2(FC)
+  # Vulcano plot
+  #### Set cutoffs for log2(FC) and p-value as parameters
+  #### Highlight also metabolic classes
+  #### Use white background by theme_bw()
   output$plotVolcano <- renderPlotly({
-    req(reactLog2FCTab())
+    req(reactLog2FCTbl())
     if (input$plotVulcanoLog2FC) {
-      if (input$highlightMetabolites) {
-        if(input)
-        req(reactHighlight())
-        plotly_vulcano(reactHighlight())
+      if (input$highlightVulcano) {
+        req(reactVulcanoHighlight())
+        plots <- plotly_log2FC(reactVulcanoHighlight(), vulcano = T, scatter = F)
+        plots$HighlightedVulcanoPlot
       } else {
-        plotly_vulcano(reactHighlight())
+        plots <- plotly_log2FC(reactLog2FCTbl(), vulcano = T, scatter = F)
+        plots$VulcanoPlot
       }
     }
   })
+  # Scatter plot
   output$plotScatter <- renderPlotly({
-    req(reactLog2FCTab())
+    req(reactLog2FCTbl())
     if (input$plotScatterLog2FC) {
-      plot <- plotly_scatter(reactLog2FCTab())
-      plot$Plot
+      plot <- plotly_log2FC(reactLog2FCTbl(), vulcano = F, scatter = T)
+      plot$Scatterplot$Plot
     }
   })
   output$plotScatterLegend <- renderPlot({
-    req(reactLog2FCTab())
+    req(reactLog2FCTbl())
     if (input$plotScatterLog2FC) {
-      plot <- plotly_scatter(reactLog2FCTab())
-      plot$Legend
+      plot <- plotly_log2FC(reactLog2FCTbl(), vulcano = F, scatter=T)
+      plot$Scatterplot$Legend
     }
   })
+  # Network plot
   output$plotNetwork <- renderPlotly({
-    req(reactLog2FCTab())
+    req(reactLog2FCTbl())
     if (input$plotNetworkLog2FC) {
-      plotly_network(reactLog2FCTab())
+      MetAlyzer::plot_network(reactLog2FCTbl())
     }
   })
 }
