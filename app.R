@@ -110,7 +110,7 @@ ui <- fluidPage(
                                            ),
                           ),
                           conditionalPanel(condition = "input.plotNetworkLog2FC",
-                                           plotOutput('plotNetwork') %>%
+                                           plotlyOutput('plotNetwork', height = "auto") %>%
                                              withSpinner(color="#56070C")
                           ),
           )
@@ -483,33 +483,32 @@ server <- function(input, output, session) {
     req(reactLog2FCTab())
     if (input$plotVulcanoLog2FC) {
       if (input$highlightMetabolites) {
+        if(input)
         req(reactHighlight())
-        plots <- plotly_log2FC(reactHighlight(), vulcano = T, scatter = F)
-        plots$HighlightedVulcanoPlot
+        plotly_vulcano(reactHighlight())
       } else {
-        plots <- plotly_log2FC(reactLog2FCTab(), vulcano = T, scatter = F)
-        plots$VulcanoPlot
+        plotly_vulcano(reactHighlight())
       }
     }
   })
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTab())
     if (input$plotScatterLog2FC) {
-      plot <- plotly_log2FC(reactLog2FCTab(), vulcano = F, scatter = T)
-      plot$Scatterplot$Plot
+      plot <- plotly_scatter(reactLog2FCTab())
+      plot$Plot
     }
   })
   output$plotScatterLegend <- renderPlot({
     req(reactLog2FCTab())
     if (input$plotScatterLog2FC) {
-      plot <- plotly_log2FC(reactLog2FCTab(), vulcano = F, scatter=T)
-      plot$Scatterplot$Legend
+      plot <- plotly_scatter(reactLog2FCTab())
+      plot$Legend
     }
   })
-  output$plotNetwork <- renderPlot({
+  output$plotNetwork <- renderPlotly({
     req(reactLog2FCTab())
     if (input$plotNetworkLog2FC) {
-      MetAlyzer::plot_network(reactLog2FCTab())
+      plotly_network(reactLog2FCTab())
     }
   })
 }
