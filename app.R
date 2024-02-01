@@ -25,10 +25,31 @@ ui <- fluidPage(
           # Show filtering options only after file is uploaded
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Data filtering', style = 'color:steelblue;font-weight:bold'),
-                           selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
-                                       choices = character(0), multiple = T),
-                           selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
-                                       choices = character(0), multiple = T),
+                           bsCollapse(
+                             open = 'Sample filtering', multiple = T,
+                             bsCollapsePanel('Sample filtering', style = 'info',
+                                             selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
+                                                         choices = character(0), multiple = T)),
+                             bsCollapsePanel(
+                               'Metabolite filtering', style = 'info',
+                               fluidRow(
+                                 column(width = 8, sliderInput('featCompleteCutoffFiltering',
+                                                               'Select % of observed values each feature should have:',
+                                                               min = 0, max = 100, value = 80))
+                               ),
+                               fluidRow(
+                                 column(width = 8, sliderInput('featValidCutoffFiltering',
+                                                               'Select % of valid values each feature should have:',
+                                                               min = 0, max = 100, value = 67)),
+                                 column(width = 3, offset = 1,
+                                        checkboxGroupInput('featValidStatusFiltering', 'Validity',
+                                                           choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
+                                                           selected = c('Valid', 'LOQ')))
+                               )
+                               # selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
+                               #             choices = character(0), multiple = T)
+                             )
+                           ),
                            fluidRow(
                              column(width = 6, actionButton('updateFiltering', 'Filter', width = '100%')),
                              column(width = 6, actionButton('resetFiltering', 'Reset', width = '100%'))
@@ -52,33 +73,24 @@ ui <- fluidPage(
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            bsCollapse(
-                             open = 'Data distribution',
-                             multiple = T,
-                             bsCollapsePanel('Sample metadata',
+                             open = 'Data distribution', multiple = T,
+                             bsCollapsePanel('Sample metadata', style = 'primary',
                                              DT::dataTableOutput('tblSmpMetadat') %>%
-                                               withSpinner(color="#56070C"),
-                                             style = 'info'),
-                             bsCollapsePanel('Data distribution',
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Data distribution', style = 'primary',
                                              plotlyOutput('plotDatDist') %>%
-                                               withSpinner(color="#56070C"),
-                                             style = 'primary'),
-                             bsCollapsePanel('Data missingness',
-                                             bsCollapsePanel('Hint',
-                                                             textOutput('summDatMiss',
-                                                                        container = strong),
-                                                             style = 'success'),
-                                             plotlyOutput('plotDatMiss') %>%
-                                               withSpinner(color="#56070C"),
-                                             style = 'primary'),
-                             bsCollapsePanel('Quantification status',
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Data completeness', style = 'primary',
+                                             bsCollapsePanel('Hint', style = 'success',
+                                                             textOutput('summDatComplete', container = strong)),
+                                             plotlyOutput('plotDatComplete') %>%
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Quantification status', style = 'primary',
                                              #### Adjust tab size
-                                             bsCollapsePanel('Hint',
-                                                             textOutput('summQuanStatus',
-                                                                        container = strong),
-                                                             style = 'success'),
+                                             bsCollapsePanel('Hint', style = 'success',
+                                                             textOutput('summQuanStatus', container = strong)),
                                              plotlyOutput('plotQuanStatus') %>%
-                                               withSpinner(color="#56070C"),
-                                             style = 'primary')
+                                               withSpinner(color="#56070C"))
                            ),
           )
         )
@@ -167,8 +179,9 @@ server <- function(input, output, session) {
     }
   })
   
-  # Retrieve abundance data and sample metadata for showing data overviews
-  datOverviewTbls <- reactive({
+  # Retrieve abundance data and sample metadata and compute feature completeness
+  # level and quantification status validity level for showing data overviews
+  datOverviewPack <- reactive({
     req(reactMetabObj$metabObj)
     metabAggreDat <- metadata(reactMetabObj$metabObj)$aggregated_data %>%
       dplyr::ungroup() %>%
@@ -183,7 +196,28 @@ server <- function(input, output, session) {
     metabAggreDat <- dplyr::left_join(metabAggreDat, metabSmpMetadat, by = 'ID') %>%
       dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
     
-    return(list(metabAggreDat = metabAggreDat, metabSmpMetadat = metabSmpMetadat))
+    # Compute completeness level of each feature for doing filtering
+    featCompleteLevel <- dplyr::select(metabAggreDat, Metabolite, Concentration) %>%
+      dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% c(0, NA) ~ 1),
+                    Miss = dplyr::case_when(Concentration %in% c(0, NA) ~ 1)) %>%
+      dplyr::group_by(Metabolite) %>%
+      dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
+      dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj),
+                    CompleteRatio = ObsCount/TotalCount)
+    # Compute validity level of each feature for doing filtering
+    #### Valid status (Valid and LOQ) and validity cutoff (67%) could be options to users
+    quanStatusValid <- dplyr::select(metabAggreDat, Metabolite, Status) %>%
+      dplyr::mutate(Valid = dplyr::case_when(Status %in% 'Valid' ~ 1),
+                    LOQ = dplyr::case_when(Status %in% 'LOQ' ~ 1),
+                    LOD = dplyr::case_when(Status %in% 'LOD' ~ 1),
+                    Invalid = dplyr::case_when(Status %in% 'Invalid' ~ 1)) %>%
+      dplyr::group_by(Metabolite) %>%
+      dplyr::summarise(ValidCount = sum(Valid, na.rm = T), LOQCount = sum(LOQ, na.rm = T),
+                       LODCount = sum(LOD, na.rm = T), InvalidCount = sum(Invalid, na.rm = T)) %>%
+      dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj))
+    
+    return(list(metabAggreDat = metabAggreDat, metabSmpMetadat = metabSmpMetadat,
+                featCompleteLevel = featCompleteLevel, quanStatusValid = quanStatusValid))
   })
   
   
@@ -393,7 +427,7 @@ server <- function(input, output, session) {
       ))
     }
   })
-
+  
   
   # Update choices for metabolite highlighting
   observe({
@@ -440,8 +474,8 @@ server <- function(input, output, session) {
   # Show data overviews
   # Data distribution
   output$plotDatDist <- renderPlotly({
-    req(datOverviewTbls()$metabAggreDat)
-    metabAggreDat <- datOverviewTbls()$metabAggreDat
+    req(datOverviewPack()$metabAggreDat)
+    metabAggreDat <- datOverviewPack()$metabAggreDat
     ggplotly(
       ggplot(metabAggreDat, aes(x=ID, y=Concentration)) +
         geom_boxplot() +
@@ -454,42 +488,30 @@ server <- function(input, output, session) {
   
   # Sample metadata
   output$tblSmpMetadat <- DT::renderDataTable({
-    req(datOverviewTbls()$metabSmpMetadat)
-    metabSmpMetadat <- datOverviewTbls()$metabSmpMetadat
+    req(datOverviewPack()$metabSmpMetadat)
+    metabSmpMetadat <- datOverviewPack()$metabSmpMetadat
     DT::datatable(metabSmpMetadat, rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
   
-  # Data missingness
-  # Compute missingness level of each metabolite for filtering hint
-  datMissLevel <- reactive({
-    req(datOverviewTbls()$metabAggreDat)
-    datOverviewTbls()$metabAggreDat %>%
-      dplyr::filter(Concentration %in% c(0, NA)) %>%
-      dplyr::group_by(Metabolite, Concentration) %>%
-      dplyr::summarise(MissCount = dplyr::n()) %>%
-      dplyr::summarise(MissCount = sum(MissCount)) %>%
-      dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj),
-                    MissRatio = MissCount/TotalCount)
+  # Data completeness
+  output$summDatComplete <- renderText({
+    req(datOverviewPack()$featCompleteLevel)
+    featCompleteLevel <- datOverviewPack()$featCompleteLevel
+    paste(sum(featCompleteLevel$CompleteRatio < 0.8), 'out of', nrow(reactMetabObj$metabObj),
+          'metabolites fail to fulfil 80% rule, which is recommended filtering out.',
+          'Besides, is there any sample with high level of missingness?')
   })
-  output$summDatMiss <- renderText({
-    req(datMissLevel())
-    paste(sum(datMissLevel()$MissRatio > 0.2), 'out of', nrow(reactMetabObj$metabObj),
-          'metabolites do not follow 80% rule, meaning that more than 20% measurements',
-          'are missing, which is recommended filtering out. Check ...',
-          'Besides, is there any sample containing mostly missing values?')
-  })
-  output$plotDatMiss <- renderPlotly({
-    req(datOverviewTbls()$metabAggreDat)
-    datMissCount <- datOverviewTbls()$metabAggreDat %>%
-      dplyr::mutate(Missingness = dplyr::case_when(Concentration %in% c(0, NA) ~ 'Missing',
-                                                   !Concentration %in% c(0, NA) ~ 'Present'),
-                    Missingness = factor(Missingness, levels = c('Present', 'Missing'))) %>%
-      dplyr::group_by(ID, Missingness) %>%
+  output$plotDatComplete <- renderPlotly({
+    req(datOverviewPack()$metabAggreDat)
+    datCompleteCount <- datOverviewPack()$metabAggreDat %>%
+      dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% c(0, NA) ~ 'Observed',
+                                                    Concentration %in% c(0, NA) ~ 'Missing')) %>%
+      dplyr::group_by(ID, Completeness) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
     ggplotly(
-      ggplot(datMissCount, aes(x=ID, y=Count, fill=Missingness)) +
+      ggplot(datCompleteCount, aes(x=ID, y=Count, fill=Completeness)) +
         geom_col(position = 'stack') +
         scale_fill_manual(values = c('grey', 'black')) +
         labs(x = 'Sample') +
@@ -499,28 +521,16 @@ server <- function(input, output, session) {
   })
   
   # Quantification status
-  # Compute validity level of each metabolite for filtering hint
-  #### Valid status (Valid and LOQ) and validity cutoff (67%) could be options to users
-  quanStatusValid <- reactive({
-    req(datOverviewTbls()$metabAggreDat)
-    datOverviewTbls()$metabAggreDat %>%
-      dplyr::filter(Status %in% c('Valid', 'LOQ')) %>%
-      dplyr::group_by(Metabolite, Status) %>%
-      dplyr::summarise(ValidCount = dplyr::n()) %>%
-      dplyr::summarise(ValidCount = sum(ValidCount)) %>%
-      dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj),
-                    ValidRatio = ValidCount/TotalCount)
-  })
   output$summQuanStatus <- renderText({
-    req(quanStatusValid())
-    paste(sum(quanStatusValid()$ValidRatio < 0.67), 'out of', nrow(reactMetabObj$metabObj),
-          'metabolites do not have 67% measurements with valid status (Valid, LOQ),',
-          'which is recommended filtering out. Check ...',
-          'Besides, is there any sample barely containing valid measurements?')
+    req(datOverviewPack()$quanStatusValid)
+    quanStatusValid <- datOverviewPack()$quanStatusValid
+    paste(sum(quanStatusValid$ValidRatio < 0.67), 'out of', nrow(reactMetabObj$metabObj),
+          'metabolites have less than 67% measurements with valid status (Valid, LOQ),',
+          'which is recommended filtering out. Besides, is there any sample with low level of validity?')
   })
   output$plotQuanStatus <- renderPlotly({
-    req(datOverviewTbls()$metabAggreDat)
-    quanStatusCount <- datOverviewTbls()$metabAggreDat %>%
+    req(datOverviewPack()$metabAggreDat)
+    quanStatusCount <- datOverviewPack()$metabAggreDat %>%
       dplyr::group_by(ID, Status) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
