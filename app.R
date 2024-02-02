@@ -183,30 +183,29 @@ server <- function(input, output, session) {
   # level and quantification status validity level for showing data overviews
   datOverviewPack <- reactive({
     req(reactMetabObj$metabObj)
-    metabAggreDat <- metadata(reactMetabObj$metabObj)$aggregated_data %>%
+    metabAggreTbl <- metadata(reactMetabObj$metabObj)$aggregated_data %>%
       dplyr::ungroup() %>%
       dplyr::mutate(ID = paste0('Smp', ID))
-    metabSmpMetadat <- colData(reactMetabObj$metabObj) %>%
+    smpMetadatTbl <- colData(reactMetabObj$metabObj) %>%
       tibble::as_tibble(rownames = 'ID') %>%
       dplyr::mutate(ID = paste0('Smp', ID))
     # Use original column names whose spaces are not replaced with '.'
-    colnames(metabSmpMetadat) <- c('ID', colnames(colData(reactMetabObj$metabObj)))
+    colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$metabObj)))
     # Prepare ID levels for displaying samples in order
     idLevels <- rownames(colData(reactMetabObj$metabObj))
-    metabAggreDat <- dplyr::left_join(metabAggreDat, metabSmpMetadat, by = 'ID') %>%
+    metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
       dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
     
     # Compute completeness level of each feature for doing filtering
-    featCompleteLevel <- dplyr::select(metabAggreDat, Metabolite, Concentration) %>%
+    featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
       dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% c(0, NA) ~ 1),
                     Miss = dplyr::case_when(Concentration %in% c(0, NA) ~ 1)) %>%
       dplyr::group_by(Metabolite) %>%
       dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
       dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj),
-                    CompleteRatio = ObsCount/TotalCount)
-    # Compute validity level of each feature for doing filtering
-    #### Valid status (Valid and LOQ) and validity cutoff (67%) could be options to users
-    quanStatusValid <- dplyr::select(metabAggreDat, Metabolite, Status) %>%
+                    CompleteRatio = ObsCount / TotalCount)
+    # Compute status counts of each feature for doing filtering
+    featStatusCountTbl <- dplyr::select(metabAggreTbl, Metabolite, Status) %>%
       dplyr::mutate(Valid = dplyr::case_when(Status %in% 'Valid' ~ 1),
                     LOQ = dplyr::case_when(Status %in% 'LOQ' ~ 1),
                     LOD = dplyr::case_when(Status %in% 'LOD' ~ 1),
@@ -216,8 +215,8 @@ server <- function(input, output, session) {
                        LODCount = sum(LOD, na.rm = T), InvalidCount = sum(Invalid, na.rm = T)) %>%
       dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj))
     
-    return(list(metabAggreDat = metabAggreDat, metabSmpMetadat = metabSmpMetadat,
-                featCompleteLevel = featCompleteLevel, quanStatusValid = quanStatusValid))
+    return(list(metabAggreTbl = metabAggreTbl, smpMetadatTbl = smpMetadatTbl,
+                featCompleteLvTbl = featCompleteLvTbl, featStatusCountTbl = featStatusCountTbl))
   })
   
   
@@ -280,16 +279,16 @@ server <- function(input, output, session) {
                 dupSmpChoiceGps = dupSmpChoiceGps))
   })
   # Update choices for feature filtering
-  observe({
-    req(featChoices())
-    if ('Metabolism Indicators' %in% unlist(featChoices()) &
-        nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$ori_metabObj)) {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
-                        selected = 'Metabolism Indicators')
-    } else {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
-    }
-  })
+  # observe({
+  #   req(featChoices())
+  #   if ('Metabolism Indicators' %in% unlist(featChoices()) &
+  #       nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$ori_metabObj)) {
+  #     updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
+  #                       selected = 'Metabolism Indicators')
+  #   } else {
+  #     updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+  #   }
+  # })
   # Update choices for sample filtering
   observe({
     req(smpChoicePack()$smpChoiceList)
@@ -300,24 +299,41 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
   })
   # Do feature filtering
+  #### Conduct sample filtering prior to feature filtering, results in more reliable filtering
   observeEvent(input$updateFiltering, {
-    if (!is.null(input$featChoicesFiltering)) {
-      #### Probably add slider for 'min_percent_valid' and options for 'per_group'
-      #### to filter unmet features out by threshold of valid values
+    req(datOverviewPack())
+    # Collect features to remove based on missingness
+    featCompleteLvTbl <- datOverviewPack()$featCompleteLvTbl
+    featCompleteLevels <- featCompleteLvTbl$CompleteRatio
+    featCompleteCutoff <- input$featCompleteCutoffFiltering / 100
+    rmMissFeats <- featCompleteLvTbl$Metabolite[featCompleteLevels < featCompleteCutoff]
+    # Collect features to remove based on validity
+    featStatusCountTbl <- datOverviewPack()$featStatusCountTbl
+    featValidCutoff <- input$featValidCutoffFiltering / 100
+    featValidStatus <- input$featValidStatusFiltering
+    featValidCounts <- rep(0, nrow(featStatusCountTbl))
+    for (status in featValidStatus) {
+      featValidCounts <- featValidCounts + featStatusCountTbl[[paste0(status, 'Count')]]
+    }
+    featValidLevels <- featValidCounts / featStatusCountTbl[['TotalCount']]
+    rmInvalidFeats <- featStatusCountTbl$Metabolite[featValidLevels < featValidCutoff]
+    # Summarize features to remove
+    rmFeats <- unique(c(rmMissFeats, rmInvalidFeats))
+    if (length(rmFeats) != 0) { #!is.null(input$featChoicesFiltering)
+      #### Check if result is same as using 'min_percent_valid' and 'valid_status'
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = input$featChoicesFiltering,
+                                                             drop_metabolites = rmFeats,
                                                              drop_NA_concentration = NULL,
                                                              min_percent_valid = NULL,
                                                              valid_status = c('Valid', 'LOQ'),
                                                              per_group = NULL)
+    } else {
+      #### Some features will still be filtered out due to 'drop_NA_concentration'.
+      #### Set it to NULL, instead of FALSE
+      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
+                                                             drop_metabolites = NULL,
+                                                             drop_NA_concentration = NULL)
     }
-    # else {
-    #   #### Some features will still be filtered out due to 'drop_NA_concentration'.
-    #   #### Set it to NULL, instead of FALSE
-    #   reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-    #                                                          drop_metabolites = NULL,
-    #                                                          drop_NA_concentration = NULL)
-    # }
   })
   # Do sample filtering
   observeEvent(input$updateFiltering, {
@@ -474,10 +490,10 @@ server <- function(input, output, session) {
   # Show data overviews
   # Data distribution
   output$plotDatDist <- renderPlotly({
-    req(datOverviewPack()$metabAggreDat)
-    metabAggreDat <- datOverviewPack()$metabAggreDat
+    req(datOverviewPack()$metabAggreTbl)
+    metabAggreTbl <- datOverviewPack()$metabAggreTbl
     ggplotly(
-      ggplot(metabAggreDat, aes(x=ID, y=Concentration)) +
+      ggplot(metabAggreTbl, aes(x=ID, y=Concentration)) +
         geom_boxplot() +
         scale_y_log10() +
         labs(x = 'Sample', y = 'Metabolite abundance') +
@@ -488,30 +504,30 @@ server <- function(input, output, session) {
   
   # Sample metadata
   output$tblSmpMetadat <- DT::renderDataTable({
-    req(datOverviewPack()$metabSmpMetadat)
-    metabSmpMetadat <- datOverviewPack()$metabSmpMetadat
-    DT::datatable(metabSmpMetadat, rownames = F, filter = list(position = 'top', clear = T, plain = F),
+    req(datOverviewPack()$smpMetadatTbl)
+    smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
+    DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
   
   # Data completeness
   output$summDatComplete <- renderText({
-    req(datOverviewPack()$featCompleteLevel)
-    featCompleteLevel <- datOverviewPack()$featCompleteLevel
-    paste(sum(featCompleteLevel$CompleteRatio < 0.8), 'out of', nrow(reactMetabObj$metabObj),
+    req(datOverviewPack()$featCompleteLvTbl)
+    featCompleteLevels <- datOverviewPack()$featCompleteLvTbl$CompleteRatio
+    paste(sum(featCompleteLevels < 0.8), 'out of', nrow(reactMetabObj$metabObj),
           'metabolites fail to fulfil 80% rule, which is recommended filtering out.',
           'Besides, is there any sample with high level of missingness?')
   })
   output$plotDatComplete <- renderPlotly({
-    req(datOverviewPack()$metabAggreDat)
-    datCompleteCount <- datOverviewPack()$metabAggreDat %>%
+    req(datOverviewPack()$metabAggreTbl)
+    smpCompleteCountTbl <- datOverviewPack()$metabAggreTbl %>%
       dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% c(0, NA) ~ 'Observed',
                                                     Concentration %in% c(0, NA) ~ 'Missing')) %>%
       dplyr::group_by(ID, Completeness) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
     ggplotly(
-      ggplot(datCompleteCount, aes(x=ID, y=Count, fill=Completeness)) +
+      ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
         geom_col(position = 'stack') +
         scale_fill_manual(values = c('grey', 'black')) +
         labs(x = 'Sample') +
@@ -522,26 +538,28 @@ server <- function(input, output, session) {
   
   # Quantification status
   output$summQuanStatus <- renderText({
-    req(datOverviewPack()$quanStatusValid)
-    quanStatusValid <- datOverviewPack()$quanStatusValid
-    paste(sum(quanStatusValid$ValidRatio < 0.67), 'out of', nrow(reactMetabObj$metabObj),
+    req(datOverviewPack()$featStatusCountTbl)
+    featStatusValid <- datOverviewPack()$featStatusCountTbl %>%
+      dplyr::mutate(TotalValidCount = ValidCount + LOQCount,
+                    ValidRatio = TotalValidCount / TotalCount)
+    paste(sum(featStatusValid$ValidRatio < 0.67), 'out of', nrow(reactMetabObj$metabObj),
           'metabolites have less than 67% measurements with valid status (Valid, LOQ),',
-          'which is recommended filtering out. Besides, is there any sample with low level of validity?')
+          'which is recommended filtering out. Besides, is there any sample containing few valid values?')
   })
   output$plotQuanStatus <- renderPlotly({
-    req(datOverviewPack()$metabAggreDat)
-    quanStatusCount <- datOverviewPack()$metabAggreDat %>%
+    req(datOverviewPack()$metabAggreTbl)
+    smpStatusCountTbl <- datOverviewPack()$metabAggreTbl %>%
       dplyr::group_by(ID, Status) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
     # Prepare colors for quantification statuses
-    #### Choose better colors and add color for NA quantification status
-    quanStatus2Color <- c(Valid = '#1f78b4', LOQ = '#e31a1c', LOD = '#ff7f00', Invalid = '#33a02c')
-    quanStatusCols <- quanStatus2Color[names(quanStatus2Color) %in% unique(quanStatusCount$Status)]
+    #### Add color for NA quantification status
+    status2Color <- c(Valid = '#33a02c', LOQ = '#1f78b4', LOD = '#ff7f00', Invalid = '#e31a1c')
+    statusCols <- status2Color[names(status2Color) %in% unique(smpStatusCountTbl$Status)]
     ggplotly(
-      ggplot(quanStatusCount, aes(x = ID, y = Count, fill = Status)) +
+      ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
         geom_col(position = "stack") +
-        scale_fill_manual(values = quanStatusCols) +
+        scale_fill_manual(values = statusCols) +
         labs(x = "Sample") +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
