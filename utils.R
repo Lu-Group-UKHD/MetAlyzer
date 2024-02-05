@@ -174,7 +174,7 @@ plotly_scatter <- function(Log2FCTab) {
   plotly_scatter <- hide_legend(plotly_scatter)
   
   # Grab Legend ggplot
-  scatter_legend <- get_legend(p_scatter)
+  scatter_legend <- ggpubr::get_legend(p_scatter)
   legend <- grid.arrange(scatter_legend, ncol=1)
   
   return(list(Plot = plotly_scatter, Legend = legend))

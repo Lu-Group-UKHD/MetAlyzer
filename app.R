@@ -36,15 +36,15 @@ ui <- fluidPage(
         ),
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
-                           tags$h4('Data distribution', style = 'color:Black;font-weight:bold'),
-                           plotlyOutput('plotDatDist')  %>%
+                           tags$h4('Quantification status', style = 'color:Black;font-weight:bold'),
+                           plotlyOutput('plotQuanStatus')  %>%
                              shinycssloaders::withSpinner(color="#56070C"),
                            tags$h4('Sample metadata', style = 'color:Black;font-weight:bold'),
                            DT::dataTableOutput('tblSmpMetadat')  %>%
                              shinycssloaders::withSpinner(color="#56070C"),
-                           tags$h4('Quantification status', style = 'color:Black;font-weight:bold'),
-                           plotlyOutput('plotQuanStatus')  %>%
-                             shinycssloaders::withSpinner(color="#56070C"),
+                           tags$h4('Data distribution', style = 'color:Black;font-weight:bold'),
+                           plotlyOutput('plotDatDist')  %>%
+                             shinycssloaders::withSpinner(color="#56070C")
           )
         )
       )
@@ -385,6 +385,7 @@ server <- function(input, output, session) {
       
       highlightTbl$highlight_metabolites <- "Other Metabolites"
       highlightTbl$highlight_metabolites[highlightTbl$Metabolite %in% selectedChoices] <- "Highlighted Metabolite(s)"
+      highlightTbl$highlight_metabolites[highlightTbl$Class %in% selectedChoices] <- "Highlighted Metabolite(s)"
       highlightTbl$highlight_metabolites <- as.factor(highlightTbl$highlight_metabolites)
       
       reactVulcanoHighlight(highlightTbl)
@@ -398,6 +399,7 @@ server <- function(input, output, session) {
       
       highlightTbl$highlight_metabolites <- "Other Metabolites"
       highlightTbl$highlight_metabolites[highlightTbl$Metabolite %in% selectedChoices] <- "Highlighted Metabolite(s)"
+      highlightTbl$highlight_metabolites[highlightTbl$Class %in% selectedChoices] <- "Highlighted Metabolite(s)"
       highlightTbl$highlight_metabolites <- as.factor(highlightTbl$highlight_metabolites)
       
       reactVulcanoHighlight(highlightTbl)
@@ -478,7 +480,7 @@ server <- function(input, output, session) {
     }
   })
   output$plotScatterLegend <- renderImage({
-    req(reactLog2FCTbl())
+    req(reactLog2FCTbl()) 
     if (input$plotScatterLog2FC) {
       plot <- plotly_scatter(reactLog2FCTbl())
       legend <- plot$Legend
