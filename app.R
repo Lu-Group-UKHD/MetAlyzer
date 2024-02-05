@@ -1,4 +1,5 @@
 library(shiny)
+library(shinyBS)
 library(shinycssloaders)
 library(MetAlyzer)
 library(SummarizedExperiment)
@@ -24,36 +25,36 @@ ui <- fluidPage(
           # Show filtering options only after file is uploaded
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Data filtering', style = 'color:steelblue;font-weight:bold'),
-                           selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
-                                       choices = character(0), multiple = T),
-                           selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
-                                       choices = character(0), multiple = T),
+                           bsCollapse(
+                             open = 'Sample filtering', multiple = T,
+                             bsCollapsePanel('Sample filtering', style = 'info',
+                                             selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
+                                                         choices = character(0), multiple = T)),
+                             bsCollapsePanel(
+                               'Metabolite filtering', style = 'info',
+                               fluidRow(
+                                 column(width = 8, sliderInput('featCompleteCutoffFiltering',
+                                                               'Select % of observed values each feature should have:',
+                                                               min = 0, max = 100, value = 80))
+                               ),
+                               fluidRow(
+                                 column(width = 8, sliderInput('featValidCutoffFiltering',
+                                                               'Select % of valid values each feature should have:',
+                                                               min = 0, max = 100, value = 67)),
+                                 column(width = 3, offset = 1,
+                                        checkboxGroupInput('featValidStatusFiltering', 'Validity',
+                                                           choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
+                                                           selected = c('Valid', 'LOQ')))
+                               )
+                               # selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
+                               #             choices = character(0), multiple = T)
+                             )
+                           ),
                            fluidRow(
                              column(width = 6, actionButton('updateFiltering', 'Filter', width = '100%')),
                              column(width = 6, actionButton('resetFiltering', 'Reset', width = '100%'))
                            ),
-          )
-        ),
-        mainPanel(
-          conditionalPanel(condition = "output.ifValidUploadedFile",
-                           tags$h4('Quantification status', style = 'color:Black;font-weight:bold'),
-                           plotlyOutput('plotQuanStatus')  %>%
-                             shinycssloaders::withSpinner(color="#56070C"),
-                           tags$h4('Sample metadata', style = 'color:Black;font-weight:bold'),
-                           DT::dataTableOutput('tblSmpMetadat')  %>%
-                             shinycssloaders::withSpinner(color="#56070C"),
-                           tags$h4('Data distribution', style = 'color:Black;font-weight:bold'),
-                           plotlyOutput('plotDatDist')  %>%
-                             shinycssloaders::withSpinner(color="#56070C")
-          )
-        )
-      )
-    ),
-    tabPanel(
-      'Visualisation',
-      sidebarLayout(
-        sidebarPanel(
-          conditionalPanel(condition = "output.ifValidUploadedFile",
+                           tags$br(),
                            tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
                              column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
@@ -67,7 +68,39 @@ ui <- fluidPage(
                            fluidRow(
                              column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
                            ),
-                           tags$br(),
+          )
+        ),
+        mainPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile",
+                           bsCollapse(
+                             open = 'Data distribution', multiple = T,
+                             bsCollapsePanel('Sample metadata', style = 'primary',
+                                             DT::dataTableOutput('tblSmpMetadat') %>%
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Data distribution', style = 'primary',
+                                             plotlyOutput('plotDatDist') %>%
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Data completeness', style = 'primary',
+                                             bsCollapsePanel('Hint', style = 'success',
+                                                             textOutput('summDatComplete', container = strong)),
+                                             plotlyOutput('plotDatComplete') %>%
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Quantification status', style = 'primary',
+                                             #### Adjust tab size
+                                             bsCollapsePanel('Hint', style = 'success',
+                                                             textOutput('summQuanStatus', container = strong)),
+                                             plotlyOutput('plotQuanStatus') %>%
+                                               withSpinner(color="#56070C"))
+                           ),
+          )
+        )
+      )
+    ),
+    tabPanel(
+      'Visualisation',
+      sidebarLayout(
+        sidebarPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
                              column(width = 4, checkboxInput('plotVulcanoLog2FC', 'Vulcano Plot',
@@ -92,7 +125,7 @@ ui <- fluidPage(
                            # Use conditionalPanel to make selected plot always shown at top
                            conditionalPanel(condition = "input.plotVulcanoLog2FC",
                                             plotlyOutput('plotVolcano') %>%
-                                              shinycssloaders::withSpinner(color="#56070C"),
+                                              withSpinner(color="#56070C"),
                            ),
                            #### Can spinner be moved?
                            conditionalPanel(condition = "input.plotScatterLog2FC",
@@ -147,23 +180,44 @@ server <- function(input, output, session) {
     }
   })
   
-  # Retrieve abundance data and sample metadata for showing data overviews
-  datOverviewTbls <- reactive({
+  # Retrieve abundance data and sample metadata and compute feature completeness
+  # level and quantification status validity level for showing data overviews
+  datOverviewPack <- reactive({
     req(reactMetabObj$metabObj)
-    metabAggreDat <- metadata(reactMetabObj$metabObj)$aggregated_data %>%
+    metabAggreTbl <- metadata(reactMetabObj$metabObj)$aggregated_data %>%
       dplyr::ungroup() %>%
       dplyr::mutate(ID = paste0('Smp', ID))
-    metabSmpMetadat <- colData(reactMetabObj$metabObj) %>%
+    smpMetadatTbl <- colData(reactMetabObj$metabObj) %>%
       tibble::as_tibble(rownames = 'ID') %>%
       dplyr::mutate(ID = paste0('Smp', ID))
     # Use original column names whose spaces are not replaced with '.'
-    colnames(metabSmpMetadat) <- c('ID', colnames(colData(reactMetabObj$metabObj)))
+    colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$metabObj)))
     # Prepare ID levels for displaying samples in order
     idLevels <- rownames(colData(reactMetabObj$metabObj))
-    metabAggreDat <- dplyr::left_join(metabAggreDat, metabSmpMetadat, by = 'ID') %>%
+    metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
       dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
     
-    return(list(metabAggreDat = metabAggreDat, metabSmpMetadat = metabSmpMetadat))
+    # Compute completeness level of each feature for doing filtering
+    featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
+      dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% c(0, NA) ~ 1),
+                    Miss = dplyr::case_when(Concentration %in% c(0, NA) ~ 1)) %>%
+      dplyr::group_by(Metabolite) %>%
+      dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
+      dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj),
+                    CompleteRatio = ObsCount / TotalCount)
+    # Compute status counts of each feature for doing filtering
+    featStatusCountTbl <- dplyr::select(metabAggreTbl, Metabolite, Status) %>%
+      dplyr::mutate(Valid = dplyr::case_when(Status %in% 'Valid' ~ 1),
+                    LOQ = dplyr::case_when(Status %in% 'LOQ' ~ 1),
+                    LOD = dplyr::case_when(Status %in% 'LOD' ~ 1),
+                    Invalid = dplyr::case_when(Status %in% 'Invalid' ~ 1)) %>%
+      dplyr::group_by(Metabolite) %>%
+      dplyr::summarise(ValidCount = sum(Valid, na.rm = T), LOQCount = sum(LOQ, na.rm = T),
+                       LODCount = sum(LOD, na.rm = T), InvalidCount = sum(Invalid, na.rm = T)) %>%
+      dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj))
+    
+    return(list(metabAggreTbl = metabAggreTbl, smpMetadatTbl = smpMetadatTbl,
+                featCompleteLvTbl = featCompleteLvTbl, featStatusCountTbl = featStatusCountTbl))
   })
   
   
@@ -226,16 +280,16 @@ server <- function(input, output, session) {
                 dupSmpChoiceGps = dupSmpChoiceGps))
   })
   # Update choices for feature filtering
-  observe({
-    req(featChoices())
-    if ('Metabolism Indicators' %in% unlist(featChoices()) &
-        nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$ori_metabObj)) {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
-                        selected = 'Metabolism Indicators')
-    } else {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
-    }
-  })
+  # observe({
+  #   req(featChoices())
+  #   if ('Metabolism Indicators' %in% unlist(featChoices()) &
+  #       nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$ori_metabObj)) {
+  #     updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
+  #                       selected = 'Metabolism Indicators')
+  #   } else {
+  #     updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+  #   }
+  # })
   # Update choices for sample filtering
   observe({
     req(smpChoicePack()$smpChoiceList)
@@ -246,15 +300,37 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
   })
   # Do feature filtering
+  #### Conduct sample filtering prior to feature filtering, results in more reliable filtering
   observeEvent(input$updateFiltering, {
-    if (!is.null(input$featChoicesFiltering)) {
-      #### Probably add slider for 'min_percent_valid' and options for 'per_group'
-      #### to filter unmet features out by threshold of valid values
+    req(datOverviewPack())
+    # Collect features to remove based on missingness
+    featCompleteLvTbl <- datOverviewPack()$featCompleteLvTbl
+    featCompleteLevels <- featCompleteLvTbl$CompleteRatio
+    featCompleteCutoff <- input$featCompleteCutoffFiltering / 100
+    rmMissFeats <- featCompleteLvTbl$Metabolite[featCompleteLevels < featCompleteCutoff]
+    # Collect features to remove based on validity
+    featStatusCountTbl <- datOverviewPack()$featStatusCountTbl
+    featValidCutoff <- input$featValidCutoffFiltering / 100
+    featValidStatus <- input$featValidStatusFiltering
+    featValidCounts <- rep(0, nrow(featStatusCountTbl))
+    for (status in featValidStatus) {
+      featValidCounts <- featValidCounts + featStatusCountTbl[[paste0(status, 'Count')]]
+    }
+    featValidLevels <- featValidCounts / featStatusCountTbl[['TotalCount']]
+    rmInvalidFeats <- featStatusCountTbl$Metabolite[featValidLevels < featValidCutoff]
+    # Summarize features to remove
+    rmFeats <- unique(c(rmMissFeats, rmInvalidFeats))
+    if (length(rmFeats) != 0) { #!is.null(input$featChoicesFiltering)
+      #### Check if result is same as using 'min_percent_valid' and 'valid_status'
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = input$featChoicesFiltering,
-                                                             drop_NA_concentration = NULL)
+                                                             drop_metabolites = rmFeats,
+                                                             drop_NA_concentration = NULL,
+                                                             min_percent_valid = NULL,
+                                                             valid_status = c('Valid', 'LOQ'),
+                                                             per_group = NULL)
     } else {
-      #### Some features will still be filtered out
+      #### Some features will still be filtered out due to 'drop_NA_concentration'.
+      #### Set it to NULL, instead of FALSE
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
                                                              drop_metabolites = NULL,
                                                              drop_NA_concentration = NULL)
@@ -368,7 +444,7 @@ server <- function(input, output, session) {
       ))
     }
   })
-
+  
   
   # Update choices for metabolite highlighting
   observe({
@@ -417,10 +493,10 @@ server <- function(input, output, session) {
   # Show data overviews
   # Data distribution
   output$plotDatDist <- renderPlotly({
-    req(datOverviewTbls()$metabAggreDat)
-    metabAggreDat <- datOverviewTbls()$metabAggreDat
+    req(datOverviewPack()$metabAggreTbl)
+    metabAggreTbl <- datOverviewPack()$metabAggreTbl
     ggplotly(
-      ggplot(metabAggreDat, aes(x=ID, y=Concentration)) +
+      ggplot(metabAggreTbl, aes(x=ID, y=Concentration)) +
         geom_boxplot() +
         scale_y_log10() +
         labs(x = 'Sample', y = 'Metabolite abundance') +
@@ -428,28 +504,66 @@ server <- function(input, output, session) {
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     )
   })
+  
   # Sample metadata
   output$tblSmpMetadat <- DT::renderDataTable({
-    req(datOverviewTbls()$metabSmpMetadat)
-    metabSmpMetadat <- datOverviewTbls()$metabSmpMetadat
-    DT::datatable(metabSmpMetadat, rownames = F, filter = list(position = 'top', clear = T, plain = F),
+    req(datOverviewPack()$smpMetadatTbl)
+    smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
+    DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
-  # Quantification status
-  output$plotQuanStatus <- renderPlotly({
-    req(datOverviewTbls()$metabAggreDat)
-    metabAggreDat <- datOverviewTbls()$metabAggreDat %>%
-      dplyr::group_by(ID, Status) %>%
-      dplyr::summarise(Count = dplyr::n())
-    # Prepare colors for quantification statuses
-    #### Choose better colors and add color for NA quantification status
-    quanStatus2Color <- c(Valid = '#1f78b4', LOQ = '#e31a1c', LOD = '#ff7f00', Invalid = '#33a02c')
-    quanStatusCols <- quanStatus2Color[names(quanStatus2Color) %in% unique(metabAggreDat$Status)]
+  
+  # Data completeness
+  output$summDatComplete <- renderText({
+    req(datOverviewPack()$featCompleteLvTbl)
+    featCompleteLevels <- datOverviewPack()$featCompleteLvTbl$CompleteRatio
+    paste(sum(featCompleteLevels < 0.8), 'out of', nrow(reactMetabObj$metabObj),
+          'metabolites fail to fulfil 80% rule, which is recommended filtering out.',
+          'Besides, is there any sample with high level of missingness?')
+  })
+  output$plotDatComplete <- renderPlotly({
+    req(datOverviewPack()$metabAggreTbl)
+    smpCompleteCountTbl <- datOverviewPack()$metabAggreTbl %>%
+      dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% c(0, NA) ~ 'Observed',
+                                                    Concentration %in% c(0, NA) ~ 'Missing')) %>%
+      dplyr::group_by(ID, Completeness) %>%
+      dplyr::summarise(Count = dplyr::n()) %>%
+      dplyr::ungroup()
     ggplotly(
-      ggplot(metabAggreDat, aes(x = ID, y = Count, fill = Status)) +
+      ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
+        geom_col(position = 'stack') +
+        scale_fill_manual(values = c('grey', 'black')) +
+        labs(x = 'Sample') +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    )
+  })
+  
+  # Quantification status
+  output$summQuanStatus <- renderText({
+    req(datOverviewPack()$featStatusCountTbl)
+    featStatusValid <- datOverviewPack()$featStatusCountTbl %>%
+      dplyr::mutate(TotalValidCount = ValidCount + LOQCount,
+                    ValidRatio = TotalValidCount / TotalCount)
+    paste(sum(featStatusValid$ValidRatio < 0.67), 'out of', nrow(reactMetabObj$metabObj),
+          'metabolites have less than 67% measurements with valid status (Valid, LOQ),',
+          'which is recommended filtering out. Besides, is there any sample containing few valid values?')
+  })
+  output$plotQuanStatus <- renderPlotly({
+    req(datOverviewPack()$metabAggreTbl)
+    smpStatusCountTbl <- datOverviewPack()$metabAggreTbl %>%
+      dplyr::group_by(ID, Status) %>%
+      dplyr::summarise(Count = dplyr::n()) %>%
+      dplyr::ungroup()
+    # Prepare colors for quantification statuses
+    #### Add color for NA quantification status
+    status2Color <- c(Valid = '#33a02c', LOQ = '#1f78b4', LOD = '#ff7f00', Invalid = '#e31a1c')
+    statusCols <- status2Color[names(status2Color) %in% unique(smpStatusCountTbl$Status)]
+    ggplotly(
+      ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
         geom_col(position = "stack") +
-        scale_fill_manual('Status', values = quanStatusCols) +
-        labs(x = "Sample", y = "Count") +
+        scale_fill_manual(values = statusCols) +
+        labs(x = "Sample") +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     )
@@ -471,6 +585,7 @@ server <- function(input, output, session) {
       }
     }
   })
+  
   # Scatter plot
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTbl())
@@ -498,6 +613,7 @@ server <- function(input, output, session) {
           alt = "My svg Histogram")
     }
   })
+  
   # Network plot
   output$plotNetwork <- renderPlotly({
     req(reactLog2FCTbl())
