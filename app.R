@@ -23,6 +23,7 @@ ui <- fluidPage(
           fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
                     placeholder = 'No .xlsx file selected'),
           # Show filtering options only after file is uploaded
+          #### Add default button
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Data filtering', style = 'color:steelblue;font-weight:bold'),
                            bsCollapse(
@@ -34,26 +35,36 @@ ui <- fluidPage(
                                'Metabolite filtering', style = 'info',
                                fluidRow(
                                  column(width = 8, sliderInput('featCompleteCutoffFiltering',
-                                                               'Select % of observed values each feature should have:',
+                                                               'Select % of observed values each metabolite should have:',
                                                                min = 0, max = 100, value = 80))
                                ),
                                fluidRow(
                                  column(width = 8, sliderInput('featValidCutoffFiltering',
-                                                               'Select % of valid values each feature should have:',
+                                                               'Select % of valid values each metabolite should have:',
                                                                min = 0, max = 100, value = 67)),
                                  column(width = 3, offset = 1,
                                         checkboxGroupInput('featValidStatusFiltering', 'Validity',
                                                            choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
-                                                           selected = c('Valid', 'LOQ')))
+                                                           selected = c('Valid', 'LOQ'))),
+                                 bsTooltip('featCompleteCutoffFiltering', 'Metabolites with observed values below this cutoff are removed.'),
+                                 bsTooltip('featValidCutoffFiltering', 'Metabolites with valid values below this cutoff are removed.'),
+                                 bsTooltip('featValidStatusFiltering', 'The selected is considered valid for filtering.')
                                )
                                # selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
                                #             choices = character(0), multiple = T)
                              )
                            ),
                            fluidRow(
-                             column(width = 6, actionButton('updateFiltering', 'Filter', width = '100%')),
-                             column(width = 6, actionButton('resetFiltering', 'Reset', width = '100%'))
+                             column(width = 5, actionButton('updateFiltering', 'Filter', width = '100%')),
+                             column(width = 3, offset = 1, actionButton('revertFiltering', 'Revert', width = '100%')),
+                             column(width = 3, actionButton('defaultFiltering', 'Default', width = '100%')),
+                             bsTooltip('revertFiltering', 'The filtered data reverts to the original data.'),
+                             bsTooltip('defaultFiltering', 'The parameters for filtering are set to default.')
                            ),
+                           tags$br(),
+                           tags$h4('Data imputation', style = 'color:steelblue;font-weight:bold'),
+                           tags$br(),
+                           tags$h4('Data normalization', style = 'color:steelblue;font-weight:bold'),
                            tags$br(),
                            tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
@@ -148,7 +159,7 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   # Create reactive objects for storing up-to-date data
-  reactMetabObj <- reactiveValues(metabObj = NULL, ori_metabObj = NULL)
+  reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL)
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
   
@@ -161,7 +172,7 @@ server <- function(input, output, session) {
     if (!is(validUploadedFile, 'try-error')) {
       reactMetabObj$metabObj <- metabObj
       # Make copy of original data for filtering reset
-      reactMetabObj$ori_metabObj <- metabObj
+      reactMetabObj$oriMetabObj <- metabObj
       # Monitor whether uploaded file is valid to show further operations on client side
       output$ifValidUploadedFile <- reactive({
         !is.null(reactMetabObj$metabObj)
@@ -175,7 +186,7 @@ server <- function(input, output, session) {
         footer = NULL
       ))
       reactMetabObj$metabObj <- NULL
-      reactMetabObj$ori_metabObj <- NULL
+      reactMetabObj$oriMetabObj <- NULL
     }
   })
   
@@ -220,7 +231,7 @@ server <- function(input, output, session) {
   })
   
   
-  # Prepare choices for feature filtering
+  # Prepare choices for feature filtering and log2(FC) vulcano highlighting
   featChoices <- reactive({
     req(reactMetabObj$metabObj)
     list(Class = as.list(unique(rowData(reactMetabObj$metabObj)$metabolic_classes)),
@@ -282,7 +293,7 @@ server <- function(input, output, session) {
   # observe({
   #   req(featChoices())
   #   if ('Metabolism Indicators' %in% unlist(featChoices()) &
-  #       nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$ori_metabObj)) {
+  #       nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$oriMetabObj)) {
   #     updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
   #                       selected = 'Metabolism Indicators')
   #   } else {
@@ -298,44 +309,23 @@ server <- function(input, output, session) {
     })
     updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
   })
-  # Do feature filtering
-  #### Conduct sample filtering prior to feature filtering, results in more reliable filtering
-  observeEvent(input$updateFiltering, {
-    req(datOverviewPack())
-    # Collect features to remove based on missingness
-    featCompleteLvTbl <- datOverviewPack()$featCompleteLvTbl
-    featCompleteLevels <- featCompleteLvTbl$CompleteRatio
-    featCompleteCutoff <- input$featCompleteCutoffFiltering / 100
-    rmMissFeats <- featCompleteLvTbl$Metabolite[featCompleteLevels < featCompleteCutoff]
-    # Collect features to remove based on validity
-    featStatusCountTbl <- datOverviewPack()$featStatusCountTbl
-    featValidCutoff <- input$featValidCutoffFiltering / 100
-    featValidStatus <- input$featValidStatusFiltering
-    featValidCounts <- rep(0, nrow(featStatusCountTbl))
-    for (status in featValidStatus) {
-      featValidCounts <- featValidCounts + featStatusCountTbl[[paste0(status, 'Count')]]
-    }
-    featValidLevels <- featValidCounts / featStatusCountTbl[['TotalCount']]
-    rmInvalidFeats <- featStatusCountTbl$Metabolite[featValidLevels < featValidCutoff]
-    # Summarize features to remove
-    rmFeats <- unique(c(rmMissFeats, rmInvalidFeats))
-    if (length(rmFeats) != 0) { #!is.null(input$featChoicesFiltering)
-      #### Check if result is same as using 'min_percent_valid' and 'valid_status'
-      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = rmFeats,
-                                                             drop_NA_concentration = NULL,
-                                                             min_percent_valid = NULL,
-                                                             valid_status = c('Valid', 'LOQ'),
-                                                             per_group = NULL)
-    } else {
-      #### Some features will still be filtered out due to 'drop_NA_concentration'.
-      #### Set it to NULL, instead of FALSE
-      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = NULL,
-                                                             drop_NA_concentration = NULL)
-    }
+  # Set parameters of feature filtering back to default
+  observeEvent(input$defaultFiltering, {
+    updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
+    updateSliderInput(session, 'featValidCutoffFiltering', value = 67)
+    updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
   })
-  # Do sample filtering
+  # Set parameters of sample filtering back to default
+  observeEvent(input$defaultFiltering, {
+    req(smpChoicePack()$smpChoiceList)
+    # Make choices lists so that sole choice in certain choice group can be shown
+    smpChoiceList <- lapply(smpChoicePack()$smpChoiceList, function(choices) {
+      as.list(choices)
+    })
+    updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
+  })
+  # Do sample filtering (place this chunk before 'Do feature filtering', so that
+  # feature filtering is executed based on sample filtered data)
   observeEvent(input$updateFiltering, {
     req(input$smpChoicesFiltering)
     for (selectedChoice in input$smpChoicesFiltering) {
@@ -375,9 +365,45 @@ server <- function(input, output, session) {
       }
     }
   })
-  # Reset feature and sample filtering
-  observeEvent(input$resetFiltering, {
-    reactMetabObj$metabObj <- reactMetabObj$ori_metabObj
+  # Do feature filtering
+  #### Add advanced feature filtering: Modified 80% rule
+  observeEvent(input$updateFiltering, {
+    req(datOverviewPack())
+    # Collect features to remove based on missingness
+    featCompleteLvTbl <- datOverviewPack()$featCompleteLvTbl
+    featCompleteLevels <- featCompleteLvTbl$CompleteRatio
+    featCompleteCutoff <- input$featCompleteCutoffFiltering / 100
+    rmMissFeats <- featCompleteLvTbl$Metabolite[featCompleteLevels < featCompleteCutoff]
+    # Collect features to remove based on validity
+    # featStatusCountTbl <- datOverviewPack()$featStatusCountTbl
+    featValidCutoff <- input$featValidCutoffFiltering / 100
+    featValidStatus <- input$featValidStatusFiltering
+    # featValidCounts <- rep(0, nrow(featStatusCountTbl))
+    # for (status in featValidStatus) {
+    #   featValidCounts <- featValidCounts + featStatusCountTbl[[paste0(status, 'Count')]]
+    # }
+    # featValidLevels <- featValidCounts / featStatusCountTbl[['TotalCount']]
+    # rmInvalidFeats <- featStatusCountTbl$Metabolite[featValidLevels < featValidCutoff]
+    # # Summarize features to remove
+    # rmFeats <- unique(c(rmMissFeats, rmInvalidFeats))
+    if (any(length(rmMissFeats) != 0, featValidCutoff != 0)) { #!is.null(input$featChoicesFiltering)
+      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
+                                                             drop_metabolites = rmMissFeats,
+                                                             drop_NA_concentration = NULL,
+                                                             min_percent_valid = featValidCutoff,
+                                                             valid_status = featValidStatus,
+                                                             per_group = NULL)
+    } else {
+      #### Some features will still be filtered out due to 'drop_NA_concentration'.
+      #### Set it to NULL, instead of FALSE
+      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
+                                                             drop_metabolites = NULL,
+                                                             drop_NA_concentration = NULL)
+    }
+  })
+  # Revert feature and sample filtering and obtain original data
+  observeEvent(input$revertFiltering, {
+    reactMetabObj$metabObj <- reactMetabObj$oriMetabObj
   })
   
   
