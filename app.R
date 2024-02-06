@@ -12,65 +12,84 @@ source("utils.R")
 ui <- fluidPage(
   # App title
   titlePanel('Biocrates Metabolomics Analysis'),
-  
-  tabsetPanel(
-    type = 'tabs',
-    tabPanel(
-      'Preprocessing',
-      sidebarLayout(
-        sidebarPanel(
-          tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
-          fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
-                    placeholder = 'No .xlsx file selected'),
-          # Show filtering options only after file is uploaded
-          conditionalPanel(condition = "output.ifValidUploadedFile",
-                           tags$h4('Data filtering', style = 'color:steelblue;font-weight:bold'),
-                           bsCollapse(
-                             open = 'Sample filtering', multiple = T,
-                             bsCollapsePanel('Sample filtering', style = 'info',
-                                             selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
-                                                         choices = character(0), multiple = T)),
-                             bsCollapsePanel(
-                               'Metabolite filtering', style = 'info',
-                               fluidRow(
-                                 column(width = 8, sliderInput('featCompleteCutoffFiltering',
-                                                               'Select % of observed values each feature should have:',
-                                                               min = 0, max = 100, value = 80))
-                               ),
-                               fluidRow(
-                                 column(width = 8, sliderInput('featValidCutoffFiltering',
-                                                               'Select % of valid values each feature should have:',
-                                                               min = 0, max = 100, value = 67)),
-                                 column(width = 3, offset = 1,
-                                        checkboxGroupInput('featValidStatusFiltering', 'Validity',
-                                                           choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
-                                                           selected = c('Valid', 'LOQ')))
-                               )
-                               # selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
-                               #             choices = character(0), multiple = T)
-                             )
+  sidebarLayout(
+    sidebarPanel(
+      tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
+      fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
+                placeholder = 'No .xlsx file selected'),
+      # Show filtering options only after file is uploaded
+      conditionalPanel(condition = "output.ifValidUploadedFile",
+                       tags$h4('Data filtering', style = 'color:steelblue;font-weight:bold'),
+                       bsCollapse(
+                         open = 'Sample filtering', multiple = T,
+                         bsCollapsePanel('Sample filtering', style = 'info',
+                                         selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
+                                                     choices = character(0), multiple = T)),
+                         bsCollapsePanel(
+                           'Metabolite filtering', style = 'info',
+                           fluidRow(
+                             column(width = 8, sliderInput('featCompleteCutoffFiltering',
+                                                           'Select % of observed values each feature should have:',
+                                                           min = 0, max = 100, value = 80))
                            ),
                            fluidRow(
-                             column(width = 6, actionButton('updateFiltering', 'Filter', width = '100%')),
-                             column(width = 6, actionButton('resetFiltering', 'Reset', width = '100%'))
-                           ),
-                           tags$br(),
-                           tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
-                           fluidRow(
-                             column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
-                                                           choices = 'Not available', multiple = F)),
-                             column(width = 3, selectInput('smpChoicesLog2FC_1', 'Group1',
-                                                           choices = character(0), multiple = F),
-                                    offset = 1),
-                             column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
-                                                           choices = character(0), multiple = F))
-                           ),
-                           fluidRow(
-                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
-                           ),
-          )
-        ),
-        mainPanel(
+                             column(width = 8, sliderInput('featValidCutoffFiltering',
+                                                           'Select % of valid values each feature should have:',
+                                                           min = 0, max = 100, value = 67)),
+                             column(width = 3, offset = 1,
+                                    checkboxGroupInput('featValidStatusFiltering', 'Validity',
+                                                       choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
+                                                       selected = c('Valid', 'LOQ')))
+                           )
+                           # selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
+                           #             choices = character(0), multiple = T)
+                         )
+                       ),
+                       fluidRow(
+                         column(width = 6, actionButton('updateFiltering', 'Filter', width = '100%')),
+                         column(width = 6, actionButton('resetFiltering', 'Reset', width = '100%'))
+                       ),
+                       tags$br(),
+                       tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
+                       fluidRow(
+                         column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
+                                                       choices = 'Not available', multiple = F)),
+                         column(width = 3, selectInput('smpChoicesLog2FC_1', 'Group1',
+                                                       choices = character(0), multiple = F),
+                                offset = 1),
+                         column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
+                                                       choices = character(0), multiple = F))
+                       ),
+                       fluidRow(
+                         column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
+                       ),
+                       
+                      tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
+                      fluidRow(
+                        column(width = 4, checkboxInput('plotVulcanoLog2FC', 'Vulcano Plot',
+                                                        value = FALSE, width = '100%')),
+                        column(width = 4, checkboxInput('plotScatterLog2FC', 'Scatter Plot',
+                                                        value = FALSE, width = '100%')),
+                        column(width = 4, checkboxInput('plotNetworkLog2FC', 'Network Plot',
+                                                        value = FALSE, width = '100%'))
+                      ),
+                      fluidRow(
+                        style = "display: flex; align-items: center;",
+                        column(width = 7, selectInput('metabChoicesVulcano',
+                                                      'Select metabolite(s) to highlight:',
+                                                      choices = character(0), multiple = T)),
+                        column(width = 5, checkboxInput('highlightVulcano', 'Highlight',
+                                                        value = FALSE, width = '100%'))
+                      ),
+                       
+      )
+    ),
+    mainPanel(
+      tabsetPanel(
+        type = 'tabs',
+        tabPanel(
+          'Preprocessing',
+        
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            bsCollapse(
                              open = 'Data distribution', multiple = T,
@@ -93,34 +112,9 @@ ui <- fluidPage(
                                                withSpinner(color="#56070C"))
                            ),
           )
-        )
-      )
-    ),
-    tabPanel(
-      'Visualisation',
-      sidebarLayout(
-        sidebarPanel(
-          conditionalPanel(condition = "output.ifValidUploadedFile",
-                           tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
-                           fluidRow(
-                             column(width = 4, checkboxInput('plotVulcanoLog2FC', 'Vulcano Plot',
-                                                             value = FALSE, width = '100%')),
-                             column(width = 4, checkboxInput('plotScatterLog2FC', 'Scatter Plot',
-                                                             value = FALSE, width = '100%')),
-                             column(width = 4, checkboxInput('plotNetworkLog2FC', 'Network Plot',
-                                                             value = FALSE, width = '100%'))
-                           ),
-                           fluidRow(
-                             style = "display: flex; align-items: center;",
-                             column(width = 7, selectInput('metabChoicesVulcano',
-                                                           'Select metabolite(s) to highlight:',
-                                                           choices = character(0), multiple = T)),
-                             column(width = 5, checkboxInput('highlightVulcano', 'Highlight',
-                                                             value = FALSE, width = '100%'))
-                           ),
-          )
         ),
-        mainPanel(
+        tabPanel(
+          'Visualisations',
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            # Use conditionalPanel to make selected plot always shown at top
                            conditionalPanel(condition = "input.plotVulcanoLog2FC",
@@ -139,13 +133,15 @@ ui <- fluidPage(
                            conditionalPanel(condition = "input.plotNetworkLog2FC",
                                             plotlyOutput('plotNetwork') %>%
                                               shinycssloaders::withSpinner(color="#56070C")
-                           ),
+                            )
           )
         )
       )
     )
   )
 )
+
+
 
 server <- function(input, output, session) {
   # Create reactive objects for storing up-to-date data
@@ -431,10 +427,10 @@ server <- function(input, output, session) {
       }
       # Use do.call to prepare arguments to be passed due to design of function:
       # deparse(substitute(categorical))
-      log2FCTbl <- do.call(MetAlyzer::calculate_log2FC, list(metalyzer_se = metabObj,
-                                                             categorical = as.symbol(selectedChoiceGp),
-                                                             impute_perc_of_min = 0.2, impute_NA = T))
-      reactLog2FCTbl(log2FCTbl)
+      metabObj <- MetAlyzer::calculate_log2FC(metalyzer_se = metabObj,
+                                                             categorical = selectedChoiceGp,
+                                                             impute_perc_of_min = 0.2, impute_NA = T)
+      reactLog2FCTbl(log2FC(metabObj))
     } else {
       showModal(modalDialog(
         title = 'Log₂(FC) computation failed...',
