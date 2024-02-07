@@ -670,6 +670,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
   return(p_network)
 }
 
+
 #' @title Read Named Regions
 #'
 #' @description This function reads in the named regions of an excel file.
@@ -722,4 +723,73 @@ read_named_region <- function(file_path, named_region) {
   }
   rownames(df) <- NULL
   return(df)
+}
+
+
+#' @title Half minimum imputation of zero and NA values
+#' @description This function is adapted from 'zero_imputation' in MetAlyzer package,
+#' performing HM imputation of zero and NA values.
+#' 
+#' @param vec A numeric vector containing the concentration values
+#' @param impute_NA Logical value whether to impute NA values
+#' @keywords internal
+HM_imputation <- function(vec, impute_NA) {
+  non_zero <- vec[vec > 0 & !is.na(vec)]
+  imp_v <- ifelse(length(non_zero) > 0, min(non_zero) * 0.5, NA)
+  vec[vec == 0] <- imp_v
+  if (impute_NA) {
+    vec[is.na(vec)] <- imp_v
+  }
+  return(vec)
+}
+
+#' @title Impute aggregated data in SE MetAlyzer object
+#' @description This function is adapted from 'data_imputation' in MetAlyzer package,
+#' imputing zero and NA concentration values using HM. If all values are zero or NA,
+#' they are set to NA. The imputed values are stored in column 'Concentration' of aggregated data.
+#'
+#' @param metalyzer_se A MetAlyzer object
+#' @param impute_NA Logical value whether to impute NA values
+#' @import dplyr
+#' @importFrom rlang .data
+data_imputation <- function(metalyzer_se, impute_NA) {
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  grouping_vars <- as.character(groups(aggregated_data))
+  aggregated_data <- aggregated_data %>%
+    group_by(Metabolite) %>%
+    mutate(Concentration = HM_imputation(Concentration, impute_NA)) %>%
+    group_by_at(grouping_vars)
+  metalyzer_se@metadata$aggregated_data <- aggregated_data
+  return(metalyzer_se)
+}
+
+#' @title Normalize aggregated data in SE MetAlyzer object
+#' @description This function normalizes concentration values among samples using
+#' median normalization that is median scaling followed by log2 transformation.
+#' The normalized values are stored in column 'Concentration' of aggregated data.
+#'
+#' @param metalyzer_se A MetAlyzer object
+#' @import dplyr, limma
+data_normalization <- function(metalyzer_se) {
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  # Create temporary aggregated data for concatenating needed information later
+  tmp_aggregated_data <- dplyr::select(aggregated_data, -Concentration)
+  # Prepare data matrix for conducting median scaling
+  data_mat <- dplyr::select(aggregated_data, Metabolite, ID, Concentration) %>%
+    tidyr::pivot_wider(names_from = 'ID', values_from = 'Concentration') %>%
+    tibble::column_to_rownames('Metabolite') %>%
+    as.matrix()
+  # Do Median normalization that is median scaling followed by log2 transformation
+  aggregated_data <- limma::normalizeBetweenArrays(data_mat, method = 'scale') %>%
+    tibble::as_tibble(rownames = 'Metabolite') %>%
+    tidyr::pivot_longer(cols = -'Metabolite',
+                        names_to = 'ID',
+                        values_to = 'Concentration') %>%
+    dplyr::mutate(Concentration = log2(Concentration),
+                  Metabolite = factor(Metabolite, levels = levels(tmp_aggregated_data$Metabolite)),
+                  ID = factor(ID, levels = levels(tmp_aggregated_data$ID))) %>%
+    dplyr::left_join(tmp_aggregated_data, by = c('ID', 'Metabolite')) %>%
+    dplyr::select(ID, Metabolite, Class, Concentration, Status)
+  metalyzer_se@metadata$aggregated_data <- aggregated_data
+  return(metalyzer_se)
 }
