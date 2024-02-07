@@ -7,6 +7,123 @@ library(viridis)
 library(ggpubr)
 library(viridisLite)
 
+#' @title Calculate log2 fold change
+#'
+#' @description This function calculates the log2 fold change of two groups from
+#' plotting_data.
+#' @param metalyzer_se A Metalyzer object
+#' @param categorical A column specifying the two groups
+#'
+#' @return A data frame containing the log2 fold change for each metabolite
+
+calculate_log2FC <- function(metalyzer_se, categorical) {
+  
+  ## Create a new dataframe to calculate the log2FC
+  if (!categorical %in% colnames(metalyzer_se@metadata$aggregated_data)) {
+    metalyzer_se <- expand_aggregated_data(metalyzer_se,
+                                           meta_data_column = categorical)
+  }
+  
+  # Perform Log2 transformation
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  aggregated_data <- mutate(aggregated_data,
+                            log2_Conc = transform(.data$mod_Conc, base::log2), ### Column name might change!!!
+                            .after = .data$mod_Conc) ### Column name might change!!!
+  metalyzer_se@metadata$aggregated_data <- aggregated_data
+
+  df <- metalyzer_se@metadata$aggregated_data %>%
+    ungroup(all_of(categorical)) %>%
+    mutate(Value = .data$log2_Conc,
+        Group = !!sym(categorical)) %>%
+    select(.data$Metabolite,
+           .data$Class,
+           .data$Group,
+           .data$Value)
+
+  ## Check if already factor
+  group_vec <- df$Group
+  if (!methods::is(group_vec, "factor")) {
+    group_vec <- factor(group_vec)
+    df$Group <- group_vec
+    cat("Warning: No order was given for categorical!\n")
+  } else {
+    group_vec <- droplevels(group_vec)
+  }
+  group_levels <- levels(group_vec)
+  if (length(group_levels) > 2) {
+    cat("Warning: More than two levels were given! Dropping",
+        paste(group_levels[3:length(group_levels)], collapse = ", "), "\n")
+  }
+  cat("Info: Calculating log2 fold change from ", group_levels[1], " to ",
+      group_levels[2], " (column: ", categorical, ").\n", sep = "")
+  df <- filter(df, .data$Group %in% group_levels[1:2])
+  df$Group <- droplevels(df$Group)
+
+  ## Check for further grouping
+  grouping_vars <- as.character(groups(df))
+
+  if (!"Metabolite" %in% grouping_vars) {
+    grouping_vars[length(grouping_vars)+1] <- "Metabolite"
+  }
+  
+  ## Calculate log2FC and p-val
+  cat("Info: Calculating log2 fold change groupwise (",
+      paste(grouping_vars, collapse = " * "),
+      ") using a linear model...  ", sep = "")
+  options(warn = -1)
+  change_df <- df %>%
+    group_modify(~ apply_linear_model(df = .x)) %>%
+    ungroup(.data$Metabolite) %>%
+    mutate(qval = qvalue::qvalue(.data$pval, pi0 = 1)$qvalues)
+  options(warn = 0)
+  cat("finished!\n")
+  
+  metalyzer_se@metadata$log2FC <- change_df
+  return(metalyzer_se)
+}
+
+#' @title Calculate log2 fold change
+#'
+#' @description This function applies a linear model to calculate the log2 fold change and
+#' its significance
+#' @param df A subset data frame
+#' @param ...
+
+apply_linear_model <- function(df, ...) {
+  class <- df$Class[1]
+  df <- df %>%
+    filter(!is.na(.data$Value)) %>%
+    droplevels()
+  if (length(levels(df$Group)) != 2) {
+    l2fc <- NA
+    pval <- NA
+  } else {
+    fit1 <- stats::lm(Value ~ Group, data = df)
+    l2fc <- fit1$coefficients[2]
+    fit_dim <- dim(summary(fit1)$coefficients)
+    pval <- summary(fit1)$coefficients[fit_dim[1],fit_dim[2]]
+  }
+  output_df <- data.frame(Class = class,
+                          log2FC = l2fc,
+                          pval = pval,
+                          row.names = NULL)
+  return(output_df)
+}
+
+#' @title Transformation
+#'
+#' @description This function performs transformation of concentration values.
+#'
+#' @param vec a vector of concentration values
+#' @param func A function for transformation
+#'
+#' @keywords internal
+transform <- function(vec, func) {
+  vec[vec > 0 & !is.na(vec)] <- func(vec[vec > 0 & !is.na(vec)])
+  return(vec)
+}
+
+
 #' Plotly Log2FC Scatter Plot
 #'
 #' This function returns a list with interactive 
