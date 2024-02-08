@@ -124,25 +124,25 @@ ui <- fluidPage(
         ),
         tabPanel(
           'Log₂(FC)',
-          conditionalPanel(condition = "output.ifValidUploadedFile",
-                          bsCollapse(
-                             open = 'Network Plot', multiple = T,
-                            bsCollapsePanel('Network Plot', style = 'primary',
-                                            div(style = "height: 800px;",
-                                             plotlyOutput('plotNetwork') %>%
-                                               withSpinner(color="#56070C"))
-                             ),
+          conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
+                           div(textOutput('textLog2FC'), style = 'color:red;font-weight:bold;font-size:110%')),
+          conditionalPanel(condition = "input.computeLog2FC",
+                           bsCollapse(
+                             open = 'Vulcano Plot', multiple = T,
                              bsCollapsePanel('Vulcano Plot', style = 'primary', 
-                                               plotlyOutput('plotVolcano') %>%
-                                                 withSpinner(color="#56070C")),
+                                             plotlyOutput('plotVolcano') %>%
+                                               withSpinner(color="#56070C")),
                              bsCollapsePanel('Scatter Plot', style = 'primary',
                                              fluidRow(
-                                              column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
-                                                       shinycssloaders::withSpinner(color="#56070C")),
-                                              column(width = 3, style = "margin-left: -175px; z-index:1;",
-                                                     imageOutput('plotScatterLegend'))
-                                             )
-                             )
+                                               column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
+                                                        shinycssloaders::withSpinner(color="#56070C")),
+                                               column(width = 3, style = "margin-left: -175px; z-index:1;",
+                                                      imageOutput('plotScatterLegend'))
+                                             )),
+                             bsCollapsePanel('Network Plot', style = 'primary',
+                                             div(style = "height: 800px;",
+                                                 plotlyOutput('plotNetwork') %>%
+                                                   withSpinner(color="#56070C")))
                            ),
           )
         )
@@ -636,6 +636,10 @@ server <- function(input, output, session) {
   })
   
   # Visualize log2(FC)
+  # Give sign before log2(FC) calculation
+  output$textLog2FC <- renderText({
+    'Please calculate Log₂(FC) first.'
+  })
   # Vulcano plot
   #### Set cutoffs for log2(FC) and p-value as parameters
   #### Highlight also metabolic classes
