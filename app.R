@@ -83,12 +83,6 @@ ui <- fluidPage(
                        ),
                        tags$br(),
                        tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
-                       checkboxInput('plotVulcanoLog2FC', 'Vulcano Plot',
-                                     value = FALSE, width = '100%'),
-                       checkboxInput('plotScatterLog2FC', 'Scatter Plot',
-                                     value = FALSE, width = '100%'),
-                       checkboxInput('plotNetworkLog2FC', 'Network Plot',
-                                     value = FALSE, width = '100%'),
                        fluidRow(
                          style = "display: flex; align-items: center;",
                          column(width = 7, selectInput('metabChoicesVulcano',
@@ -131,24 +125,25 @@ ui <- fluidPage(
         tabPanel(
           'Log₂(FC)',
           conditionalPanel(condition = "output.ifValidUploadedFile",
-                           # Use conditionalPanel to make selected plot always shown at top
-                           conditionalPanel(condition = "input.plotVulcanoLog2FC",
-                                            plotlyOutput('plotVolcano') %>%
-                                              withSpinner(color="#56070C"),
-                           ),
-                           #### Can spinner be moved?
-                           conditionalPanel(condition = "input.plotScatterLog2FC",
-                                            fluidRow(
+                          bsCollapse(
+                             open = 'Network Plot', multiple = T,
+                            bsCollapsePanel('Network Plot', style = 'primary',
+                                            div(style = "height: 800px;",
+                                             plotlyOutput('plotNetwork') %>%
+                                               withSpinner(color="#56070C"))
+                             ),
+                             bsCollapsePanel('Vulcano Plot', style = 'primary', 
+                                               plotlyOutput('plotVolcano') %>%
+                                                 withSpinner(color="#56070C")),
+                             bsCollapsePanel('Scatter Plot', style = 'primary',
+                                             fluidRow(
                                               column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
                                                        shinycssloaders::withSpinner(color="#56070C")),
                                               column(width = 3, style = "margin-left: -175px; z-index:1;",
                                                      imageOutput('plotScatterLegend'))
-                                            ),
+                                             )
+                             )
                            ),
-                           conditionalPanel(condition = "input.plotNetworkLog2FC",
-                                            plotlyOutput('plotNetwork') %>%
-                                              shinycssloaders::withSpinner(color="#56070C")
-                           )
           )
         )
       )
@@ -444,7 +439,6 @@ server <- function(input, output, session) {
     doneNormalization(0)
   })
   
-  
   # Update sample choice groups for log2(FC) calculation
   observe({
     req(smpChoicePack()$smpChoiceList)
@@ -648,50 +642,43 @@ server <- function(input, output, session) {
   #### Use white background by theme_bw()
   output$plotVolcano <- renderPlotly({
     req(reactLog2FCTbl())
-    if (input$plotVulcanoLog2FC) {
-      if (input$highlightVulcano) {
-        req(reactVulcanoHighlight())
-        plotly_vulcano(reactVulcanoHighlight())
-      } else {
-        plotly_vulcano(reactLog2FCTbl())
-      }
+    if (input$highlightVulcano) {
+      req(reactVulcanoHighlight())
+      plotly_vulcano(reactVulcanoHighlight())
+    } else {
+      plotly_vulcano(reactLog2FCTbl())
     }
   })
   
   # Scatter plot
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTbl())
-    if (input$plotScatterLog2FC) {
-      plot <- plotly_scatter(reactLog2FCTbl())
-      plot$Plot
-    }
+    plot <- plotly_scatter(reactLog2FCTbl())
+    plot$Plot
   })
   output$plotScatterLegend <- renderImage({
     req(reactLog2FCTbl()) 
-    if (input$plotScatterLog2FC) {
-      plot <- plotly_scatter(reactLog2FCTbl())
-      legend <- plot$Legend
-      # A temp file to save the output.
-      # This file will be removed later by renderImage
-      
-      outfile <- tempfile(fileext='.svg')
-      ggsave(file=outfile, plot=legend)
-      
-      # Return a list containing the filename
-      list(src = normalizePath(outfile),
-           contentType = 'image/svg+xml',
-           width = 571.675,
-           height = 400,
-           alt = "My svg Histogram")
-    }
-  })
+    plot <- plotly_scatter(reactLog2FCTbl())
+    legend <- plot$Legend
+    # A temp file to save the output.
+    # This file will be removed later by renderImage
+    
+    outfile <- tempfile(fileext='.svg')
+    ggsave(file=outfile, plot=legend)
+    
+    # Return a list containing the filename
+    list(src = normalizePath(outfile),
+          contentType = 'image/svg+xml',
+          width = 571.675,
+          height = 400,
+          alt = "My svg Histogram",
+          deleteFile = TRUE)
+  }, deleteFile = TRUE)
   
   # Network plot
   output$plotNetwork <- renderPlotly({
     req(reactLog2FCTbl())
-    if (input$plotNetworkLog2FC) {
-      plotly_network(reactLog2FCTbl())
-    }
+    plotly_network(reactLog2FCTbl())
   })
 }
 

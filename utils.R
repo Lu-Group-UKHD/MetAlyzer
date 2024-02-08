@@ -19,29 +19,18 @@ library(viridisLite)
 calc_log2FC <- function(metalyzer_se, categorical) {
   
   ## Create a new dataframe to calculate the log2FC
-  if (!categorical %in% colnames(metalyzer_se@metadata$aggregated_data)) {
-    aggregated_data <- metalyzer_se@metadata$aggregated_data
-    meta_data <- colData(metalyzer_se)
-    
-    if (!categorical %in% colnames(meta_data)) {
-      cat("Warning: Could not find column", categorical, "in meta data!\n")
-    } else if (categorical %in% colnames(aggregated_data)) {
-      cat("Info: Column", categorical, "already exists in aggregated_data.\n")
-    } else {
-      if (!is.character(categorical)) {
-        categorical <- deparse(substitute(categorical))
-      }
-      mapping_vec <- unlist(meta_data[categorical])
-      names(mapping_vec) <- rownames(meta_data[categorical])
-      aggregated_data <- dplyr::mutate(aggregated_data, 
-                                       !!categorical := factor(sapply(.data$ID, function(id) {
-                                         mapping_vec[id]
-                                       }),
-                                       levels = unique(mapping_vec)), .after = .data$ID)
-      
-      metalyzer_se@metadata$aggregated_data <- aggregated_data
-    }
-  }
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  meta_data <- colData(metalyzer_se)
+
+  mapping_vec <- unlist(meta_data[categorical])
+  names(mapping_vec) <- rownames(meta_data[categorical])
+  aggregated_data <- dplyr::mutate(aggregated_data, 
+                                    !!categorical := factor(sapply(.data$ID, function(id) {
+                                      mapping_vec[id]
+                                    }),
+                                    levels = unique(mapping_vec)), .after = .data$ID)
+  
+  metalyzer_se@metadata$aggregated_data <- aggregated_data
 
   df <- metalyzer_se@metadata$aggregated_data %>%
     ungroup(all_of(categorical)) %>%
@@ -625,7 +614,8 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                     marker = list(color = nodes$FC_thresh, 
                             colorbar = list(title = "log2FC with FDR correction"),
                             colorscale='Viridis',
-                            showscale = TRUE))
+                            showscale = TRUE),
+                    height = 800)
 
   p_network <- layout(
     network,
@@ -788,7 +778,8 @@ data_normalization <- function(metalyzer_se) {
                   Metabolite = factor(Metabolite, levels = levels(tmp_aggregated_data$Metabolite)),
                   ID = factor(ID, levels = levels(tmp_aggregated_data$ID))) %>%
     dplyr::left_join(tmp_aggregated_data, by = c('ID', 'Metabolite')) %>%
-    dplyr::select(ID, Metabolite, Class, Concentration, Status)
+    dplyr::select(ID, Metabolite, Class, Concentration, Status) %>%
+    dplyr::group_by(Metabolite)
   metalyzer_se@metadata$aggregated_data <- aggregated_data
   return(metalyzer_se)
 }
