@@ -4,6 +4,7 @@ library(shinycssloaders)
 library(MetAlyzer)
 library(SummarizedExperiment)
 library(tidyverse)
+library(limma)
 source("utils.R")
 
 # setwd('/Users/qianwu/Desktop/RShiny_Biocrates_DataAnalysis')
@@ -493,9 +494,8 @@ server <- function(input, output, session) {
       }
       # Use do.call to prepare arguments to be passed due to design of function:
       # deparse(substitute(categorical))
-      metabObj <- MetAlyzer::calculate_log2FC(metalyzer_se = metabObj,
-                                                             categorical = selectedChoiceGp,
-                                                             impute_perc_of_min = 0.2, impute_NA = T)
+      metabObj <- calc_log2FC(metalyzer_se = metabObj,
+                              categorical = selectedChoiceGp)
       reactLog2FCTbl(log2FC(metabObj))
     } else {
       showModal(modalDialog(

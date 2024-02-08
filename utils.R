@@ -16,24 +16,36 @@ library(viridisLite)
 #'
 #' @return A data frame containing the log2 fold change for each metabolite
 
-calculate_log2FC <- function(metalyzer_se, categorical) {
+calc_log2FC <- function(metalyzer_se, categorical) {
   
   ## Create a new dataframe to calculate the log2FC
   if (!categorical %in% colnames(metalyzer_se@metadata$aggregated_data)) {
-    metalyzer_se <- expand_aggregated_data(metalyzer_se,
-                                           meta_data_column = categorical)
+    aggregated_data <- metalyzer_se@metadata$aggregated_data
+    meta_data <- colData(metalyzer_se)
+    
+    if (!categorical %in% colnames(meta_data)) {
+      cat("Warning: Could not find column", categorical, "in meta data!\n")
+    } else if (categorical %in% colnames(aggregated_data)) {
+      cat("Info: Column", categorical, "already exists in aggregated_data.\n")
+    } else {
+      if (!is.character(categorical)) {
+        categorical <- deparse(substitute(categorical))
+      }
+      mapping_vec <- unlist(meta_data[categorical])
+      names(mapping_vec) <- rownames(meta_data[categorical])
+      aggregated_data <- dplyr::mutate(aggregated_data, 
+                                       !!categorical := factor(sapply(.data$ID, function(id) {
+                                         mapping_vec[id]
+                                       }),
+                                       levels = unique(mapping_vec)), .after = .data$ID)
+      
+      metalyzer_se@metadata$aggregated_data <- aggregated_data
+    }
   }
-  
-  # Perform Log2 transformation
-  aggregated_data <- metalyzer_se@metadata$aggregated_data
-  aggregated_data <- mutate(aggregated_data,
-                            log2_Conc = transform(.data$mod_Conc, base::log2), ### Column name might change!!!
-                            .after = .data$mod_Conc) ### Column name might change!!!
-  metalyzer_se@metadata$aggregated_data <- aggregated_data
 
   df <- metalyzer_se@metadata$aggregated_data %>%
     ungroup(all_of(categorical)) %>%
-    mutate(Value = .data$log2_Conc,
+    mutate(Value = .data$Concentration,
         Group = !!sym(categorical)) %>%
     select(.data$Metabolite,
            .data$Class,
@@ -108,19 +120,6 @@ apply_linear_model <- function(df, ...) {
                           pval = pval,
                           row.names = NULL)
   return(output_df)
-}
-
-#' @title Transformation
-#'
-#' @description This function performs transformation of concentration values.
-#'
-#' @param vec a vector of concentration values
-#' @param func A function for transformation
-#'
-#' @keywords internal
-transform <- function(vec, func) {
-  vec[vec > 0 & !is.na(vec)] <- func(vec[vec > 0 & !is.na(vec)])
-  return(vec)
 }
 
 
