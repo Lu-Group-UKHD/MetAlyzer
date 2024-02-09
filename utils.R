@@ -50,7 +50,9 @@ calc_log2FC <- function(metalyzer_se, categorical) {
   # Combined all information into a table
   group_info <- combined_data[, c(1, ncol(feat_data)+1)]
   log2FCTab <- dplyr::left_join(aggregated_data, group_info, by = 'ID') %>%
-    dplyr::left_join(log2FCRes, by = 'Metabolite')
+    dplyr::left_join(log2FCRes, by = 'Metabolite') %>%
+    dplyr::select(Metabolite, Class, log2FC, pval, qval) %>%
+    dplyr::distinct(Metabolite, .keep_all = TRUE)
   metalyzer_se@metadata$log2FC <- log2FCTab
   return(metalyzer_se)
 }
@@ -300,13 +302,12 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                          drop = FALSE,
                          guide = guide_legend(override.aes = list(size = 2),
                                               order=2, ncol = 2)) +
-      theme(plot.title = element_text(face = 'bold.italic', hjust = 0.5),
-            legend.key = element_rect(fill = 'white')) +
+      theme_bw() +
       labs(x = 'log2(FC)', y = "-log10(p)")
     
     ## Interactive: Create interactive plot
     p_vulcano_highlighted <- ggplotly(p_fc_vulcano_highlighted, tooltip = "text")
-    
+
     return(p_vulcano_highlighted)
   } else {
     ## Plot: Create vulcano ggplot object
@@ -324,8 +325,7 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                          drop = FALSE,
                          guide = guide_legend(override.aes = list(size = 2),
                                               order=2, ncol = 2)) +
-      theme(plot.title = element_text(face = 'bold.italic', hjust = 0.5),
-            legend.key = element_rect(fill = 'white')) +
+      theme_bw() +
       labs(x = 'log2(FC)', y = "-log10(p)")
     
     ## Interactive: Create interactive plot
