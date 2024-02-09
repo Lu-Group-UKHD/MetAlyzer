@@ -18,7 +18,7 @@ ui <- fluidPage(
       tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
       fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
                 placeholder = 'No .xlsx file selected'),
-      # Show filtering options only after file is uploaded
+      # Show data processing options only after file is uploaded
       conditionalPanel(condition = "output.ifValidUploadedFile",
                        tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
                        bsCollapse(
@@ -125,7 +125,7 @@ ui <- fluidPage(
         tabPanel(
           'Log₂(FC)',
           conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
-                           div(textOutput('textLog2FC'), style = 'color:red;font-weight:bold;font-size:110%')),
+                           div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
           conditionalPanel(condition = "input.computeLog2FC",
                            bsCollapse(
                              open = 'Vulcano Plot', multiple = T,
@@ -191,6 +191,7 @@ server <- function(input, output, session) {
   datOverviewPack <- reactive({
     req(reactMetabObj$metabObj)
     metabAggreTbl <- metadata(reactMetabObj$metabObj)$aggregated_data %>%
+      #### Do not know why Metabolite column is grouped by MetAlyzer
       dplyr::ungroup() %>%
       dplyr::mutate(ID = paste0('Smp', ID))
     smpMetadatTbl <- colData(reactMetabObj$metabObj) %>%
@@ -476,14 +477,22 @@ server <- function(input, output, session) {
   # Compute log2(FC)
   observeEvent(input$computeLog2FC, {
     if (input$smpChoicesLog2FC_1 != input$smpChoicesLog2FC_2) {
+      metabObj <- reactMetabObj$metabObj
+      # Do log2 transformation on data for 'calc_log2FC' if normalization was not performed
+      if (doneNormalization() == 0) {
+        oriConc <- metadata(metabObj)$aggregated_data$Concentration
+        if (sum(oriConc %in% 0) > 0) {
+          metadata(metabObj)$aggregated_data$Concentration <- oriConc + 0.0001
+        }
+        metabObj <- data_normalization(metabObj)
+      }
+      # Extract samples of interest
       selectedChoiceGp <- input$smpChoiceGpsLog2FC
       selectedChoices <- c(input$smpChoicesLog2FC_1, input$smpChoicesLog2FC_2)
       if (!'NA' %in% selectedChoices) {
-        metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
-                                              .data[[selectedChoiceGp]] %in% selectedChoices)
+        metabObj <- MetAlyzer::filterMetaData(metabObj, .data[[selectedChoiceGp]] %in% selectedChoices)
       } else {
-        metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
-                                              is.na(.data[[selectedChoiceGp]]) |
+        metabObj <- MetAlyzer::filterMetaData(metabObj, is.na(.data[[selectedChoiceGp]]) |
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
       # Use do.call to prepare arguments to be passed due to design of function:
