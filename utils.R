@@ -58,10 +58,12 @@ calc_log2FC <- function(metalyzer_se, categorical) {
 }
 
 
-#' Plotly Log2FC Scatter Plot
+#' @title Plotly Log2FC Scatter Plot
 #'
-#' This function returns a list with interactive 
+#' @description This function returns a list with interactive 
 #' scatterplot based on log2 fold change data.
+#' 
+#' @param Log2FCTab A data frame containing log2 fold change data
 plotly_scatter <- function(Log2FCTab) {
   ### Data Wrangling
   ## Background: Define colors for significance 
@@ -113,7 +115,7 @@ plotly_scatter <- function(Log2FCTab) {
     }
     return(color)
   })
-  
+
   ## Data: Add pseudo x-value to data as a order of metabolites
   ordered_classes <- c(names(lc_colors), names(fia_colors))
   p_data <- lapply(ordered_classes, function(class) {
@@ -125,15 +127,6 @@ plotly_scatter <- function(Log2FCTab) {
   p_data <- bind_rows(data.frame(Class = rep(NA, 5)), p_data)
   p_data$x <- seq(nrow(p_data))
   p_data <- filter(p_data, !is.na(.data$Class))
-  
-  ## Data: Determine labels
-  signif_p_data <- filter(p_data, .data$signif_color != names(signif_colors)[1])
-  
-  labels <- sapply(p_data$Metabolite, function(m) {
-    m <- as.character(m)
-    label <- if_else(m %in% signif_p_data$Metabolite, m, "")
-    return(label)
-  })
   
   ## Legend: Significance color
   signif_colors <- sort(signif_colors, decreasing = TRUE)
@@ -218,90 +211,71 @@ plotly_scatter <- function(Log2FCTab) {
           panel.grid.minor.y = element_line('#ECECEC'),
           panel.background = element_blank()) +
     labs(x = 'Metabolites')
-  
+
   ## Interactive: Create interactive plot
-  plotly_scatter <- ggplotly(p_scatter, tooltip = "text", showlegend = FALSE)
-  plotly_scatter <- hide_legend(plotly_scatter)
-  
+  plotly_plot <- ggplotly(p_scatter, tooltip = "text", showlegend = FALSE)
+  plotly_plot <- hide_legend(plotly_plot)
+
+  # TODO: Find god to figure out why this is not working
+  ## Highlight Metabolites by changing symbol
+  #if ("highlight" %in% colnames(p_data)) {
+  #  for (i in 1:nrow(p_data)) {
+  #    if (isTRUE(p_data$highlight[i])) {
+  #      print(p_data[i,])
+  #      x_val <- p_data$x[i]
+  #      y_val <- p_data$log2FC[i]
+  #      color_hex <- p_data$signif_color[i]
+  #            
+  #      plotly_plot <- plotly_plot %>% add_trace(
+  #        x = x_val,
+  #        y = y_val,
+  #        type = "scatter",
+  #        mode = "markers",
+  #        marker = list(size = 5)
+  #      )
+  #    }
+  #  }
+  #}
+
   # Grab Legend ggplot
   scatter_legend <- ggpubr::get_legend(p_scatter)
   legend <- grid.arrange(scatter_legend, ncol=1)
   
-  return(list(Plot = plotly_scatter, Legend = legend))
+  return(list(Plot = plotly_plot, Legend = legend))
 }
+#' @title Plotly Log2FC Vulcano Plot
 
-#' Plotly Log2FC Vulcano Plot
 #'
-#' This function returns a list with interactive 
+#' @descritpion This function returns a list with interactive 
 #' vulcanoplot based on log2 fold change data.
+#' 
+#' @param Log2FCTab A data frame containing log2 fold change data
+#' @param cutoff_y A numeric value specifying the cutoff for q-value
+#' @param cutoff_x A numeric value specifying the cutoff for log2 fold change
 plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
-  ### Data Wrangling
-  ## Background: Define colors for significance 
-  signif_colors=c("#5F5F5F"=1,
-                  "#FEBF6E"=0.1,
-                  "#EE5C42"=0.05,
-                  "#8B1A1A"=0.01)
-  
-  ## Background: Load polarity data
-  polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
-  
-  polarity_df <- utils::read.csv(polarity_file) %>%
-    select(.data$Class,
-           .data$Polarity) %>%
-    mutate(Class = factor(.data$Class),
-           Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
-    arrange(.data$Polarity)
-  
-  ## Background: Set class colors
-  class_colors <- metalyzer_colors()
-  
-  names(class_colors) <- levels(polarity_df$Class)
-  
-  ## Background: Define LC and FIA classes with color
-  lc_polarity_df <- filter(polarity_df,
-                           .data$Polarity == 'LC',
-                           .data$Class %in% Log2FCTab$Class)
-  lc_colors <- class_colors[which(names(class_colors) %in% lc_polarity_df$Class)]
-  fia_polarity_df <- filter(polarity_df,
-                            .data$Polarity == 'FIA',
-                            .data$Class %in% Log2FCTab$Class)
-  fia_colors <- class_colors[which(names(class_colors) %in% fia_polarity_df$Class)]
-  
-  ## Legend: Manage breaks and values
-  breaks <- c(names(lc_colors), names(fia_colors))
-  values <- c(lc_colors,fia_colors)
-  names(values) <- NULL
-  
   ## Data: Replace NAs
   Log2FCTab$log2FC[is.na(Log2FCTab$log2FC)] <- 0
   Log2FCTab$qval[is.na(Log2FCTab$qval)] <- 1
   
-  # Data Vulcano: Create Dataframe for vulcano plot
-  log2FCvulcano <- Log2FCTab
-  log2FCvulcano$Class <- as.character(log2FCvulcano$Class)
-  log2FCvulcano$Class[log2FCvulcano$qval > cutoff_y] <- NA
-  log2FCvulcano$Class[abs(log2FCvulcano$log2FC) < log2(cutoff_x)] <- NA
+  if("highlight" %in% colnames(Log2FCTab)) {
+    # rename factor levels for improving Legend understanding
+    Log2FCTab$highlight <- factor(Log2FCTab$highlight, levels = c(FALSE, TRUE), labels = c("Other Metabolites", "Highlighted Metabolite(s)"))
   
-  log2FCvulcano$labels <- as.character(log2FCvulcano$Metabolite)
-  log2FCvulcano$labels[which(is.na(log2FCvulcano$Class))] <- ""
-  
-  if("highlight_metabolites" %in% colnames(log2FCvulcano)) {
     ## Plot: Create vulcano ggplot object with highlighted points
-    p_fc_vulcano_highlighted <- ggplot(log2FCvulcano %>%
-                                         arrange(desc(highlight_metabolites)),
+    p_fc_vulcano_highlighted <- ggplot(Log2FCTab %>%
+                                         arrange(desc(highlight)),
                                        aes(x = .data$log2FC,
                                            y = -log10(.data$qval),
-                                           color = .data$highlight_metabolites,
-                                           label = labels)) +
-      geom_point(size = 1, aes(text = paste0(Metabolite, "\nClass: ", Class, "\nlog2 Fold Change: ", round(log2FC, digits=5), "\np-value: ", round(pval, digits=5)))) +
+                                           color = .data$highlight)) +
+      geom_point(size = 1, aes(text = paste0(Metabolite, 
+                                            "\nClass: ", Class, 
+                                            "\nlog2 Fold Change: ", round(log2FC, digits=5), 
+                                            "\np-value: ", round(pval, digits=5)))) +
       geom_vline(xintercept=c(-log2(cutoff_x), log2(cutoff_x)), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
       scale_color_manual('',
                          breaks = c("Other Metabolites", "Highlighted Metabolite(s)"),
-                         values = c("#d3d3d3","#56070C"),
-                         drop = FALSE,
-                         guide = guide_legend(override.aes = list(size = 2),
-                                              order=2, ncol = 2)) +
+                         values = c("#d3d3d3","#56070C")) +
       theme_bw() +
       labs(x = 'log2(FC)', y = "-log10(p)")
     
@@ -310,21 +284,29 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
 
     return(p_vulcano_highlighted)
   } else {
+    # Data Vulcano: Prepare Dataframe for vulcano plot
+    Log2FCTab$Class <- as.character(Log2FCTab$Class)
+    Log2FCTab$Class[Log2FCTab$qval > cutoff_y] <- "Not Significant"
+    Log2FCTab$Class[abs(Log2FCTab$log2FC) < log2(cutoff_x)] <- "Not Significant"
+
+    breaks <- unique(Log2FCTab$Class)
+    values <- class_colors[names(class_colors) %in% Log2FCTab$Class]
+
     ## Plot: Create vulcano ggplot object
-    p_fc_vulcano <- ggplot(log2FCvulcano,
+    p_fc_vulcano <- ggplot(Log2FCTab,
                            aes(x = .data$log2FC,
                                y = -log10(.data$qval),
-                               color = .data$Class,
-                               label = labels)) +
+                               color = .data$Class)) +
       geom_vline(xintercept=c(-log2(cutoff_x), log2(cutoff_x)), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
-      geom_point(size = 1, aes(text = paste0(Metabolite, "\nClass: ", Class, "\nlog2 Fold Change: ", round(log2FC, digits=5), "\np-value: ", round(pval, digits=5)))) +
+      geom_point(size = 1, aes(text = paste0(Metabolite, 
+                                            "\nClass: ", Class, 
+                                            "\nlog2 Fold Change: ", round(log2FC, digits=5), 
+                                            "\np-value: ", round(pval, digits=5)))) +
       scale_color_manual('Classes',
                          breaks = breaks,
                          values = values,
-                         drop = FALSE,
-                         guide = guide_legend(override.aes = list(size = 2),
-                                              order=2, ncol = 2)) +
+                         drop = FALSE) +
       theme_bw() +
       labs(x = 'log2(FC)', y = "-log10(p)")
     
@@ -335,10 +317,13 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
   }
 }
 
-#' Plotly Log2FC Network Plot
+#' @title Plotly Log2FC Network Plot
 #'
-#' This function returns a list with interactive 
+#' @description This function returns a list with interactive 
 #' networkplot based on log2 fold change data.
+#' 
+#' @param Log2FCTab A data frame containing log2 fold change data
+#' @param q_value A numeric value specifying the cutoff for q-value
 plotly_network <- function(Log2FCTab, q_value=0.05) {
   pathway_file <- MetAlyzer::pathway()
   
@@ -388,7 +373,6 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
     edges <- edges[-invalid_edges, ]
   }
   
-  
   edges$x_start <- nodes[edges$Node1, "x"]
   edges$y_start <- nodes[edges$Node1, "y"]
   edges$x_end <- nodes[edges$Node2, "x"]
@@ -410,90 +394,67 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                       !is.na(.data$log2FC),
                       !is.na(.data$qval),
                       .data$qval <= q_value)
-  
+
   nodes$FC_thresh <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    if (length(m_vec) > 1) {
-      # Nodes with more than 1 metabolite assigned
-      tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-      if (nrow(tmp_df) > 0) {
-        # At least one of the metabolites is significantly change
-        # -> take the mean log2 fold change
-        l2fc <- sum(tmp_df$log2FC) / length(m_vec)
-      } else {
-        if (any(tmp_df$Metabolite %in% levels(Log2FCTab$Metabolite))) {
-          # At least one metabolite was measured but none are significantly changed
-          l2fc <- 0
-        } else {
-          # None of the metabolites were measured
-          l2fc <- NA
-        }
-      }
-    } else {
-      # Nodes with 0 or 1 metabolite assigned
-      if (m_vec %in% signif_df$Metabolite) {
-        # Metabolite is significantly changed
-        l2fc <- signif_df$log2FC[which(signif_df$Metabolite == m_vec)]
-      } else if (m_vec %in% levels(Log2FCTab$Metabolite)) {
-        # Metabolite was measured but is not significantly changed
+    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 significantly changed
+      l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
+    } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
+        # Not significantly changed but measured
         l2fc <- 0
-      } else {
-        # Metabolite was not measured
+    } else {
+        # Not measured
         l2fc <- NA
-      }
     }
     return(l2fc)
   })
-  
+
   ## Add p-value to nodes_df
   nodes$p_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    if (length(m_vec) > 1) {
-      # Nodes with more than 1 metabolite assigned
-      tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-      if (nrow(tmp_df) > 0) {
-        # At least one of the metabolites is significantly change
-        # -> How to calculate the combined p value???
-        pval<- sum(tmp_df$pval) / length(m_vec)
-      } else {
-        if (any(tmp_df$Metabolite %in% levels(Log2FCTab$Metabolite))) {
-          # At least one metabolite was measured but none are significantly changed
-          pval <- 0
-        } else {
-          # None of the metabolites were measured
-          pval <- NA
-        }
-      }
+    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 significantly changed
+      pval <- sum(tmp_df$pval) / nrow(tmp_df)
+    } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
+        # Not significantly changed but measured
+        pval <- sum(Log2FCTab$pval[Log2FCTab$Metabolite == m_vec]) / length(m_vec)
     } else {
-      # Nodes with 0 or 1 metabolite assigned
-      if (m_vec %in% signif_df$Metabolite) {
-        # Metabolite is significantly changed
-        pval <- signif_df$pval[which(signif_df$Metabolite == m_vec)]
-      } else if (m_vec %in% levels(Log2FCTab$Metabolite)) {
-        # Metabolite was measured but is not significantly changed
-        pval <- 0
-      } else {
-        # Metabolite was not measured
+        # Not measured
         pval <- NA
-      }
     }
     return(pval)
   })
-  
+
   ## Draw network
   # Create a plot of the network using ggplotly
   label_size <- 20
   area_size <- 10
   edge_size <- 1.25
   annotation_size <- 11
-  
-  # Create the coloured area behind the edges
-  # Turn edges with no pathway into white
+
+  # Preparing Hexcodes for Annotation Colors
+  nodes$color <- sapply(nodes$FC_thresh, function(value) {
+    if (is.na(value)) {
+      return("grey")
+    } else {
+      # Using the viridis color scale, adjust 'option' based on your preference
+      color_scale <- viridis(10, option = "D")
+      nodes_range <- na.omit(nodes$FC_thresh)
+      
+      color_index <- findInterval(value, seq(min(nodes_range), max(nodes_range)+0.1, length.out = length(color_scale) + 1))
+      return(color_scale[color_index])
+    }
+  })
+
+  # Prepare the Edges List
   area_shapes <- list()
   for (i in seq_along(edges$Color)) {
     if (is.na(edges$Color[i])) {
-      edges$Color[i] <- "white"
+      edges$Color[i] <- "white"   # Assign edges without pathway white
     }
   }
-  
+  # Create background of edges
   for (i in 1:nrow(edges)) {
     area_shape <- list(
       type = "line",
@@ -526,26 +487,6 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
   }
   edges_area_combined <- c(area_shapes, edge_shapes)
   
-  # Function to convert numerical values to color codes
-  value_to_color <- function(value) {
-    if (is.na(value)) {
-      return("grey")
-    } else {
-      # Using the viridis color scale, adjust 'option' based on your preference
-      color_scale <- viridis(10, option = "D")
-      nodes_range <- na.omit(nodes$FC_thresh)
-      
-      color_index <- findInterval(value, seq(min(nodes_range), max(nodes_range)+0.1, length.out = length(color_scale) + 1))
-      return(color_scale[color_index])
-    }
-  }
-  
-  # Adding a new column 'color' with color codes based on the numerical values
-  nodes$color <- sapply(nodes$FC_thresh, value_to_color)
-  
-  # Remove axis and add title
-  axis <- list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE)
-  
   # Create the nodes
   network <- plot_ly(nodes,
                      x = nodes$x,
@@ -557,16 +498,8 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                                    colorscale='Viridis',
                                    showscale = TRUE),
                      height = 800)
-  
-  p_network <- layout(
-    network,
-    title = '',
-    shapes = edges_area_combined,
-    xaxis = axis,
-    yaxis = axis,
-    hovermode = FALSE) 
-  
-  # Add annotations for the nodes
+
+  # Add annotations over the nodes
   for (i in 1:nrow(nodes)) {
     p_network <- p_network %>% add_annotations(
       text = nodes$Label[i],
@@ -583,6 +516,15 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                          "\np value: ", round(nodes$p_value[i], 5))
     )
   }
+
+  # Add the edges
+  p_network <- layout(
+    network,
+    title = '',
+    shapes = edges_area_combined,
+    xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
+    yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
+    hovermode = FALSE) 
   
   # Add annotations for the pathways
   for (i in 1:nrow(pathways)) {
@@ -606,6 +548,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
 #'
 #' @param file_path The file path of the file
 #' @param named_region The region name u want to read in
+#' @keywords internal
 read_named_region <- function(file_path, named_region) {
   full_sheet <- openxlsx::read.xlsx(
     file_path,

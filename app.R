@@ -18,6 +18,10 @@ ui <- fluidPage(
       tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
       fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
                 placeholder = 'No .xlsx file selected'),
+      checkboxInput('exampleFile', 
+                    HTML('<b>Select example dataframe:</b> Metabolite concentrations of 81 extraction samples by
+                         [Gegner <i>et al</i>. 2022]'), 
+                    value = FALSE),
       # Show data processing options only after file is uploaded
       conditionalPanel(condition = "output.ifValidUploadedFile",
                        tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
@@ -91,6 +95,19 @@ ui <- fluidPage(
                          column(width = 5, checkboxInput('highlightVulcano', 'Highlight',
                                                          value = FALSE, width = '100%'))
                        ),
+                       tags$h4('Determine x- and y- cutoff for vulcano plot'),
+                       fluidRow(
+                         column(width = 8, sliderInput('plotSignificanceXCutoff',
+                                                       'Select log2FC x-cutoff',
+                                                       min = 0, max = 10, value = 1.5, step = 0.5))
+                       ),
+                       fluidRow(
+                         column(width = 8, sliderInput('plotSignificanceYCutoff',
+                                                       'Select % y-cutoff',
+                                                       min = 0, max = 0.20, value = 0.05, step = 0.025)
+                         )
+                       )
+                        
                        
       )
     ),
@@ -158,6 +175,21 @@ server <- function(input, output, session) {
   reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL)
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
+
+  # Initialize Metalyzer SE Object with example data
+  observeEvent(input$exampleFile, {
+    if (input$exampleFile) {
+      metabObj <- MetAlyzer_dataset(file_path = example_extraction_data(), silent = T)
+      reactMetabObj$metabObj <- metabObj
+      # Make copy of original data for filtering reset
+      reactMetabObj$oriMetabObj <- metabObj
+      # Monitor whether uploaded file is valid to show further operations on client side
+      output$ifValidUploadedFile <- reactive({
+        !is.null(reactMetabObj$metabObj)
+      })
+      outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
+    }
+  })
   
   # Initialize MetAlyzer SE object
   observeEvent(input$uploadedFile, {
@@ -174,6 +206,8 @@ server <- function(input, output, session) {
         !is.null(reactMetabObj$metabObj)
       })
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
+      # Update Example Checkbox to False
+      updateCheckboxInput(session, "exampleFile", value = FALSE)
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -517,17 +551,15 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'metabChoicesVulcano', choices = featChoices())
   })
   # Create new column for highlighting metabolites
-  #### Probably better change 'highlight_metabolites' to 'highlight'
   observeEvent(input$highlightVulcano, {
     req(reactLog2FCTbl())
     if (!is.null(input$metabChoicesVulcano)) {
       selectedChoices <- input$metabChoicesVulcano
       highlightTbl <- reactLog2FCTbl()
       
-      highlightTbl$highlight_metabolites <- "Other Metabolites"
-      highlightTbl$highlight_metabolites[highlightTbl$Metabolite %in% selectedChoices] <- "Highlighted Metabolite(s)"
-      highlightTbl$highlight_metabolites[highlightTbl$Class %in% selectedChoices] <- "Highlighted Metabolite(s)"
-      highlightTbl$highlight_metabolites <- as.factor(highlightTbl$highlight_metabolites)
+      highlightTbl$highlight <- FALSE
+      highlightTbl$highlight[highlightTbl$Metabolite %in% selectedChoices] <- TRUE
+      highlightTbl$highlight[highlightTbl$Class %in% selectedChoices] <- TRUE
       
       reactVulcanoHighlight(highlightTbl)
     }
@@ -538,10 +570,9 @@ server <- function(input, output, session) {
       selectedChoices <- input$metabChoicesVulcano
       highlightTbl <- reactLog2FCTbl()
       
-      highlightTbl$highlight_metabolites <- "Other Metabolites"
-      highlightTbl$highlight_metabolites[highlightTbl$Metabolite %in% selectedChoices] <- "Highlighted Metabolite(s)"
-      highlightTbl$highlight_metabolites[highlightTbl$Class %in% selectedChoices] <- "Highlighted Metabolite(s)"
-      highlightTbl$highlight_metabolites <- as.factor(highlightTbl$highlight_metabolites)
+      highlightTbl$highlight <- FALSE
+      highlightTbl$highlight[highlightTbl$Metabolite %in% selectedChoices] <- TRUE
+      highlightTbl$highlight[highlightTbl$Class %in% selectedChoices] <- TRUE
       
       reactVulcanoHighlight(highlightTbl)
     }
@@ -657,17 +688,27 @@ server <- function(input, output, session) {
     req(reactLog2FCTbl())
     if (input$highlightVulcano) {
       req(reactVulcanoHighlight())
-      plotly_vulcano(reactVulcanoHighlight())
+      plotly_vulcano(reactVulcanoHighlight(), 
+                     cutoff_x = input$plotSignificanceXCutoff,
+                     cutoff_y = input$plotSignificanceYCutoff)
     } else {
-      plotly_vulcano(reactLog2FCTbl())
+      plotly_vulcano(reactLog2FCTbl(), 
+                     cutoff_x = input$plotSignificanceXCutoff,
+                     cutoff_y = input$plotSignificanceYCutoff)
     }
   })
   
   # Scatter plot
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTbl())
-    plot <- plotly_scatter(reactLog2FCTbl())
-    plot$Plot
+    if (input$highlightVulcano) {
+      req(reactVulcanoHighlight())
+      plot <- plotly_scatter(reactVulcanoHighlight())
+      plot$Plot
+    } else {
+      plot <- plotly_scatter(reactLog2FCTbl())
+      plot$Plot
+    }
   })
   output$plotScatterLegend <- renderImage({
     req(reactLog2FCTbl()) 
