@@ -418,7 +418,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       pval <- sum(tmp_df$pval) / nrow(tmp_df)
     } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
         # Not significantly changed but measured
-        pval <- sum(Log2FCTab$pval[Log2FCTab$Metabolite == m_vec]) / length(m_vec)
+        pval <- sum(Log2FCTab$pval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
         # Not measured
         pval <- NA
@@ -499,6 +499,15 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                                    showscale = TRUE),
                      height = 800)
 
+  # Add the edges
+  p_network <- layout(
+    network,
+    title = '',
+    shapes = edges_area_combined,
+    xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
+    yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
+    hovermode = FALSE) 
+  
   # Add annotations over the nodes
   for (i in 1:nrow(nodes)) {
     p_network <- p_network %>% add_annotations(
@@ -516,15 +525,6 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                          "\np value: ", round(nodes$p_value[i], 5))
     )
   }
-
-  # Add the edges
-  p_network <- layout(
-    network,
-    title = '',
-    shapes = edges_area_combined,
-    xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
-    yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
-    hovermode = FALSE) 
   
   # Add annotations for the pathways
   for (i in 1:nrow(pathways)) {

@@ -72,6 +72,15 @@ ui <- fluidPage(
                          bsTooltip('defaultProcessing', 'The parameters for processing are set to default.')
                        ),
                        tags$br(),
+                       tags$h4('Export Raw Concentration', style = 'color:steelblue;font-weight:bold'),
+                       fluidRow(style = "display: flex; align-items: flex-end;",
+                         column(width = 7, selectInput('metaChoicesExport', 'Select Columns to include:',
+                                                       choices = character(0), multiple = T)),
+                         column(width = 5, downloadButton('downloadRawConc', 'Download',
+                                                          style = 'width:100%; margin-bottom: 15px')),
+                         bsTooltip('downloadRawConc', 'This output can directly be used for MetaboAnalyst')
+                       ),
+                       tags$br(),
                        tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
                        fluidRow(
                          column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
@@ -102,9 +111,11 @@ ui <- fluidPage(
                                                        min = 0, max = 10, value = 1.5, step = 0.5))
                        ),
                        fluidRow(
-                         column(width = 8, sliderInput('plotSignificanceYCutoff',
-                                                       'Select % y-cutoff',
-                                                       min = 0, max = 0.20, value = 0.05, step = 0.025)
+                         column(width = 8, selectInput('plotSignificanceYCutoff',
+                                                       'Select % p value significance',
+                                                       choices = c(0.2, 0.15, 0.10, 0.05, 0.01, 0.001),
+                                                       multiple = F,
+                                                       selected = 0.05)
                          )
                        )
                         
@@ -188,6 +199,8 @@ server <- function(input, output, session) {
         !is.null(reactMetabObj$metabObj)
       })
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
+      # Update Export Choices
+      updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
     }
   })
   
@@ -208,6 +221,8 @@ server <- function(input, output, session) {
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
       # Update Example Checkbox to False
       updateCheckboxInput(session, "exampleFile", value = FALSE)
+      # Update Export Choices
+      updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -260,7 +275,7 @@ server <- function(input, output, session) {
     return(list(metabAggreTbl = metabAggreTbl, smpMetadatTbl = smpMetadatTbl,
                 featCompleteLvTbl = featCompleteLvTbl, featStatusCountTbl = featStatusCountTbl))
   })
-  
+
   
   # Prepare choices for feature filtering and log2(FC) vulcano highlighting
   featChoices <- reactive({
@@ -682,27 +697,33 @@ server <- function(input, output, session) {
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     )
   })
-  
+  # Export Concentration Values
+  output$downloadRawConc <- downloadHandler(
+    filename = function() {
+      paste("concentration_values", ".csv", sep = "")
+    },
+    content = function(file) {
+      req(reactMetabObj$metabObj)
+      MetAlyzer::exportConcValues(reactMetabObj$metabObj, input$metaChoicesExport, file_path = "concentration_values.csv")
+    }
+  )
   # Visualize log2(FC)
   # Give sign before log2(FC) calculation
   output$textLog2FC <- renderText({
     'Please calculate Log₂(FC) first.'
   })
   # Vulcano plot
-  #### Set cutoffs for log2(FC) and p-value as parameters
-  #### Highlight also metabolic classes
-  #### Use white background by theme_bw()
   output$plotVolcano <- renderPlotly({
     req(reactLog2FCTbl())
     if (input$highlightVulcano) {
       req(reactVulcanoHighlight())
       plotly_vulcano(reactVulcanoHighlight(), 
                      cutoff_x = input$plotSignificanceXCutoff,
-                     cutoff_y = input$plotSignificanceYCutoff)
+                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
     } else {
       plotly_vulcano(reactLog2FCTbl(), 
                      cutoff_x = input$plotSignificanceXCutoff,
-                     cutoff_y = input$plotSignificanceYCutoff)
+                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
     }
   })
   
