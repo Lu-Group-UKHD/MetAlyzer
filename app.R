@@ -19,8 +19,7 @@ ui <- fluidPage(
       fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
                 placeholder = 'No .xlsx file selected'),
       checkboxInput('exampleFile', 
-                    HTML('<b>Select example dataframe:</b> Metabolite concentrations of 81 extraction samples by
-                         [Gegner <i>et al</i>. 2022]'), 
+                    HTML('Explore with an <b>example dataset</b>: <a href = "https://doi.org/10.3389/fmolb.2022.961448">[Gegner et al. 2022]</a>'), 
                     value = FALSE),
       # Show data processing options only after file is uploaded
       conditionalPanel(condition = "output.ifValidUploadedFile",
