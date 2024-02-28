@@ -529,11 +529,19 @@ server <- function(input, output, session) {
         metabObj <- MetAlyzer::filterMetaData(metabObj, is.na(.data[[selectedChoiceGp]]) |
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
-      # Use do.call to prepare arguments to be passed due to design of function:
-      # deparse(substitute(categorical))
+
       metabObj <- calc_log2FC(metalyzer_se = metabObj,
                               categorical = selectedChoiceGp)
       reactLog2FCTbl(log2FC(metabObj))
+      # Update the slider input, for custom inputs
+      updateSliderInput(session, "plotSignificanceXCutoff", 
+                        min = 0, 
+                        max = round(max(na.omit(reactLog2FCTbl()$log2FC)),1), 
+                        value = 1.5)
+      updateSliderInput(session, "plotSignificanceYCutoff", 
+                        min = 0, 
+                        max = round(max(na.omit(reactLog2FCTbl()$pval)),2), 
+                        value = 0.05)
     } else {
       showModal(modalDialog(
         title = 'Log₂(FC) computation failed...',
