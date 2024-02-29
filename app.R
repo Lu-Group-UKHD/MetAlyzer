@@ -18,6 +18,9 @@ ui <- fluidPage(
       tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
       fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
                 placeholder = 'No .xlsx file selected'),
+      checkboxInput('exampleFile', 
+                    HTML('Explore with an <b>example dataset</b>: <a href = "https://doi.org/10.3389/fmolb.2022.961448">[Gegner et al. 2022]</a>'), 
+                    value = FALSE),
       # Show data processing options only after file is uploaded
       conditionalPanel(condition = "output.ifValidUploadedFile",
                        tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
@@ -68,6 +71,15 @@ ui <- fluidPage(
                          bsTooltip('defaultProcessing', 'The parameters for processing are set to default.')
                        ),
                        tags$br(),
+                       tags$h4('Export Raw Concentration', style = 'color:steelblue;font-weight:bold'),
+                       fluidRow(style = "display: flex; align-items: flex-end;",
+                         column(width = 7, selectInput('metaChoicesExport', 'Select Columns to include:',
+                                                       choices = character(0), multiple = T)),
+                         column(width = 5, downloadButton('downloadRawConc', 'Download',
+                                                          style = 'width:100%; margin-bottom: 15px')),
+                         bsTooltip('downloadRawConc', 'This output can directly be used for MetaboAnalyst')
+                       ),
+                       tags$br(),
                        tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
                        fluidRow(
                          column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
@@ -91,6 +103,21 @@ ui <- fluidPage(
                          column(width = 5, checkboxInput('highlightVulcano', 'Highlight',
                                                          value = FALSE, width = '100%'))
                        ),
+                       tags$h4('Determine x- and y- cutoff for vulcano plot'),
+                       fluidRow(
+                         column(width = 8, sliderInput('plotSignificanceXCutoff',
+                                                       'Select log2FC x-cutoff',
+                                                       min = 0, max = 10, value = 1.5, step = 0.5))
+                       ),
+                       fluidRow(
+                         column(width = 8, selectInput('plotSignificanceYCutoff',
+                                                       'Select % p value significance',
+                                                       choices = c(0.2, 0.15, 0.10, 0.05, 0.01, 0.001),
+                                                       multiple = F,
+                                                       selected = 0.05)
+                         )
+                       )
+                        
                        
       )
     ),
@@ -158,6 +185,23 @@ server <- function(input, output, session) {
   reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL)
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
+
+  # Initialize Metalyzer SE Object with example data
+  observeEvent(input$exampleFile, {
+    if (input$exampleFile) {
+      metabObj <- MetAlyzer_dataset(file_path = example_extraction_data(), silent = T)
+      reactMetabObj$metabObj <- metabObj
+      # Make copy of original data for filtering reset
+      reactMetabObj$oriMetabObj <- metabObj
+      # Monitor whether uploaded file is valid to show further operations on client side
+      output$ifValidUploadedFile <- reactive({
+        !is.null(reactMetabObj$metabObj)
+      })
+      outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
+      # Update Export Choices
+      updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
+    }
+  })
   
   # Initialize MetAlyzer SE object
   observeEvent(input$uploadedFile, {
@@ -174,6 +218,10 @@ server <- function(input, output, session) {
         !is.null(reactMetabObj$metabObj)
       })
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
+      # Update Example Checkbox to False
+      updateCheckboxInput(session, "exampleFile", value = FALSE)
+      # Update Export Choices
+      updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -226,7 +274,7 @@ server <- function(input, output, session) {
     return(list(metabAggreTbl = metabAggreTbl, smpMetadatTbl = smpMetadatTbl,
                 featCompleteLvTbl = featCompleteLvTbl, featStatusCountTbl = featStatusCountTbl))
   })
-  
+
   
   # Prepare choices for feature filtering and log2(FC) vulcano highlighting
   featChoices <- reactive({
@@ -495,11 +543,19 @@ server <- function(input, output, session) {
         metabObj <- MetAlyzer::filterMetaData(metabObj, is.na(.data[[selectedChoiceGp]]) |
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
-      # Use do.call to prepare arguments to be passed due to design of function:
-      # deparse(substitute(categorical))
+
       metabObj <- calc_log2FC(metalyzer_se = metabObj,
                               categorical = selectedChoiceGp)
       reactLog2FCTbl(log2FC(metabObj))
+      # Update the slider input, for custom inputs
+      updateSliderInput(session, "plotSignificanceXCutoff", 
+                        min = 0, 
+                        max = round(max(na.omit(reactLog2FCTbl()$log2FC)),1), 
+                        value = 1.5)
+      updateSliderInput(session, "plotSignificanceYCutoff", 
+                        min = 0, 
+                        max = round(max(na.omit(reactLog2FCTbl()$pval)),2), 
+                        value = 0.05)
     } else {
       showModal(modalDialog(
         title = 'Log₂(FC) computation failed...',
@@ -517,17 +573,15 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'metabChoicesVulcano', choices = featChoices())
   })
   # Create new column for highlighting metabolites
-  #### Probably better change 'highlight_metabolites' to 'highlight'
   observeEvent(input$highlightVulcano, {
     req(reactLog2FCTbl())
     if (!is.null(input$metabChoicesVulcano)) {
       selectedChoices <- input$metabChoicesVulcano
       highlightTbl <- reactLog2FCTbl()
       
-      highlightTbl$highlight_metabolites <- "Other Metabolites"
-      highlightTbl$highlight_metabolites[highlightTbl$Metabolite %in% selectedChoices] <- "Highlighted Metabolite(s)"
-      highlightTbl$highlight_metabolites[highlightTbl$Class %in% selectedChoices] <- "Highlighted Metabolite(s)"
-      highlightTbl$highlight_metabolites <- as.factor(highlightTbl$highlight_metabolites)
+      highlightTbl$highlight <- FALSE
+      highlightTbl$highlight[highlightTbl$Metabolite %in% selectedChoices] <- TRUE
+      highlightTbl$highlight[highlightTbl$Class %in% selectedChoices] <- TRUE
       
       reactVulcanoHighlight(highlightTbl)
     }
@@ -538,10 +592,9 @@ server <- function(input, output, session) {
       selectedChoices <- input$metabChoicesVulcano
       highlightTbl <- reactLog2FCTbl()
       
-      highlightTbl$highlight_metabolites <- "Other Metabolites"
-      highlightTbl$highlight_metabolites[highlightTbl$Metabolite %in% selectedChoices] <- "Highlighted Metabolite(s)"
-      highlightTbl$highlight_metabolites[highlightTbl$Class %in% selectedChoices] <- "Highlighted Metabolite(s)"
-      highlightTbl$highlight_metabolites <- as.factor(highlightTbl$highlight_metabolites)
+      highlightTbl$highlight <- FALSE
+      highlightTbl$highlight[highlightTbl$Metabolite %in% selectedChoices] <- TRUE
+      highlightTbl$highlight[highlightTbl$Class %in% selectedChoices] <- TRUE
       
       reactVulcanoHighlight(highlightTbl)
     }
@@ -643,31 +696,47 @@ server <- function(input, output, session) {
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     )
   })
-  
+  # Export Concentration Values
+  output$downloadRawConc <- downloadHandler(
+    filename = function() {
+      paste("concentration_values", ".csv", sep = "")
+    },
+    content = function(file) {
+      req(reactMetabObj$metabObj)
+      MetAlyzer::exportConcValues(reactMetabObj$metabObj, input$metaChoicesExport, file_path = "concentration_values.csv")
+    }
+  )
   # Visualize log2(FC)
   # Give sign before log2(FC) calculation
   output$textLog2FC <- renderText({
     'Please calculate Log₂(FC) first.'
   })
   # Vulcano plot
-  #### Set cutoffs for log2(FC) and p-value as parameters
-  #### Highlight also metabolic classes
-  #### Use white background by theme_bw()
   output$plotVolcano <- renderPlotly({
     req(reactLog2FCTbl())
     if (input$highlightVulcano) {
       req(reactVulcanoHighlight())
-      plotly_vulcano(reactVulcanoHighlight())
+      plotly_vulcano(reactVulcanoHighlight(), 
+                     cutoff_x = input$plotSignificanceXCutoff,
+                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
     } else {
-      plotly_vulcano(reactLog2FCTbl())
+      plotly_vulcano(reactLog2FCTbl(), 
+                     cutoff_x = input$plotSignificanceXCutoff,
+                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
     }
   })
   
   # Scatter plot
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTbl())
-    plot <- plotly_scatter(reactLog2FCTbl())
-    plot$Plot
+    if (input$highlightVulcano) {
+      req(reactVulcanoHighlight())
+      plot <- plotly_scatter(reactVulcanoHighlight())
+      plot$Plot
+    } else {
+      plot <- plotly_scatter(reactLog2FCTbl())
+      plot$Plot
+    }
   })
   output$plotScatterLegend <- renderImage({
     req(reactLog2FCTbl()) 
