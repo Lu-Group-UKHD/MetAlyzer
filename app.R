@@ -31,7 +31,7 @@ ui <- fluidPage(
           conditionalPanel(condition = "output.ifValidUploadedFile",
                           tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
                           bsCollapse(
-                            open = 'Sample filtering', multiple = T,
+                            open = c('Sample filtering', 'Filtering Log'), multiple = T,
                             bsCollapsePanel('Sample filtering', style = 'info',
                                             selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
                                                         choices = character(0), multiple = T)),
@@ -67,6 +67,17 @@ ui <- fluidPage(
                               # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
                               #                               observed values in each metabolite.')),
                               # bsTooltip('normalization', 'Median scaling is conducted followed by log2 transformation.')
+                            ),
+                            bsCollapsePanel(
+                              'Filtering Log', style = 'info',
+                              fluidRow(
+                                column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Sample</h5>')),
+                                column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Features</h5>'))
+                              ),
+                              fluidRow(
+                                column(width=6, verbatimTextOutput('smpFilterLog')),
+                                column(width=6, verbatimTextOutput('featFilterLog')),
+                              )
                             )
                           ),
                           fluidRow(
@@ -90,13 +101,7 @@ ui <- fluidPage(
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            bsCollapse(
-                             open = 'Data distribution', multiple = T,
-                             bsCollapsePanel('Sample metadata', style = 'primary',
-                                             DT::dataTableOutput('tblSmpMetadat') %>%
-                                               withSpinner(color="#56070C")),
-                             bsCollapsePanel('Data distribution', style = 'primary',
-                                             plotlyOutput('plotDatDist') %>%
-                                               withSpinner(color="#56070C")),
+                             open = c('Data completeness', 'Quantification status'), multiple = T,
                              bsCollapsePanel('Data completeness', style = 'primary',
                                              bsCollapsePanel('Hint', style = 'success',
                                                              textOutput('summDatComplete', container = strong)),
@@ -107,6 +112,12 @@ ui <- fluidPage(
                                              bsCollapsePanel('Hint', style = 'success',
                                                              textOutput('summQuanStatus', container = strong)),
                                              plotlyOutput('plotQuanStatus') %>%
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Sample metadata', style = 'primary',
+                                             DT::dataTableOutput('tblSmpMetadat') %>%
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Data distribution', style = 'primary',
+                                             plotlyOutput('plotDatDist') %>%
                                                withSpinner(color="#56070C"))
                            )
           )
@@ -153,11 +164,6 @@ ui <- fluidPage(
                                               multiple = F,
                                               selected = 0.05)
                             )
-                          ),
-                          tags$br(),
-                          fluidRow(
-                            column(width = 6, downloadButton("downloadVulcanoPlot", "Download Interactive Vulcano Plot")),
-                            column(width = 6, downloadButton("downloadScatterPlot", "Download Interactive Scatter Plot"))
                           )
           )
         ),
@@ -168,7 +174,10 @@ ui <- fluidPage(
                           div(style = "text-align:center; margin-top: 1rem;",
                             tags$h4('Vulcano Plot'),
                             plotlyOutput('plotVolcano') %>%
-                              withSpinner(color="#56070C")
+                              withSpinner(color="#56070C"),
+                            fluidRow(style="display:flex; justify-content:center; margin-top: 1rem;",
+                              column(width = 3, downloadButton("downloadVulcanoPlot", "Download Interactive Vulcano Plot"))
+                            )
                           ),
                           tags$br(),
                           div(style = "text-align:center; margin-top: 1rem;",
@@ -178,6 +187,9 @@ ui <- fluidPage(
                                        shinycssloaders::withSpinner(color="#56070C")),
                               column(width = 3, style = "margin-left: -175px; z-index:1;",
                                      imageOutput('plotScatterLegend'))
+                            ),
+                            fluidRow(style="display:flex; justify-content:center; margin-bottom: 1rem; margin-top: 1rem;",
+                              column(width = 3, downloadButton("downloadScatterPlot", "Download Interactive Scatter Plot"))
                             )
                           )
           )
@@ -207,6 +219,9 @@ server <- function(input, output, session) {
   reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL)
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
+  
+  reactSmpFilterLog <- reactiveValues(log = c())
+  reactFeatFilterLog <- reactiveValues(log = c())
 
   # Initialize Metalyzer SE Object with example data
   observeEvent(input$exampleFile, {
@@ -232,6 +247,9 @@ server <- function(input, output, session) {
                                     sheet = 1, silent = T),
       silent = T)
     if (!is(validUploadedFile, 'try-error')) {
+      # Update Example Checkbox to False
+      updateCheckboxInput(session, "exampleFile", value = FALSE)
+      
       reactMetabObj$metabObj <- metabObj
       # Make copy of original data for filtering reset
       reactMetabObj$oriMetabObj <- metabObj
@@ -240,8 +258,6 @@ server <- function(input, output, session) {
         !is.null(reactMetabObj$metabObj)
       })
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
-      # Update Example Checkbox to False
-      updateCheckboxInput(session, "exampleFile", value = FALSE)
       # Update Export Choices
       updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
     } else {
@@ -409,6 +425,9 @@ server <- function(input, output, session) {
   # feature filtering is executed based on sample filtered data)
   observeEvent(input$updateProcessing, {
     req(input$smpChoicesFiltering)
+
+    reactSmpFilterLog$log <- c(reactSmpFilterLog$log, input$smpChoicesFiltering)
+    
     for (selectedChoice in input$smpChoicesFiltering) {
       selectedChoiceGp <- smpChoicePack()$smpChoices2Gps[selectedChoice]
       # Prepare up-to-date choices of selected choice group to avoid error that
@@ -450,9 +469,11 @@ server <- function(input, output, session) {
   #### Add advanced feature filtering: Modified 80% rule
   observeEvent(input$updateProcessing, {
     req(datOverviewPack())
+    
+    reactFeatFilterLog$log <- c(reactFeatFilterLog$log, input$featChoicesFiltering)
+    
     # Collect features to remove based on user's selection
     rmSelectedFeats <- input$featChoicesFiltering
-    print(is.null(rmSelectedFeats))
     # Collect features to remove based on missingness
     featCompleteLvTbl <- datOverviewPack()$featCompleteLvTbl
     featCompleteLevels <- featCompleteLvTbl$CompleteRatio
@@ -508,6 +529,9 @@ server <- function(input, output, session) {
   observeEvent(input$revertProcessing, {
     reactMetabObj$metabObj <- reactMetabObj$oriMetabObj
     doneNormalization(0)
+    
+    reactSmpFilterLog$log <- c()
+    reactFeatFilterLog$log <- c()
   })
   
   # Update sample choice groups for log2(FC) calculation
@@ -630,6 +654,21 @@ server <- function(input, output, session) {
   #         axis.ticks = element_line(linewidth = 0.8),
   #         legend.text = element_text(size = 15))
   
+  # Filter Logs
+  output$smpFilterLog <- renderPrint({
+    req(reactSmpFilterLog$log)
+    
+    print_string <- paste(reactSmpFilterLog$log, collapse = "\n")
+    cat(print_string)
+  })
+  
+  output$featFilterLog <- renderPrint({
+    req(reactFeatFilterLog$log)
+
+    print_string <- paste(reactFeatFilterLog$log, collapse = "\n")
+    cat(print_string)
+  })
+  
   # Show data overviews
   # Data distribution
   output$plotDatDist <- renderPlotly({
@@ -721,11 +760,16 @@ server <- function(input, output, session) {
   # Export Concentration Values
   output$downloadRawConc <- downloadHandler(
     filename = function() {
-      paste("concentration_values", ".csv", sep = "")
+      paste("concentration_values_", format(Sys.Date(), "%Y-%m-%d"), ".csv", sep = "")
     },
     content = function(file) {
       req(reactMetabObj$metabObj)
-      MetAlyzer::exportConcValues(reactMetabObj$metabObj, input$metaChoicesExport, file_path = "concentration_values.csv")
+      
+      output_file <- file.path(tempdir(), paste("concentration_values_", format(Sys.Date(), "%Y-%m-%d"), ".csv", sep = ""))
+      MetAlyzer::exportConcValues(reactMetabObj$metabObj, input$metaChoicesExport, file_path = output_file)
+      
+      file.copy(output_file, file)
+      unlink(output_file)
     }
   )
   # Visualize log2(FC)
@@ -835,7 +879,7 @@ server <- function(input, output, session) {
           contentType = 'image/svg+xml',
           width = 571.675,
           height = 400,
-          alt = "My svg Histogram",
+          alt = "",
           deleteFile = TRUE)
   }, deleteFile = TRUE)
   
