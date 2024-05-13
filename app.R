@@ -6,126 +6,88 @@ library(SummarizedExperiment)
 library(tidyverse)
 library(limma)
 source("utils.R")
+library(bslib)
+library(htmlwidgets)
 
 # setwd('/Users/qianwu/Desktop/RShiny_Biocrates_DataAnalysis')
 # metabObj <- MetAlyzer_dataset(file_path = './data/extraction_data.xlsx', silent = T)
 
+
 ui <- fluidPage(
-  # App title
   titlePanel('Biocrates Metabolomics Analysis'),
-  sidebarLayout(
-    sidebarPanel(
-      tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
-      fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
-                placeholder = 'No .xlsx file selected'),
-      checkboxInput('exampleFile', 
-                    HTML('Explore with an <b>example dataset</b>: <a href = "https://doi.org/10.3389/fmolb.2022.961448">[Gegner et al. 2022]</a>'), 
-                    value = FALSE),
-      # Show data processing options only after file is uploaded
-      conditionalPanel(condition = "output.ifValidUploadedFile",
-                       tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
-                       bsCollapse(
-                         open = 'Sample filtering', multiple = T,
-                         bsCollapsePanel('Sample filtering', style = 'info',
-                                         selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
-                                                     choices = character(0), multiple = T)),
-                         bsCollapsePanel(
-                           'Metabolite filtering', style = 'info',
-                           selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
-                                       choices = character(0), multiple = T),
-                           fluidRow(
-                             column(width = 8, sliderInput('featCompleteCutoffFiltering',
-                                                           'Select % of observed values each metabolite should have:',
-                                                           min = 0, max = 100, value = 80))
-                           ),
-                           fluidRow(
-                             column(width = 8, sliderInput('featValidCutoffFiltering',
-                                                           'Select % of valid values each metabolite should have:',
-                                                           min = 0, max = 100, value = 50)),
-                             column(width = 3, offset = 1,
-                                    checkboxGroupInput('featValidStatusFiltering', 'Validity',
-                                                       choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
-                                                       selected = c('Valid', 'LOQ'))),
-                             bsTooltip('featCompleteCutoffFiltering',
-                                       'Metabolites with observed values below this cutoff are removed.'),
-                             bsTooltip('featValidCutoffFiltering',
-                                       'Metabolites with valid values below this cutoff are removed.'),
-                             bsTooltip('featValidStatusFiltering',
-                                       'The selected is considered valid for filtering.')
-                           )
-                         ),
-                         bsCollapsePanel(
-                           'Imputation and Normalization', style = 'info',
-                           checkboxInput('imputation', 'Half minimum (HM) imputation', value = T),
-                           checkboxInput('normalization', 'Median normalization (followed by log2 transformation)', value = T)
-                           # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
-                           #                               observed values in each metabolite.')),
-                           # bsTooltip('normalization', 'Median scaling is conducted followed by log2 transformation.')
-                         )
-                       ),
-                       fluidRow(
-                         column(width = 5, actionButton('updateProcessing', 'Process', width = '100%')),
-                         column(width = 3, offset = 1, actionButton('revertProcessing', 'Revert', width = '100%')),
-                         column(width = 3, actionButton('defaultProcessing', 'Default', width = '100%')),
-                         bsTooltip('revertProcessing', 'The processed data reverts to the original data.'),
-                         bsTooltip('defaultProcessing', 'The parameters for processing are set to default.')
-                       ),
-                       tags$br(),
-                       tags$h4('Export Raw Concentration', style = 'color:steelblue;font-weight:bold'),
-                       fluidRow(style = "display: flex; align-items: flex-end;",
-                         column(width = 7, selectInput('metaChoicesExport', 'Select Columns to include:',
-                                                       choices = character(0), multiple = T)),
-                         column(width = 5, downloadButton('downloadRawConc', 'Download',
-                                                          style = 'width:100%; margin-bottom: 15px')),
-                         bsTooltip('downloadRawConc', 'This output can directly be used for MetaboAnalyst')
-                       ),
-                       tags$br(),
-                       tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
-                       fluidRow(
-                         column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
-                                                       choices = 'Not available', multiple = F)),
-                         column(width = 3, selectInput('smpChoicesLog2FC_1', 'Group1',
-                                                       choices = character(0), multiple = F),
-                                offset = 1),
-                         column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
-                                                       choices = character(0), multiple = F))
-                       ),
-                       fluidRow(
-                         column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
-                       ),
-                       tags$br(),
-                       tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
-                       fluidRow(
-                         style = "display: flex; align-items: center;",
-                         column(width = 7, selectInput('metabChoicesVulcano',
-                                                       'Select metabolite(s) to highlight:',
-                                                       choices = character(0), multiple = T)),
-                         column(width = 5, checkboxInput('highlightVulcano', 'Highlight',
-                                                         value = FALSE, width = '100%'))
-                       ),
-                       tags$h4('Determine x- and y- cutoff for vulcano plot'),
-                       fluidRow(
-                         column(width = 8, sliderInput('plotSignificanceXCutoff',
-                                                       'Select log2FC x-cutoff',
-                                                       min = 0, max = 10, value = 1.5, step = 0.5))
-                       ),
-                       fluidRow(
-                         column(width = 8, selectInput('plotSignificanceYCutoff',
-                                                       'Select % p value significance',
-                                                       choices = c(0.2, 0.15, 0.10, 0.05, 0.01, 0.001),
-                                                       multiple = F,
-                                                       selected = 0.05)
-                         )
-                       )
-                        
-                       
-      )
-    ),
-    mainPanel(
-      tabsetPanel(
-        type = 'tabs',
-        tabPanel(
-          'Overview',
+  tabsetPanel(
+    type = 'tabs',
+    tabPanel(
+      'Overview',
+      sidebarLayout(
+        sidebarPanel(
+          tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
+          fileInput('uploadedFile', NULL, multiple = F, accept = '.xlsx',
+                    placeholder = 'No .xlsx file selected'),
+          checkboxInput('exampleFile', 
+                        HTML('Explore with an <b>example dataset</b>: <a href = "https://doi.org/10.3389/fmolb.2022.961448">[Gegner et al. 2022]</a>'), 
+                        value = FALSE),
+          # Show data processing options only after file is uploaded
+          conditionalPanel(condition = "output.ifValidUploadedFile",
+                          tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
+                          bsCollapse(
+                            open = 'Sample filtering', multiple = T,
+                            bsCollapsePanel('Sample filtering', style = 'info',
+                                            selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
+                                                        choices = character(0), multiple = T)),
+                            bsCollapsePanel(
+                              'Metabolite filtering', style = 'info',
+                              selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
+                                          choices = character(0), multiple = T),
+                              fluidRow(
+                                column(width = 8, sliderInput('featCompleteCutoffFiltering',
+                                                              'Select % of observed values each metabolite should have:',
+                                                              min = 0, max = 100, value = 80))
+                              ),
+                              fluidRow(
+                                column(width = 8, sliderInput('featValidCutoffFiltering',
+                                                              'Select % of valid values each metabolite should have:',
+                                                              min = 0, max = 100, value = 50)),
+                                column(width = 3, offset = 1,
+                                        checkboxGroupInput('featValidStatusFiltering', 'Validity',
+                                                          choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
+                                                          selected = c('Valid', 'LOQ'))),
+                                bsTooltip('featCompleteCutoffFiltering',
+                                          'Metabolites with observed values below this cutoff are removed.'),
+                                bsTooltip('featValidCutoffFiltering',
+                                          'Metabolites with valid values below this cutoff are removed.'),
+                                bsTooltip('featValidStatusFiltering',
+                                          'The selected is considered valid for filtering.')
+                              )
+                            ),
+                            bsCollapsePanel(
+                              'Imputation and Normalization', style = 'info',
+                              checkboxInput('imputation', 'Half minimum (HM) imputation', value = T),
+                              checkboxInput('normalization', 'Median normalization (followed by log2 transformation)', value = T)
+                              # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
+                              #                               observed values in each metabolite.')),
+                              # bsTooltip('normalization', 'Median scaling is conducted followed by log2 transformation.')
+                            )
+                          ),
+                          fluidRow(
+                            column(width = 5, actionButton('updateProcessing', 'Process', width = '100%')),
+                            column(width = 3, offset = 1, actionButton('revertProcessing', 'Revert', width = '100%')),
+                            column(width = 3, actionButton('defaultProcessing', 'Default', width = '100%')),
+                            bsTooltip('revertProcessing', 'The processed data reverts to the original data.'),
+                            bsTooltip('defaultProcessing', 'The parameters for processing are set to default.')
+                          ),
+                          tags$br(),
+                          tags$h4('Export Raw Concentration', style = 'color:steelblue;font-weight:bold'),
+                          fluidRow(style = "display: flex; align-items: flex-end;",
+                            column(width = 7, selectInput('metaChoicesExport', 'Select Columns to include:',
+                                                          choices = character(0), multiple = T)),
+                            column(width = 5, downloadButton('downloadRawConc', 'Download',
+                                                              style = 'width:100%; margin-bottom: 15px')),
+                            bsTooltip('downloadRawConc', 'This output can directly be used for MetaboAnalyst')
+                          )            
+          )
+        ),
+        mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            bsCollapse(
                              open = 'Data distribution', multiple = T,
@@ -146,39 +108,99 @@ ui <- fluidPage(
                                                              textOutput('summQuanStatus', container = strong)),
                                              plotlyOutput('plotQuanStatus') %>%
                                                withSpinner(color="#56070C"))
-                           ),
-          )
-        ),
-        tabPanel(
-          'Log₂(FC)',
-          conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
-                           div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
-          conditionalPanel(condition = "input.computeLog2FC",
-                           bsCollapse(
-                             open = 'Vulcano Plot', multiple = T,
-                             bsCollapsePanel('Vulcano Plot', style = 'primary', 
-                                             plotlyOutput('plotVolcano') %>%
-                                               withSpinner(color="#56070C")),
-                             bsCollapsePanel('Scatter Plot', style = 'primary',
-                                             fluidRow(
-                                               column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C")),
-                                               column(width = 3, style = "margin-left: -175px; z-index:1;",
-                                                      imageOutput('plotScatterLegend'))
-                                             )),
-                             bsCollapsePanel('Network Plot', style = 'primary',
-                                             div(style = "height: 800px;",
-                                                 plotlyOutput('plotNetwork') %>%
-                                                   withSpinner(color="#56070C")))
-                           ),
+                           )
           )
         )
+      )
+    ), # TabPanel 1 End
+    tabPanel(
+      'Log₂(FC)',
+      sidebarLayout(
+        sidebarPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile",
+                          tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
+                          fluidRow(
+                            column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
+                                                          choices = 'Not available', multiple = F)),
+                            column(width = 3, selectInput('smpChoicesLog2FC_1', 'Group1',
+                                                          choices = character(0), multiple = F),
+                                  offset = 1),
+                            column(width = 3, selectInput('smpChoicesLog2FC_2', 'Group2',
+                                                          choices = character(0), multiple = F))
+                          ),
+                          fluidRow(
+                            column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
+                          ),
+                          tags$br(),
+                          tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
+                          fluidRow(
+                            style = "display: flex; align-items: center;",
+                            column(width = 7, selectInput('metabChoicesVulcano',
+                                                          'Select metabolite(s) to highlight:',
+                                                          choices = character(0), multiple = T)),
+                            column(width = 5, checkboxInput('highlightVulcano', 'Highlight',
+                                                            value = FALSE, width = '100%'))
+                          ),
+                          tags$h4('Determine x- and y- cutoff for vulcano plot'),
+                          fluidRow(
+                            column(width = 6, sliderInput('plotSignificanceXCutoff',
+                                                          'Select log2FC x-cutoff',
+                                                          min = 0, max = 10, value = 1.5, step = 0.5)
+                            ),
+                            column(width = 6, selectInput('plotSignificanceYCutoff',
+                                              'Select % p value significance',
+                                              choices = c(0.2, 0.15, 0.10, 0.05, 0.01, 0.001),
+                                              multiple = F,
+                                              selected = 0.05)
+                            )
+                          ),
+                          tags$br(),
+                          fluidRow(
+                            column(width = 6, downloadButton("downloadVulcanoPlot", "Download Interactive Vulcano Plot")),
+                            column(width = 6, downloadButton("downloadScatterPlot", "Download Interactive Scatter Plot"))
+                          )
+          )
+        ),
+        mainPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
+                          div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
+          conditionalPanel(condition = "input.computeLog2FC",
+                          div(style = "text-align:center; margin-top: 1rem;",
+                            tags$h4('Vulcano Plot'),
+                            plotlyOutput('plotVolcano') %>%
+                              withSpinner(color="#56070C")
+                          ),
+                          tags$br(),
+                          div(style = "text-align:center; margin-top: 1rem;",
+                            tags$h4('Scatter Plot'),
+                            fluidRow(
+                              column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
+                                       shinycssloaders::withSpinner(color="#56070C")),
+                              column(width = 3, style = "margin-left: -175px; z-index:1;",
+                                     imageOutput('plotScatterLegend'))
+                            )
+                          )
+          )
+        )
+      )
+    ), # TabPanel 2 End
+    tabPanel(
+      'Network',
+      tags$br(),
+      #### If I add this App breaks ??
+      #conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
+      #                 div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
+      conditionalPanel(condition = "output.ifValidUploadedFile",
+                      div(style = "height: 100vh; width: 100%;",
+                        plotlyOutput('plotNetwork') %>%
+                          withSpinner(color="#56070C"),
+                        div(style = "width: 100%; margin-top: 405px; display: flex; justify-content: center;",
+                            downloadButton("downloadNetworkPlot", "Download Interactive Network Plot"))
+                      )
       )
     )
   )
 )
-
-
 
 server <- function(input, output, session) {
   # Create reactive objects for storing up-to-date data
@@ -711,6 +733,66 @@ server <- function(input, output, session) {
   output$textLog2FC <- renderText({
     'Please calculate Log₂(FC) first.'
   })
+  # Download the log2(FC) visuals as html
+  output$downloadVulcanoPlot <- downloadHandler(
+    filename = function() {
+      "vulcano_plot.html"
+    },
+    content = function(file) {
+      # Define a variable to store the final plot
+      if (input$highlightVulcano) {
+        req(reactVulcanoHighlight())
+        final_plot <- plotly_vulcano(reactVulcanoHighlight(), 
+                       cutoff_x = input$plotSignificanceXCutoff,
+                       cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+      } else {
+        final_plot <- plotly_vulcano(reactLog2FCTbl(), 
+                       cutoff_x = input$plotSignificanceXCutoff,
+                       cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+      }
+      
+      # Save the Plotly plot as an HTML file
+      htmlwidgets::saveWidget(
+        widget = final_plot,
+        file = file,
+        selfcontained = TRUE
+      )
+    }
+  )
+  output$downloadScatterPlot <- downloadHandler(
+    filename = function() {
+      "scatter_plot.html"
+    },
+    content = function(file) {
+      # Define a variable to store the final plot
+      if (input$highlightVulcano) {
+        req(reactVulcanoHighlight())
+        final_plot <- plotly_scatter(reactVulcanoHighlight())$Plot
+      } else {
+        final_plot <- plotly_scatter(reactLog2FCTbl())$Plot
+      }
+      
+      # Save the Plotly plot as an HTML file
+      htmlwidgets::saveWidget(
+        widget = final_plot,
+        file = file,
+        selfcontained = TRUE
+      )
+    }
+  )
+  output$downloadNetworkPlot <- downloadHandler(
+    filename = function() {
+      "network_plot.html"
+    },
+    content = function(file) {
+      # Save the Plotly plot as an HTML file
+      htmlwidgets::saveWidget(
+        widget = plotly_network(reactLog2FCTbl()),
+        file = file,
+        selfcontained = TRUE
+      )
+    }
+  )
   # Vulcano plot
   output$plotVolcano <- renderPlotly({
     req(reactLog2FCTbl())
@@ -732,10 +814,10 @@ server <- function(input, output, session) {
     if (input$highlightVulcano) {
       req(reactVulcanoHighlight())
       plot <- plotly_scatter(reactVulcanoHighlight())
-      plot$Plot
+      hide_legend(plot$Plot)
     } else {
       plot <- plotly_scatter(reactLog2FCTbl())
-      plot$Plot
+      hide_legend(plot$Plot)
     }
   })
   output$plotScatterLegend <- renderImage({

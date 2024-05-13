@@ -168,7 +168,7 @@ plotly_scatter <- function(Log2FCTab) {
     filter(.data$Class %in% names(lc_colors)) %>%
     select(.data$x) %>%
     max()
-  
+
   ylims <- c(min(Log2FCTab$log2FC) - 0.75, max(Log2FCTab$log2FC) + 0,75)
   
   ## Plot: Create ggplot object
@@ -190,7 +190,7 @@ plotly_scatter <- function(Log2FCTab) {
     geom_point(size = 0.5, aes(text = paste0(Metabolite, 
                                              "\nClass: ", Class, 
                                              "\nlog2 Fold Change: ", round(log2FC, digits=5),  
-                                             "\np-value: ", round(pval, digits=5)))) + 
+                                             "\nadj. p-value: ", round(qval, digits=5)))) + 
     scale_color_manual(paste0('Significance\n(linear model fit with FDR correction)'),
                        labels = signif_labels,
                        values = names(signif_colors),
@@ -214,7 +214,6 @@ plotly_scatter <- function(Log2FCTab) {
 
   ## Interactive: Create interactive plot
   plotly_plot <- ggplotly(p_scatter, tooltip = "text", showlegend = FALSE)
-  plotly_plot <- hide_legend(plotly_plot)
 
   # TODO: Find god to figure out why this is not working
   ## Highlight Metabolites by changing symbol
@@ -253,6 +252,16 @@ plotly_scatter <- function(Log2FCTab) {
 #' @param cutoff_y A numeric value specifying the cutoff for q-value
 #' @param cutoff_x A numeric value specifying the cutoff for log2 fold change
 plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
+  # Make Colors unique for each class
+  polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
+  polarity_df <- utils::read.csv(polarity_file) %>%
+  select(.data$Class,
+          .data$Polarity) %>%
+  mutate(Class = factor(.data$Class),
+          Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
+  arrange(.data$Polarity)
+  class_colors <- metalyzer_colors()
+  names(class_colors) <- levels(polarity_df$Class)
   ## Data: Replace NAs
   Log2FCTab$log2FC[is.na(Log2FCTab$log2FC)] <- 0
   Log2FCTab$qval[is.na(Log2FCTab$qval)] <- 1
@@ -270,7 +279,7 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
       geom_point(size = 1, aes(text = paste0(Metabolite, 
                                             "\nClass: ", Class, 
                                             "\nlog2 Fold Change: ", round(log2FC, digits=5), 
-                                            "\np-value: ", round(pval, digits=5)))) +
+                                            "\nadj. p-value: ", round(qval, digits=5)))) +
       geom_vline(xintercept=c(-log2(cutoff_x), log2(cutoff_x)), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
       scale_color_manual('',
@@ -302,7 +311,7 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
       geom_point(size = 1, aes(text = paste0(Metabolite, 
                                             "\nClass: ", Class, 
                                             "\nlog2 Fold Change: ", round(log2FC, digits=5), 
-                                            "\np-value: ", round(pval, digits=5)))) +
+                                            "\nadj. p-value: ", round(qval, digits=5)))) +
       scale_color_manual('Classes',
                          breaks = breaks,
                          values = values,
@@ -411,19 +420,19 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
   })
 
   ## Add p-value to nodes_df
-  nodes$p_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+  nodes$q_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
     tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
-      pval <- sum(tmp_df$pval) / nrow(tmp_df)
+      qval <- sum(tmp_df$qval) / nrow(tmp_df)
     } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
         # Not significantly changed but measured
-        pval <- sum(Log2FCTab$pval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
+        qval <- sum(Log2FCTab$qval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
         # Not measured
-        pval <- NA
+        qval <- NA
     }
-    return(pval)
+    return(qval)
   })
 
   ## Draw network
@@ -494,7 +503,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                      type = "scatter",
                      mode = "markers",
                      marker = list(color = nodes$FC_thresh, 
-                                   colorbar = list(title = "log2FC with FDR correction"),
+                                   colorbar = list(title = ""),
                                    colorscale='Viridis',
                                    showscale = TRUE),
                      height = 800)
@@ -502,7 +511,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
   # Add the edges
   p_network <- layout(
     network,
-    title = '',
+    title = 'Log₂(FC) with FDR Correction',
     shapes = edges_area_combined,
     xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
     yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
@@ -522,7 +531,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       opacity = 1,
       hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
                          "\nPathway: ", nodes$Pathway[i],
-                         "\np value: ", round(nodes$p_value[i], 5))
+                         "\nadj. p-value: ", round(nodes$q_value[i], 5))
     )
   }
   
