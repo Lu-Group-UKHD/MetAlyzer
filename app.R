@@ -9,10 +9,6 @@ source("utils.R")
 library(bslib)
 library(htmlwidgets)
 
-# setwd('/Users/qianwu/Desktop/RShiny_Biocrates_DataAnalysis')
-# metabObj <- MetAlyzer_dataset(file_path = './data/extraction_data.xlsx', silent = T)
-
-
 ui <- fluidPage(
   titlePanel('Biocrates Metabolomics Analysis'),
   tabsetPanel(
@@ -471,7 +467,7 @@ server <- function(input, output, session) {
     req(datOverviewPack())
     
     reactFeatFilterLog$log <- c(reactFeatFilterLog$log, input$featChoicesFiltering)
-    
+
     # Collect features to remove based on user's selection
     rmSelectedFeats <- input$featChoicesFiltering
     # Collect features to remove based on missingness
@@ -496,10 +492,11 @@ server <- function(input, output, session) {
       #### rmFeats to 'drop_metabolites'????
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
                                                              drop_metabolites = rmSelectedFeats,
-                                                             drop_NA_concentration = NULL)
+                                                             drop_NA_concentration = FALSE)
+      
       reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
                                                              drop_metabolites = rmMissFeats,
-                                                             drop_NA_concentration = NULL,
+                                                             drop_NA_concentration = FALSE,
                                                              min_percent_valid = featValidCutoff,
                                                              valid_status = featValidStatus,
                                                              per_group = NULL)
