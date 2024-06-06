@@ -190,7 +190,8 @@ plotly_scatter <- function(Log2FCTab) {
     geom_point(size = 0.5, aes(text = paste0(Metabolite, 
                                              "\nClass: ", Class, 
                                              "\nlog2 Fold Change: ", round(log2FC, digits=5),  
-                                             "\nadj. p-value: ", round(qval, digits=5)))) + 
+                                             "\nadj. p-value: ", round(qval, digits=5),
+                                             "\np-value: ", round(pval, digits=5)))) + 
     scale_color_manual(paste0('Significance\n(linear model fit with FDR correction)'),
                        labels = signif_labels,
                        values = names(signif_colors),
@@ -279,7 +280,8 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
       geom_point(size = 1, aes(text = paste0(Metabolite, 
                                             "\nClass: ", Class, 
                                             "\nlog2 Fold Change: ", round(log2FC, digits=5), 
-                                            "\nadj. p-value: ", round(qval, digits=5)))) +
+                                            "\nadj. p-value: ", round(qval, digits=5),
+                                            "\np-value: ", round(pval, digits=5)))) +
       geom_vline(xintercept=c(-log2(cutoff_x), log2(cutoff_x)), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
       scale_color_manual('',
@@ -311,7 +313,8 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
       geom_point(size = 1, aes(text = paste0(Metabolite, 
                                             "\nClass: ", Class, 
                                             "\nlog2 Fold Change: ", round(log2FC, digits=5), 
-                                            "\nadj. p-value: ", round(qval, digits=5)))) +
+                                            "\nadj. p-value: ", round(qval, digits=5),
+                                            "\np-value: ", round(pval, digits=5)))) +
       scale_color_manual('Classes',
                          breaks = breaks,
                          values = values,
@@ -419,7 +422,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
     return(l2fc)
   })
 
-  ## Add p-value to nodes_df
+  ## Add q-value to nodes_df
   nodes$q_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
     tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
@@ -433,6 +436,22 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
         qval <- NA
     }
     return(qval)
+  })
+
+  ## Add p-value to nodes_df
+  nodes$p_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 significantly changed
+      pval <- sum(tmp_df$pval) / nrow(tmp_df)
+    } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
+        # Not significantly changed but measured
+        pval <- sum(Log2FCTab$pval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
+    } else {
+        # Not measured
+        pval <- NA
+    }
+    return(pval)
   })
 
   ## Draw network
@@ -531,7 +550,8 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       opacity = 1,
       hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
                          "\nPathway: ", nodes$Pathway[i],
-                         "\nadj. p-value: ", round(nodes$q_value[i], 5))
+                         "\nadj. p-value: ", round(nodes$q_value[i], 5),
+                         "\np-value: ", round(nodes$p_value[i], 5))
     )
   }
   
