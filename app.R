@@ -212,7 +212,7 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   # Create reactive objects for storing up-to-date data
-  reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL)
+  reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL, tmpMetabObj = NULL)
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
   reactParamLog <- reactiveValues(smpFiltering = c(), featFiltering = c())
@@ -235,7 +235,6 @@ server <- function(input, output, session) {
   observe({
     req(!input$exampleFile)
     reactMetabObj$metabObj <- NULL
-    reactMetabObj$oriMetabObj <- NULL
   })
   # Initialize Metalyzer SE object with example data
   observeEvent(input$exampleFile, {
@@ -244,6 +243,8 @@ server <- function(input, output, session) {
     reactMetabObj$metabObj <- metabObj
     # Make copy of original data for filtering reset
     reactMetabObj$oriMetabObj <- metabObj
+    # Make copy of original data for sanity check of filtering
+    reactMetabObj$tmpMetabObj <- metabObj
     # Monitor whether example data is used to show further operations on client side
     output$ifValidUploadedFile <- reactive({
       !is.null(reactMetabObj$metabObj)
@@ -264,6 +265,8 @@ server <- function(input, output, session) {
       reactMetabObj$metabObj <- metabObj
       # Make copy of original data for filtering reset
       reactMetabObj$oriMetabObj <- metabObj
+      # Make copy of original data for sanity check of filtering
+      reactMetabObj$tmpMetabObj <- metabObj
       # Monitor whether uploaded file is valid to show further operations on client side
       output$ifValidUploadedFile <- reactive({
         !is.null(reactMetabObj$metabObj)
@@ -281,7 +284,6 @@ server <- function(input, output, session) {
         footer = NULL
       ))
       reactMetabObj$metabObj <- NULL
-      reactMetabObj$oriMetabObj <- NULL
     }
   })
   
@@ -418,14 +420,11 @@ server <- function(input, output, session) {
   # feature filtering is executed based on sample filtered data)
   observeEvent(input$updateProcessing, {
     req(input$smpChoicesFiltering)
-
-    reactParamLog$smpFiltering <- unique(c(reactParamLog$smpFiltering, input$smpChoicesFiltering))
-    
     for (selectedChoice in input$smpChoicesFiltering) {
       selectedChoiceGp <- smpChoicePack()$smpChoices2Gps[selectedChoice]
       # Prepare up-to-date choices of selected choice group to avoid error that
       # metadata of same sample is selected multiple times at once
-      choices <- unique(colData(reactMetabObj$metabObj)[[selectedChoiceGp]])
+      choices <- unique(colData(reactMetabObj$tmpMetabObj)[[selectedChoiceGp]])
       # Convert NA into character so that it can be searched
       if (any(is.na(choices))) {
         choices <- choices[-which(is.na(choices))]
@@ -434,11 +433,11 @@ server <- function(input, output, session) {
       if (!selectedChoiceGp %in% smpChoicePack()$dupSmpChoiceGps) {
         if (selectedChoice %in% choices) {
           if (selectedChoice == 'NA') {
-            reactMetabObj$metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
-                                                                !is.na(.data[[selectedChoiceGp]]))
+            reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetaData(reactMetabObj$tmpMetabObj,
+                                                                   !is.na(.data[[selectedChoiceGp]]))
           } else {
-            reactMetabObj$metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
-                                                                !.data[[selectedChoiceGp]] %in% selectedChoice)
+            reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetaData(reactMetabObj$tmpMetabObj,
+                                                                   !.data[[selectedChoiceGp]] %in% selectedChoice)
           }
         }
       } else {
@@ -448,23 +447,36 @@ server <- function(input, output, session) {
         modSelectedChoice <- stringr::str_remove(selectedChoice, regexSuffix)
         if (modSelectedChoice %in% choices) {
           if (modSelectedChoice == 'NA') {
-            reactMetabObj$metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
-                                                                !is.na(.data[[selectedChoiceGp]]))
+            reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetaData(reactMetabObj$tmpMetabObj,
+                                                                   !is.na(.data[[selectedChoiceGp]]))
           } else {
-            reactMetabObj$metabObj <- MetAlyzer::filterMetaData(reactMetabObj$metabObj,
-                                                                !.data[[selectedChoiceGp]] %in% modSelectedChoice)
+            reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetaData(reactMetabObj$tmpMetabObj,
+                                                                   !.data[[selectedChoiceGp]] %in% modSelectedChoice)
           }
         }
       }
+    }
+    # Avoid app crash when no sample is left
+    if (ncol(reactMetabObj$tmpMetabObj) != 0) {
+      # Update main Metalyzer object for reverting temporary Metalyzer object in
+      # feature filtering part if needed
+      reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
+      
+      # Log samples removed
+      reactParamLog$smpFiltering <- unique(c(reactParamLog$smpFiltering, input$smpChoicesFiltering))
+    } else {
+      showModal(modalDialog(
+        title = 'No sample is left after sample filtering...',
+        'Please respecify parameters for sample filtering.',
+        easyClose = T,
+        footer = NULL
+      ))
     }
   })
   # Do feature filtering
   #### Add advanced feature filtering: Modified 80% rule
   observeEvent(input$updateProcessing, {
     req(datOverviewPack())
-    
-    reactParamLog$featFiltering <- unique(c(reactParamLog$featFiltering, input$featChoicesFiltering))
-
     # Collect features to remove based on user's selection
     rmSelectedFeats <- input$featChoicesFiltering
     # Collect features to remove based on missingness
@@ -483,26 +495,41 @@ server <- function(input, output, session) {
     # featValidLevels <- featValidCounts / featStatusCountTbl[['TotalCount']]
     # rmInvalidFeats <- featStatusCountTbl$Metabolite[featValidLevels < featValidCutoff]
     # # Summarize features to remove
-    rmFeats <- unique(c(rmSelectedFeats, rmMissFeats)) # rmInvalidFeats
-    if (any(length(rmFeats) != 0, featValidCutoff != 0)) {
+    # rmFeats <- unique(c(rmSelectedFeats, rmMissFeats)) # rmInvalidFeats
+    # Skip feature filtering if no sample was left in sample filtering part since
+    # feature filtering is based on sample filtered data
+    if (ncol(reactMetabObj$tmpMetabObj) != 0) {
       #### Filtering results depend on whether rmSelectedFeats is Null when specifying
       #### rmFeats to 'drop_metabolites'????
-      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = rmSelectedFeats,
-                                                             drop_NA_concentration = FALSE)
-      
-      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = rmMissFeats,
-                                                             drop_NA_concentration = FALSE,
-                                                             min_percent_valid = featValidCutoff,
-                                                             valid_status = featValidStatus,
-                                                             per_group = NULL)
+      reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetabolites(reactMetabObj$tmpMetabObj,
+                                                                drop_metabolites = rmSelectedFeats,
+                                                                drop_NA_concentration = FALSE)
+      reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetabolites(reactMetabObj$tmpMetabObj,
+                                                                drop_metabolites = rmMissFeats,
+                                                                drop_NA_concentration = FALSE,
+                                                                min_percent_valid = featValidCutoff,
+                                                                valid_status = featValidStatus,
+                                                                per_group = NULL)
+      # Avoid app crash when no feature is left, e.g., min_percent_valid > 0 and valid_status == c()
+      if (nrow(reactMetabObj$tmpMetabObj) != 0) {
+        # Update main Metalyzer object for further analysis
+        reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
+        
+        # Log features removed
+        reactParamLog$featFiltering <- unique(c(reactParamLog$featFiltering, input$featChoicesFiltering))
+      } else {
+        # Revert temporary Metalyzer object to sample filtered data for redoing feature filtering
+        reactMetabObj$tmpMetabObj <- reactMetabObj$metabObj
+        showModal(modalDialog(
+          title = 'No metabolite is left after feature filtering...',
+          'Please respecify parameters for metabolite filtering.',
+          easyClose = T,
+          footer = NULL
+        ))
+      }
     } else {
-      #### Some features will still be filtered out due to 'drop_NA_concentration'.
-      #### Set it to NULL, instead of FALSE
-      reactMetabObj$metabObj <- MetAlyzer::filterMetabolites(reactMetabObj$metabObj,
-                                                             drop_metabolites = NULL,
-                                                             drop_NA_concentration = NULL)
+      # Revert temporary Metalyzer object to original data for redoing sample filtering
+      reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
     }
   })
   # Create reactive value to monitor if data normalization is done to avoid data
@@ -523,6 +550,7 @@ server <- function(input, output, session) {
   observeEvent(input$revertProcessing, {
     req(reactMetabObj$metabObj)
     reactMetabObj$metabObj <- reactMetabObj$oriMetabObj
+    reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
     doneNormalization(0)
     
     # Set parameters for feature filtering back to default
