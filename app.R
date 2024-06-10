@@ -65,6 +65,7 @@ ui <- fluidPage(
                                # bsTooltip('normalization', 'Median scaling is conducted followed by log2 transformation.')
                              ),
                              bsCollapsePanel(
+                               #### Create independent tab for log
                                'Filtering Log', style = 'info',
                                fluidRow(
                                  column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Sample</h5>')),
@@ -77,11 +78,9 @@ ui <- fluidPage(
                              )
                            ),
                            fluidRow(
-                             column(width = 5, actionButton('updateProcessing', 'Process', width = '100%')),
-                             column(width = 3, offset = 1, actionButton('revertProcessing', 'Revert', width = '100%')),
-                             column(width = 3, actionButton('defaultProcessing', 'Default', width = '100%')),
-                             bsTooltip('revertProcessing', 'The processed data reverts to the original data.'),
-                             bsTooltip('defaultProcessing', 'The parameters for processing are set to default.')
+                             column(width = 6, actionButton('updateProcessing', 'Process', width = '100%')),
+                             column(width = 6, actionButton('revertProcessing', 'Revert/Default', width = '100%')),
+                             bsTooltip('revertProcessing', 'The processed data and specified parameters revert to the origins.')
                            ),
                            tags$br(),
                            tags$h4('Export Raw Concentration', style = 'color:steelblue;font-weight:bold'),
@@ -216,9 +215,8 @@ server <- function(input, output, session) {
   reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL)
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
+  reactParamLog <- reactiveValues(smpFiltering = c(), featFiltering = c())
   
-  reactSmpFilterLog <- reactiveValues(log = c())
-  reactFeatFilterLog <- reactiveValues(log = c())
   
   # Show fileInput only when example data is not used
   output$updateFileInput <- renderUI({
@@ -233,18 +231,13 @@ server <- function(input, output, session) {
       'Uncheck example data box to upload your own data.'
     }
   })
-  # Bring UI and Metalyzer SE Objects back to origins when example data box is unchecked
+  # Bring UI back to origin when example data box is unchecked
   observe({
     req(!input$exampleFile)
-    output$ifValidUploadedFile <- reactive({
-      !is.null(reactMetabObj$metabObj)
-    })
-    outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
     reactMetabObj$metabObj <- NULL
     reactMetabObj$oriMetabObj <- NULL
   })
-  
-  # Initialize Metalyzer SE Object with example data
+  # Initialize Metalyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
     metabObj <- MetAlyzer_dataset(file_path = example_extraction_data(), silent = T)
@@ -256,8 +249,11 @@ server <- function(input, output, session) {
       !is.null(reactMetabObj$metabObj)
     })
     outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
+    
+    # Empty parameter log
+    reactParamLog$smpFiltering <- c()
+    reactParamLog$featFiltering <- c()
   })
-  
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
     validUploadedFile <- try(
@@ -273,6 +269,10 @@ server <- function(input, output, session) {
         !is.null(reactMetabObj$metabObj)
       })
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
+      
+      # Empty parameter log
+      reactParamLog$smpFiltering <- c()
+      reactParamLog$featFiltering <- c()
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -284,6 +284,7 @@ server <- function(input, output, session) {
       reactMetabObj$oriMetabObj <- NULL
     }
   })
+  
   
   # Retrieve abundance data and sample metadata and compute feature completeness
   # level and quantification status validity level for showing data overviews
@@ -327,11 +328,6 @@ server <- function(input, output, session) {
   })
   
   
-  # Update choices for sample metadata to include in exported concentration file
-  observe({
-    req(reactMetabObj$metabObj)
-    updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
-  })
   # Prepare choices for feature filtering and log2(FC) vulcano highlighting
   featChoices <- reactive({
     req(reactMetabObj$metabObj)
@@ -393,12 +389,13 @@ server <- function(input, output, session) {
   # Update choices for feature filtering
   observe({
     req(featChoices())
-    if ('Metabolism Indicators' %in% unlist(featChoices()) &
-        nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$oriMetabObj)) {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
-                        selected = 'Metabolism Indicators')
-    } else {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+    if (nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$oriMetabObj)) {
+      if ('Metabolism Indicators' %in% unlist(featChoices())) {
+        updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
+                          selected = 'Metabolism Indicators')
+      } else {
+        updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+      }
     }
   })
   # Update choices for sample filtering
@@ -408,43 +405,21 @@ server <- function(input, output, session) {
     smpChoiceList <- lapply(smpChoicePack()$smpChoiceList, function(choices) {
       as.list(choices)
     })
-    updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
-  })
-  # Set parameters for feature filtering back to default
-  observeEvent(input$defaultProcessing, {
-    req(featChoices())
-    if ('Metabolism Indicators' %in% unlist(featChoices()) &
-        nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$oriMetabObj)) {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
-                        selected = 'Metabolism Indicators')
-    } else {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+    if (ncol(reactMetabObj$metabObj) == ncol(reactMetabObj$oriMetabObj)) {
+      updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
     }
   })
-  # Set parameters for sample filtering back to default
-  observeEvent(input$defaultProcessing, {
-    req(smpChoicePack()$smpChoiceList)
-    # Make choices lists so that sole choice in certain choice group can be shown
-    smpChoiceList <- lapply(smpChoicePack()$smpChoiceList, function(choices) {
-      as.list(choices)
-    })
-    updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
-  })
-  # Set static parameters for data processing back to default
-  observeEvent(input$defaultProcessing, {
-    updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
-    updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
-    updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
-    
-    updateCheckboxInput(session, 'imputation', value = T)
-    updateCheckboxInput(session, 'normalization', value = T)
+  # Update choices for sample metadata to include in exported concentration file
+  observe({
+    req(reactMetabObj$metabObj)
+    updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
   })
   # Do sample filtering (place this chunk before 'Do feature filtering', so that
   # feature filtering is executed based on sample filtered data)
   observeEvent(input$updateProcessing, {
     req(input$smpChoicesFiltering)
 
-    reactSmpFilterLog$log <- c(reactSmpFilterLog$log, input$smpChoicesFiltering)
+    reactParamLog$smpFiltering <- unique(c(reactParamLog$smpFiltering, input$smpChoicesFiltering))
     
     for (selectedChoice in input$smpChoicesFiltering) {
       selectedChoiceGp <- smpChoicePack()$smpChoices2Gps[selectedChoice]
@@ -488,7 +463,7 @@ server <- function(input, output, session) {
   observeEvent(input$updateProcessing, {
     req(datOverviewPack())
     
-    reactFeatFilterLog$log <- c(reactFeatFilterLog$log, input$featChoicesFiltering)
+    reactParamLog$featFiltering <- unique(c(reactParamLog$featFiltering, input$featChoicesFiltering))
 
     # Collect features to remove based on user's selection
     rmSelectedFeats <- input$featChoicesFiltering
@@ -544,14 +519,37 @@ server <- function(input, output, session) {
       doneNormalization(1)
     }
   })
-  # Revert feature and sample filtering and obtain original data
+  # Revert processed data and specified parameters back to origins
   observeEvent(input$revertProcessing, {
+    req(reactMetabObj$metabObj)
     reactMetabObj$metabObj <- reactMetabObj$oriMetabObj
     doneNormalization(0)
     
-    reactSmpFilterLog$log <- c()
-    reactFeatFilterLog$log <- c()
+    # Set parameters for feature filtering back to default
+    if ('Metabolism Indicators' %in% unlist(featChoices())) {
+      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
+                        selected = 'Metabolism Indicators')
+    } else {
+      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+    }
+    updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
+    updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+    updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
+    # Set parameters for sample filtering back to default
+    # Make choices lists so that sole choice in certain choice group can be shown
+    smpChoiceList <- lapply(smpChoicePack()$smpChoiceList, function(choices) {
+      as.list(choices)
+    })
+    updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
+    # Set parameters for imputation and normalization back to default
+    updateCheckboxInput(session, 'imputation', value = T)
+    updateCheckboxInput(session, 'normalization', value = T)
+    
+    # Empty parameter log
+    reactParamLog$smpFiltering <- c()
+    reactParamLog$featFiltering <- c()
   })
+  
   
   # Update sample choice groups for log2(FC) calculation
   observe({
@@ -673,19 +671,14 @@ server <- function(input, output, session) {
   #         axis.ticks = element_line(linewidth = 0.8),
   #         legend.text = element_text(size = 15))
   
-  # Filter Logs
+  # Create log for specified parameters
   output$smpFilterLog <- renderPrint({
-    req(reactSmpFilterLog$log)
-    
-    print_string <- paste(reactSmpFilterLog$log, collapse = "\n")
-    cat(print_string)
+    req(reactParamLog$smpFiltering)
+    cat(paste(reactParamLog$smpFiltering, collapse = "\n"))
   })
-  
   output$featFilterLog <- renderPrint({
-    req(reactFeatFilterLog$log)
-
-    print_string <- paste(reactFeatFilterLog$log, collapse = "\n")
-    cat(print_string)
+    req(reactParamLog$featFiltering)
+    cat(paste(reactParamLog$featFiltering, collapse = "\n"))
   })
   
   # Show data overviews
