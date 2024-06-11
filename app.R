@@ -251,6 +251,13 @@ server <- function(input, output, session) {
     })
     outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
     
+    # Set parameters back to default
+    updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
+    updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+    updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
+    updateCheckboxInput(session, 'imputation', value = T)
+    updateCheckboxInput(session, 'normalization', value = T)
+    
     # Empty parameter log
     reactParamLog$smpFiltering <- c()
     reactParamLog$featFiltering <- c()
@@ -272,6 +279,13 @@ server <- function(input, output, session) {
         !is.null(reactMetabObj$metabObj)
       })
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
+      
+      # Set parameters back to default
+      updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
+      updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+      updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
+      updateCheckboxInput(session, 'imputation', value = T)
+      updateCheckboxInput(session, 'normalization', value = T)
       
       # Empty parameter log
       reactParamLog$smpFiltering <- c()
@@ -457,14 +471,7 @@ server <- function(input, output, session) {
       }
     }
     # Avoid app crash when no sample is left
-    if (ncol(reactMetabObj$tmpMetabObj) != 0) {
-      # Update main Metalyzer object for reverting temporary Metalyzer object in
-      # feature filtering part if needed
-      reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
-      
-      # Log samples removed
-      reactParamLog$smpFiltering <- unique(c(reactParamLog$smpFiltering, input$smpChoicesFiltering))
-    } else {
+    if (ncol(reactMetabObj$tmpMetabObj) == 0) {
       showModal(modalDialog(
         title = 'No sample is left after sample filtering...',
         'Please respecify parameters for sample filtering.',
@@ -515,11 +522,11 @@ server <- function(input, output, session) {
         # Update main Metalyzer object for further analysis
         reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
         
+        # Log samples removed
+        reactParamLog$smpFiltering <- unique(c(reactParamLog$smpFiltering, input$smpChoicesFiltering))
         # Log features removed
         reactParamLog$featFiltering <- unique(c(reactParamLog$featFiltering, input$featChoicesFiltering))
       } else {
-        # Revert temporary Metalyzer object to sample filtered data for redoing feature filtering
-        reactMetabObj$tmpMetabObj <- reactMetabObj$metabObj
         showModal(modalDialog(
           title = 'No metabolite is left after feature filtering...',
           'Please respecify parameters for metabolite filtering.',
@@ -527,9 +534,6 @@ server <- function(input, output, session) {
           footer = NULL
         ))
       }
-    } else {
-      # Revert temporary Metalyzer object to original data for redoing sample filtering
-      reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
     }
   })
   # Create reactive value to monitor if data normalization is done to avoid data
@@ -538,12 +542,18 @@ server <- function(input, output, session) {
   # Do data imputation and normalization
   observeEvent(input$updateProcessing, {
     req(reactMetabObj$metabObj)
-    if (input$imputation) {
-      reactMetabObj$metabObj <- data_imputation(reactMetabObj$metabObj, impute_NA = F)
-    }
-    if (all(input$normalization, doneNormalization() == 0)) {
-      reactMetabObj$metabObj <- data_normalization(reactMetabObj$metabObj)
-      doneNormalization(1)
+    # Skip imputation and normalization if no sample or feature was left after filtering
+    if (ncol(reactMetabObj$tmpMetabObj) != 0 & nrow(reactMetabObj$tmpMetabObj) != 0) {
+      if (input$imputation) {
+        reactMetabObj$metabObj <- data_imputation(reactMetabObj$metabObj, impute_NA = F)
+      }
+      if (all(input$normalization, doneNormalization() == 0)) {
+        reactMetabObj$metabObj <- data_normalization(reactMetabObj$metabObj)
+        doneNormalization(1)
+      }
+    } else {
+      # Revert temporary Metalyzer object to origin for redoing filtering
+      reactMetabObj$tmpMetabObj <- reactMetabObj$metabObj
     }
   })
   # Revert processed data and specified parameters back to origins
