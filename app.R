@@ -17,7 +17,7 @@ ui <- fluidPage(
       'Overview',
       sidebarLayout(
         sidebarPanel(
-          tags$h4('Data uploading', style = 'color:steelblue;font-weight:bold'),
+          tags$h4('Data Uploading', style = 'color:steelblue;font-weight:bold'),
           uiOutput('updateFileInput'),
           div(textOutput('textFileInput'), style = 'color:IndianRed;font-weight:bold;font-size:110%'),
           checkboxInput('exampleFile',
@@ -97,7 +97,14 @@ ui <- fluidPage(
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            bsCollapse(
-                             open = c('Data completeness', 'Quantification status'), multiple = T,
+                             open = c('Data distribution', 'Data completeness'), multiple = T,
+                             bsCollapsePanel('Sample metadata', style = 'primary',
+                                             DT::dataTableOutput('tblSmpMetadat') %>%
+                                               withSpinner(color="#56070C")),
+                             bsCollapsePanel('Data distribution', style = 'primary',
+                                             uiOutput('updateGpColsDatDist'),
+                                             plotlyOutput('plotDatDist') %>%
+                                               withSpinner(color="#56070C")),
                              bsCollapsePanel('Data completeness', style = 'primary',
                                              bsCollapsePanel('Hint', style = 'success',
                                                              textOutput('summDatComplete', container = strong)),
@@ -108,12 +115,6 @@ ui <- fluidPage(
                                              bsCollapsePanel('Hint', style = 'success',
                                                              textOutput('summQuanStatus', container = strong)),
                                              plotlyOutput('plotQuanStatus') %>%
-                                               withSpinner(color="#56070C")),
-                             bsCollapsePanel('Sample metadata', style = 'primary',
-                                             DT::dataTableOutput('tblSmpMetadat') %>%
-                                               withSpinner(color="#56070C")),
-                             bsCollapsePanel('Data distribution', style = 'primary',
-                                             plotlyOutput('plotDatDist') %>%
                                                withSpinner(color="#56070C"))
                            )
           )
@@ -721,27 +722,41 @@ server <- function(input, output, session) {
   
   # Show data overviews
   # Data distribution
-  output$plotDatDist <- renderPlotly({
-    req(datOverviewPack()$metabAggreTbl)
-    metabAggreTbl <- datOverviewPack()$metabAggreTbl
-    if (doneNormalization() == 0) {
-      ggplotly(
-        ggplot(metabAggreTbl, aes(x=ID, y=Concentration)) +
-          geom_boxplot() +
-          scale_y_log10() +
-          labs(x = 'Sample', y = 'Metabolite abundance') +
-          theme_bw() +
-          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-      )
+  output$updateGpColsDatDist <- renderUI({
+    req(smpChoicePack()$smpChoiceList)
+    smpChoiceList <- smpChoicePack()$smpChoiceList
+    # Remove choice groups whose level sizes are one or equal to sample size
+    choiceGpSizes <- sapply(smpChoiceList, length)
+    rmChoiceGps <- which(choiceGpSizes == 1 | choiceGpSizes == ncol(reactMetabObj$metabObj))
+    if (length(rmChoiceGps) != 0) {
+      smpChoiceGps <- names(smpChoiceList)[-rmChoiceGps]
     } else {
-      ggplotly(
-        ggplot(metabAggreTbl, aes(x=ID, y=Concentration)) +
-          geom_boxplot() +
-          labs(x = 'Sample', y = 'Metabolite abundance') +
-          theme_bw() +
-          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-      )
+      smpChoiceGps <- names(smpChoiceList)
     }
+    selectInput('gpColsDatDist', 'Color by:',
+                choices = c('None', smpChoiceGps),
+                selected = 'None', multiple = F)
+  })
+  output$plotDatDist <- renderPlotly({
+    req(datOverviewPack()$metabAggreTbl, input$gpColsDatDist)
+    metabAggreTbl <- datOverviewPack()$metabAggreTbl
+    if (input$gpColsDatDist == 'None') {
+      g <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration)) +
+        geom_boxplot()
+    } else {
+      g <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=.data[[input$gpColsDatDist]])) +
+        geom_boxplot(alpha = 1) +
+        scale_fill_brewer(palette = 'Set1')
+    }
+    g <- g +
+      labs(x = 'Sample', y = 'Metabolite abundance') +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    # Put abundance on log10 scale for better visualization if data is not normalized 
+    if (doneNormalization() == 0) {
+      g <- g + scale_y_log10()
+    }
+    ggplotly(g)
   })
   
   # Sample metadata
@@ -807,6 +822,7 @@ server <- function(input, output, session) {
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     )
   })
+  
   # Export Concentration Values
   output$downloadRawConc <- downloadHandler(
     filename = function() {
@@ -822,6 +838,7 @@ server <- function(input, output, session) {
       unlink(output_file)
     }
   )
+  
   # Visualize log2(FC)
   # Give sign before log2(FC) calculation
   output$textLog2FC <- renderText({
