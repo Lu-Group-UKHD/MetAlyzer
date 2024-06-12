@@ -626,37 +626,27 @@ read_named_region <- function(file_path, named_region) {
 }
 
 
-#' @title Half minimum imputation of zero and NA values
-#' @description This function is adapted from 'zero_imputation' in MetAlyzer package,
-#' performing HM imputation of zero and NA values.
-#' 
-#' @param vec A numeric vector containing the concentration values
-#' @param impute_NA Logical value whether to impute NA values
-#' @keywords internal
-HM_imputation <- function(vec, impute_NA) {
-  non_miss <- vec[vec > 0 & !is.na(vec)]
-  imp_v <- ifelse(length(non_miss) > 0, min(non_miss) * 0.5, NA)
-  vec[vec == 0] <- imp_v
-  if (impute_NA) {
-    vec[is.na(vec)] <- imp_v
-  }
-  return(vec)
-}
-
 #' @title Impute aggregated data in SE MetAlyzer object
-#' @description This function is adapted from 'data_imputation' in MetAlyzer package,
-#' imputing zero and NA concentration values using HM. If all values are zero or NA,
-#' they are set to NA. The imputed values are stored in column 'Concentration' of aggregated data.
+#' @description This function imputes zero-valued concentrations (missing values)
+#' using HM. If all values are zeros, they are set to NA. The imputed values are
+#' stored in column 'Concentration' of aggregated data.
 #'
 #' @param metalyzer_se A MetAlyzer object
 #' @param impute_NA Logical value whether to impute NA values
 #' @import dplyr
-#' @importFrom rlang .data
-data_imputation <- function(metalyzer_se, impute_NA) {
+data_imputation <- function(metalyzer_se) { #impute_NA = F
   aggregated_data <- metalyzer_se@metadata$aggregated_data
-  #### Do not know why Metabolite column is grouped by MetAlyzer
-  aggregated_data <- dplyr::ungroup(aggregated_data) %>%
-    dplyr::mutate(Concentration = HM_imputation(Concentration, impute_NA))
+  #### Note that aggregated data is already grouped by Metabolite by MetAlyzer
+  HM_feats <- dplyr::filter(aggregated_data, Concentration > 0, !is.na(Concentration)) %>%
+    dplyr::summarise(HM = min(Concentration) * 0.5)
+  # Do half-minimum (HM) imputation, which replaces missing values with half of
+  # minimum of observed values in corresponding variables
+  aggregated_data <- dplyr::left_join(aggregated_data, HM_feats, by = 'Metabolite') %>%
+    #### How we deal with those NA values? Let them stay NA for now
+    dplyr::mutate(Concentration = dplyr::case_when(Concentration %in% 0 ~ HM,
+                                                   !Concentration %in% 0 ~ Concentration)) %>%
+    dplyr::select(-HM) %>%
+    dplyr::ungroup()
   metalyzer_se@metadata$aggregated_data <- aggregated_data
   return(metalyzer_se)
 }

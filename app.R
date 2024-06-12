@@ -237,7 +237,7 @@ server <- function(input, output, session) {
     req(!input$exampleFile)
     reactMetabObj$metabObj <- NULL
   })
-  # Initialize Metalyzer SE object with example data
+  # Initialize MetAlyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
     metabObj <- MetAlyzer_dataset(file_path = example_extraction_data(), silent = T)
@@ -520,7 +520,7 @@ server <- function(input, output, session) {
                                                                 per_group = NULL)
       # Avoid app crash when no feature is left, e.g., min_percent_valid > 0 and valid_status == c()
       if (nrow(reactMetabObj$tmpMetabObj) != 0) {
-        # Update main Metalyzer object for further analysis
+        # Update main MetAlyzer object for further analysis
         reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
         
         # Log samples removed
@@ -546,14 +546,14 @@ server <- function(input, output, session) {
     # Skip imputation and normalization if no sample or feature was left after filtering
     if (ncol(reactMetabObj$tmpMetabObj) != 0 & nrow(reactMetabObj$tmpMetabObj) != 0) {
       if (input$imputation) {
-        reactMetabObj$metabObj <- data_imputation(reactMetabObj$metabObj, impute_NA = F)
+        reactMetabObj$metabObj <- data_imputation(reactMetabObj$metabObj)
       }
       if (all(input$normalization, doneNormalization() == 0)) {
         reactMetabObj$metabObj <- data_normalization(reactMetabObj$metabObj)
         doneNormalization(1)
       }
     } else {
-      # Revert temporary Metalyzer object to origin for redoing filtering
+      # Revert temporary MetAlyzer object to origin for redoing filtering
       reactMetabObj$tmpMetabObj <- reactMetabObj$metabObj
     }
   })
