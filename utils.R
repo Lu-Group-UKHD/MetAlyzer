@@ -1,4 +1,5 @@
 library(limma)
+library(vsn)
 library(MetAlyzer)
 library(plotly)
 library(gridExtra)
@@ -628,19 +629,20 @@ read_named_region <- function(file_path, named_region) {
 
 #' @title Impute aggregated data in SE MetAlyzer object
 #' @description This function imputes zero-valued concentrations (missing values)
-#' using HM. If all values are zeros, they are set to NA. The imputed values are
-#' stored in column 'Concentration' of aggregated data.
+#' using half-minimum (HM). If all values are zeros, they are set to NA. The imputed
+#' values are stored in column 'Concentration' of aggregated data.
 #'
 #' @param metalyzer_se A MetAlyzer object
-#' @param impute_NA Logical value whether to impute NA values
+#' @param impute_NA A logical value whether to impute NA values
 #' @import dplyr
 data_imputation <- function(metalyzer_se) { #impute_NA = F
   aggregated_data <- metalyzer_se@metadata$aggregated_data
+  # Prepare HM values for corresponding features
   #### Note that aggregated data is already grouped by Metabolite by MetAlyzer
   HM_feats <- dplyr::filter(aggregated_data, Concentration > 0, !is.na(Concentration)) %>%
     dplyr::summarise(HM = min(Concentration) * 0.5)
-  # Do half-minimum (HM) imputation, which replaces missing values with half of
-  # minimum of observed values in corresponding variables
+  # Do HM imputation, which replaces missing values with half of minimum of observed
+  # values in corresponding variables
   aggregated_data <- dplyr::left_join(aggregated_data, HM_feats, by = 'Metabolite') %>%
     #### How we deal with those NA values? Let them stay NA for now
     dplyr::mutate(Concentration = dplyr::case_when(Concentration %in% 0 ~ HM,
@@ -651,34 +653,61 @@ data_imputation <- function(metalyzer_se) { #impute_NA = F
   return(metalyzer_se)
 }
 
+#' @title Generalized log2 transform data
+#' @description This function conducts generalized log2 transformation on data
+#'
+#' @param x A matrix or a vector containing numerical values
+glog2 <- function(x) {
+  (asinh(x)-log(2))/log(2)
+}
+
 #' @title Normalize aggregated data in SE MetAlyzer object
 #' @description This function normalizes concentration values among samples using
-#' median normalization that is median scaling followed by log2 transformation.
-#' The normalized values are stored in column 'Concentration' of aggregated data.
+#' total ion count (TIC) normalization, variance stabilizing normalization (VSN),
+#' or median normalization. The normalized values are stored in column 'Concentration'
+#' of aggregated data.
 #'
 #' @param metalyzer_se A MetAlyzer object
+#' @param norm_method A character specifying the normalization method to use, which
+#' should be one of 'TIC', 'VSN', or 'median'
 #' @import dplyr, limma
-data_normalization <- function(metalyzer_se) {
+data_normalization <- function(metalyzer_se, norm_method) {
   aggregated_data <- metalyzer_se@metadata$aggregated_data
   # Create temporary aggregated data for concatenating needed information later
   #### Do not know why Metabolite column is grouped by MetAlyzer
   tmp_aggregated_data <- dplyr::ungroup(aggregated_data) %>%
     dplyr::select(-Concentration)
-  # Prepare data matrix for conducting median scaling
+  # Prepare data matrix for conducting normalization
   data_mat <- dplyr::ungroup(aggregated_data) %>%
     dplyr::select(Metabolite, ID, Concentration) %>%
     tidyr::pivot_wider(names_from = 'ID', values_from = 'Concentration') %>%
     tibble::column_to_rownames('Metabolite') %>%
     as.matrix()
-  # Do Median normalization that is median scaling followed by log2 transformation
-  aggregated_data <- limma::normalizeBetweenArrays(data_mat, method = 'scale') %>%
-    tibble::as_tibble(rownames = 'Metabolite') %>%
+  if (norm_method %in% 'TIC') {
+    # Do TIC normalization
+    row_sums <- rowSums(data_mat, na.rm = T)
+    median_rowSums <- median(row_sums)
+    norm_data <- apply(data_mat, 2, function(smp_conc) {
+      smp_conc/row_sums * median_rowSums
+    }) %>%
+      glog2()
+  } else if (norm_method %in% 'VSN') {
+    # Do vsn normalization
+    fit <- vsnMatrix(data_mat)
+    norm_data <- predict(fit, data_mat)
+  } else if (norm_method %in% 'median') {
+    # Do median normalization that is median scaling followed by log2 transformation
+    norm_data <- limma::normalizeBetweenArrays(data_mat, method = 'scale') %>%
+      # Use generalized log2 transformation to avoid -Inf
+      glog2()
+  }
+  # Convert matrix to aggregated long data
+  aggregated_data <- tibble::as_tibble(norm_data, rownames = 'Metabolite') %>%
     tidyr::pivot_longer(cols = -'Metabolite',
                         names_to = 'ID',
                         values_to = 'Concentration') %>%
-    dplyr::mutate(Concentration = log2(Concentration),
-                  #### Make character columns class factor as original aggregated data
-                  Metabolite = factor(Metabolite, levels = levels(tmp_aggregated_data$Metabolite)),
+    #### Make character columns class factor as original aggregated data
+    dplyr::mutate(Metabolite = factor(Metabolite, levels = levels(tmp_aggregated_data$Metabolite)),
                   ID = factor(ID, levels = levels(tmp_aggregated_data$ID))) %>%
     dplyr::left_join(tmp_aggregated_data, by = c('ID', 'Metabolite')) %>%
     dplyr::select(ID, Metabolite, Class, Concentration, Status)

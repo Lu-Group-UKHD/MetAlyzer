@@ -1,5 +1,6 @@
 library(shiny)
 library(shinyBS)
+library(shinyWidgets)
 library(shinycssloaders)
 library(MetAlyzer)
 library(SummarizedExperiment)
@@ -58,8 +59,13 @@ ui <- fluidPage(
                              ),
                              bsCollapsePanel(
                                'Imputation and Normalization', style = 'info',
-                               checkboxInput('imputation', 'Half minimum (HM) imputation', value = T),
-                               checkboxInput('normalization', 'Median normalization (followed by log2 transformation)', value = T)
+                               materialSwitch('imputation', 'Half-minimum (HM) imputation',
+                                              value = T, status = 'primary', right = T),
+                               selectInput('normalization', 'Select normalization method to use:',
+                                           choices = c('None', 'Total ion count (TIC) log₂ normalization',
+                                                       'Median log₂ normalization'),
+                                           selected = 'Total ion count (TIC) log₂ normalization', multiple = F)
+                               # checkboxInput('normalization', 'Median normalization (followed by log2 transformation)', value = T)
                                # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
                                #                               observed values in each metabolite.')),
                                # bsTooltip('normalization', 'Median scaling is conducted followed by log2 transformation.')
@@ -216,7 +222,9 @@ server <- function(input, output, session) {
   reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL, tmpMetabObj = NULL)
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
-  reactParamLog <- reactiveValues(smpFiltering = c(), featFiltering = c())
+  reactParamLog <- reactiveValues(smpFiltering = c(), featFiltering = c(), featCompleteCutoff = 0,
+                                  featValidCutoff = 0, featValidStatus = c(), imputation = F,
+                                  normalization = 'None')
   
   
   # Show fileInput only when example data is not used
@@ -256,12 +264,17 @@ server <- function(input, output, session) {
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
     updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
-    updateCheckboxInput(session, 'imputation', value = T)
-    updateCheckboxInput(session, 'normalization', value = T)
+    updateMaterialSwitch(session, 'imputation', value = T)
+    updateSelectInput(session, 'normalization', selected = 'Total ion count (TIC) log₂ normalization')
     
     # Empty parameter log
     reactParamLog$smpFiltering <- c()
     reactParamLog$featFiltering <- c()
+    reactParamLog$featCompleteCutoff <- 0
+    reactParamLog$featValidCutoff <- 0
+    reactParamLog$featValidStatus <- c()
+    reactParamLog$imputation <- F
+    reactParamLog$normalization <- 'None'
   })
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
@@ -285,12 +298,17 @@ server <- function(input, output, session) {
       updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
       updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
       updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
-      updateCheckboxInput(session, 'imputation', value = T)
-      updateCheckboxInput(session, 'normalization', value = T)
+      updateMaterialSwitch(session, 'imputation', value = T)
+      updateSelectInput(session, 'normalization', selected = 'Total ion count (TIC) log₂ normalization')
       
       # Empty parameter log
       reactParamLog$smpFiltering <- c()
       reactParamLog$featFiltering <- c()
+      reactParamLog$featCompleteCutoff <- 0
+      reactParamLog$featValidCutoff <- 0
+      reactParamLog$featValidStatus <- c()
+      reactParamLog$imputation <- F
+      reactParamLog$normalization <- 'None'
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -431,10 +449,37 @@ server <- function(input, output, session) {
     req(reactMetabObj$metabObj)
     updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
   })
+  
+  # Create reactive values to monitor if data imputation and normalization are done
+  # to avoid data normalized more than one time
+  doneImputation <- reactiveVal(0)
+  doneNormalization <- reactiveVal(0)
   # Do sample filtering (place this chunk before 'Do feature filtering', so that
   # feature filtering is executed based on sample filtered data)
   observeEvent(input$updateProcessing, {
     req(input$smpChoicesFiltering)
+    # Rerun data processing if any parameter is changed, so that processing can follow
+    # order from sample filtering, feature filtering, imputation, to normalization
+    # if (any(!identical(reactParamLog$smpFiltering, input$smpChoicesFiltering),
+    #         !identical(reactParamLog$featFiltering, input$featChoicesFiltering),
+    #         !identical(reactParamLog$featCompleteCutoff, input$featCompleteCutoffFiltering),
+    #         !identical(reactParamLog$featValidCutoff, input$featValidCutoffFiltering),
+    #         !identical(reactParamLog$featValidStatus, input$featValidStatusFiltering),
+    #         !identical(reactParamLog$imputation, input$imputation),
+    #         !identical(reactParamLog$normalization, input$normalization))) {
+    #   reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
+    #   doneImputation(0)
+    #   doneNormalization(0)
+    # 
+    #   reactParamLog$smpFiltering <- c()
+    #   reactParamLog$featFiltering <- c()
+    #   reactParamLog$featCompleteCutoff <- 0
+    #   reactParamLog$featValidCutoff <- 0
+    #   reactParamLog$featValidStatus <- c()
+    #   reactParamLog$imputation <- F
+    #   reactParamLog$normalization <- 'None'
+    # }
+    
     for (selectedChoice in input$smpChoicesFiltering) {
       selectedChoiceGp <- smpChoicePack()$smpChoices2Gps[selectedChoice]
       # Prepare up-to-date choices of selected choice group to avoid error that
@@ -519,15 +564,7 @@ server <- function(input, output, session) {
                                                                 valid_status = featValidStatus,
                                                                 per_group = NULL)
       # Avoid app crash when no feature is left, e.g., min_percent_valid > 0 and valid_status == c()
-      if (nrow(reactMetabObj$tmpMetabObj) != 0) {
-        # Update main MetAlyzer object for further analysis
-        reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
-        
-        # Log samples removed
-        reactParamLog$smpFiltering <- unique(c(reactParamLog$smpFiltering, input$smpChoicesFiltering))
-        # Log features removed
-        reactParamLog$featFiltering <- unique(c(reactParamLog$featFiltering, input$featChoicesFiltering))
-      } else {
+      if (nrow(reactMetabObj$tmpMetabObj) == 0) {
         showModal(modalDialog(
           title = 'No metabolite is left after feature filtering...',
           'Please respecify parameters for metabolite filtering.',
@@ -537,24 +574,38 @@ server <- function(input, output, session) {
       }
     }
   })
-  # Create reactive value to monitor if data normalization is done to avoid data
-  # normalized more than one time
-  doneNormalization <- reactiveVal(0)
   # Do data imputation and normalization
   observeEvent(input$updateProcessing, {
-    req(reactMetabObj$metabObj)
+    req(reactMetabObj$tmpMetabObj)
     # Skip imputation and normalization if no sample or feature was left after filtering
-    if (ncol(reactMetabObj$tmpMetabObj) != 0 & nrow(reactMetabObj$tmpMetabObj) != 0) {
-      if (input$imputation) {
-        reactMetabObj$metabObj <- data_imputation(reactMetabObj$metabObj)
+    if (all(ncol(reactMetabObj$tmpMetabObj) != 0, nrow(reactMetabObj$tmpMetabObj) != 0)) {
+      if (all(input$imputation, doneImputation() == 0)) {
+        reactMetabObj$tmpMetabObj <- data_imputation(reactMetabObj$tmpMetabObj)
+        doneImputation(1)
       }
-      if (all(input$normalization, doneNormalization() == 0)) {
-        reactMetabObj$metabObj <- data_normalization(reactMetabObj$metabObj)
-        doneNormalization(1)
+      if (doneNormalization() == 0) {
+        if (input$normalization == 'Total ion count (TIC) log₂ normalization') {
+          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'TIC')
+          doneNormalization(1)
+        } else if (input$normalization == 'Median log₂ normalization') {
+          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'median')
+          doneNormalization(1)
+        }
       }
+      # Update main MetAlyzer object for further analysis
+      reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
+      
+      # Log parameters
+      reactParamLog$smpFiltering <- unique(c(reactParamLog$smpFiltering, input$smpChoicesFiltering))
+      reactParamLog$featFiltering <- unique(c(reactParamLog$featFiltering, input$featChoicesFiltering))
+      reactParamLog$featCompleteCutoff <- input$featCompleteCutoffFiltering
+      reactParamLog$featValidCutoff <- input$featValidCutoffFiltering
+      reactParamLog$featValidStatus <- c(reactParamLog$featValidStatus, input$featValidStatusFiltering)
+      reactParamLog$imputation <- input$imputation
+      reactParamLog$normalization <- input$normalization
     } else {
       # Revert temporary MetAlyzer object to origin for redoing filtering
-      reactMetabObj$tmpMetabObj <- reactMetabObj$metabObj
+      reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
     }
   })
   # Revert processed data and specified parameters back to origins
@@ -562,6 +613,7 @@ server <- function(input, output, session) {
     req(reactMetabObj$metabObj)
     reactMetabObj$metabObj <- reactMetabObj$oriMetabObj
     reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
+    doneImputation(0)
     doneNormalization(0)
     
     # Set parameters for feature filtering back to default
@@ -581,12 +633,17 @@ server <- function(input, output, session) {
     })
     updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
     # Set parameters for imputation and normalization back to default
-    updateCheckboxInput(session, 'imputation', value = T)
-    updateCheckboxInput(session, 'normalization', value = T)
+    updateMaterialSwitch(session, 'imputation', value = T)
+    updateSelectInput(session, 'normalization', selected = 'Total ion count (TIC) log₂ normalization')
     
     # Empty parameter log
     reactParamLog$smpFiltering <- c()
     reactParamLog$featFiltering <- c()
+    reactParamLog$featCompleteCutoff <- 0
+    reactParamLog$featValidCutoff <- 0
+    reactParamLog$featValidStatus <- c()
+    reactParamLog$imputation <- F
+    reactParamLog$normalization <- 'None'
   })
   
   
