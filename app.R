@@ -9,6 +9,8 @@ library(limma)
 source("utils.R")
 library(bslib)
 library(htmlwidgets)
+library(svglite)
+library(writexl)
 
 ui <- fluidPage(
   titlePanel('Biocrates Metabolomics Analysis'),
@@ -24,6 +26,7 @@ ui <- fluidPage(
           checkboxInput('exampleFile',
                         HTML('Explore app with <b>example dataset</b>: <a href = "https://doi.org/10.3389/fmolb.2022.961448">[Gegner et al. 2022]</a>'), 
                         value = FALSE),
+          bsTooltip('exampleFile', 'Discover the full range of functions with this diverse tissue dataset.'),
           # Show data processing options only after file is uploaded
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
@@ -97,10 +100,32 @@ ui <- fluidPage(
                              column(width = 5, downloadButton('downloadRawConc', 'Download',
                                                               style = 'width:100%; margin-bottom: 15px')),
                              bsTooltip('downloadRawConc', 'This output can directly be used for MetaboAnalyst.')
+                           ),
+                           tags$br(),
+                           tags$h4('Export Metabolite Identificators', style = 'color:steelblue;font-weight:bold'),
+                           fluidRow(
+                             style = "display: flex; align-items: flex-end;",
+                             column(width = 4, selectInput('metaChoicesID', 'Select Metabolites to include:',
+                                                           choices = character(0), multiple = T)),
+                             column(width = 4, selectInput('IDChoices', 'Select different Identificators',
+                                                           choices = character(0), multiple = T)),
+                             column(width = 4, downloadButton('downloadMetaID', 'Download',
+                                                              style = 'width:100%; margin-bottom: 15px')),
+                             bsTooltip('downloadMetaID', 'This was generated from the HMDB')
                            )
           )
         ),
         mainPanel(
+          conditionalPanel(condition = "output.ifValidUploadedFile === undefined",
+            HTML(HTML('<br>
+                      <h3>This tool is here to help you analyze and explore your Biocrates data.</h3>
+                      <br>
+                      <p>Please ensure your Excel file contains the cell <b>"Class"</b> and the column 
+                      <b>"Sample Type"</b> with correct indentation, as these are used as anchor cells!</p>
+                      <br>
+                      <p>Additional information is available by hovering over all action elements.</p>')
+            )
+          ),
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            bsCollapse(
                              open = c('Data distribution', 'Data completeness'), multiple = T,
@@ -449,6 +474,11 @@ server <- function(input, output, session) {
     req(reactMetabObj$metabObj)
     updateSelectInput(session, 'metaChoicesExport', choices = colnames(colData(reactMetabObj$metabObj)))
   })
+  # Update choices for sample metadata to include in exported Metabolite Idenfier
+  observe({
+    req(featChoices())
+    updateSelectInput(session, 'metaChoicesID', choices = featChoices())
+  })
   
   # Create reactive values to monitor if data imputation and normalization are done
   # to avoid data normalized more than one time
@@ -724,7 +754,20 @@ server <- function(input, output, session) {
       ))
     }
   })
+  # Update choices for Metabolite Identifiers
   
+  observe({
+    req(featChoices())
+    updateSelectInput(session, 'metaboliteSelection', choices = featChoices())
+  })
+  
+  observe({
+    req(reactMetabObj$metabObj)
+    IDTable <- readxl::read_excel('data/mappingTable.xlsx')
+    IDChoices <- colnames(IDTable)
+    
+    updateSelectInput(session, 'IDChoices', choices = IDChoices)
+  })
   
   # Update choices for metabolite highlighting
   observe({
@@ -895,6 +938,38 @@ server <- function(input, output, session) {
       unlink(output_file)
     }
   )
+  # Export Metabolite Idetifier
+  output$downloadMetaID <- downloadHandler(
+    filename = function() {
+      paste("metabolite_identifier", format(Sys.Date(), "%Y-%m-%d"), ".xlsx", sep = "")
+    },
+    content = function(file) {
+      req(reactMetabObj$metabObj)
+      
+      output_file <- file.path(tempdir(), paste("metabolite_identifier", format(Sys.Date(), "%Y-%m-%d"), ".xlsx", sep = ""))
+      IDTable <- readxl::read_excel('data/mappingTable.xlsx')
+      
+      metabolites_df <- SummarizedExperiment::rowData(reactMetabObj$metabObj)
+      metabolites <- as.vector(rownames(metabolites_df))
+      classes <- as.vector(metabolites_df$metabolic_classes)
+      
+      # Correct logic for selecting metabolites and classes
+      selMeta <- metabolites[metabolites %in% input$metaChoicesID]
+      selClas <- metabolites[which(classes %in% input$metaChoicesID)]
+      
+      selection <- unique(c(selMeta, selClas))
+      BiocratesName <- as.vector(unlist(IDTable[, 1]))
+
+      # Correct logic for subsetting IDTable
+      slicedIDTable <- IDTable[which(BiocratesName %in% selection), input$IDChoices]
+      
+      writexl::write_xlsx(slicedIDTable, output_file)
+      
+      file.copy(output_file, file)
+      unlink(output_file)
+    }
+  )
+  
   
   # Visualize log2(FC)
   # Give sign before log2(FC) calculation
