@@ -65,10 +65,9 @@ ui <- fluidPage(
                                materialSwitch('imputation', 'Half-minimum (HM) imputation',
                                               value = T, status = 'primary', right = T),
                                selectInput('normalization', 'Select normalization method to use:',
-                                           choices = c('None', 'Total ion count (TIC) log₂ normalization',
-                                                       'Median log₂ normalization'),
-                                           selected = 'Total ion count (TIC) log₂ normalization', multiple = F)
-                               # checkboxInput('normalization', 'Median normalization (followed by log2 transformation)', value = T)
+                                           choices = c('None', 'Median log₂ normalization',
+                                                       'Total ion count (TIC) log₂ normalization'),
+                                           selected = 'Median log₂ normalization', multiple = F)
                                # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
                                #                               observed values in each metabolite.')),
                                # bsTooltip('normalization', 'Median scaling is conducted followed by log2 transformation.')
@@ -116,7 +115,7 @@ ui <- fluidPage(
           )
         ),
         mainPanel(
-          conditionalPanel(condition = "output.ifValidUploadedFile === undefined",
+          conditionalPanel(condition = "output.ifValidUploadedFile == undefined",
             HTML(HTML('<br>
                       <h3>This tool is here to help you analyze and explore your Biocrates data.</h3>
                       <br>
@@ -290,7 +289,7 @@ server <- function(input, output, session) {
     updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
     updateMaterialSwitch(session, 'imputation', value = T)
-    updateSelectInput(session, 'normalization', selected = 'Total ion count (TIC) log₂ normalization')
+    updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
     
     # Empty parameter log
     reactParamLog$smpFiltering <- c()
@@ -324,7 +323,7 @@ server <- function(input, output, session) {
       updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
       updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
       updateMaterialSwitch(session, 'imputation', value = T)
-      updateSelectInput(session, 'normalization', selected = 'Total ion count (TIC) log₂ normalization')
+      updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
       
       # Empty parameter log
       reactParamLog$smpFiltering <- c()
@@ -391,15 +390,15 @@ server <- function(input, output, session) {
   # Prepare choices for feature filtering and log2(FC) vulcano highlighting
   featChoices <- reactive({
     req(reactMetabObj$metabObj)
-    list(Class = as.list(unique(rowData(reactMetabObj$metabObj)$metabolic_classes)),
-         Metabolite = as.list(rownames(reactMetabObj$metabObj)))
+    list(Class = as.list(unique(rowData(reactMetabObj$tmpMetabObj)$metabolic_classes)),
+         Metabolite = as.list(rownames(reactMetabObj$tmpMetabObj)))
   })
   # Prepare needed information for sample filtering (i.e., choices, dictionary for
   # choice group searches, and list of choice groups containing duplicated choices)
   # and log2(FC) calculation
   smpChoicePack <- reactive({
     req(reactMetabObj$metabObj)
-    smpChoiceList <- as.list(colData(reactMetabObj$metabObj))
+    smpChoiceList <- as.list(colData(reactMetabObj$tmpMetabObj))
     # Uniquify choices in every choice group and convert NA into character so
     # that it can be shown on client side
     for (i in seq_along(smpChoiceList)) {
@@ -484,32 +483,34 @@ server <- function(input, output, session) {
   # to avoid data normalized more than one time
   doneImputation <- reactiveVal(0)
   doneNormalization <- reactiveVal(0)
+  # Rerun data processing if any parameter is changed, so that processing can follow
+  # order from sample filtering, feature filtering, imputation, to normalization
+  observeEvent(input$updateProcessing, {
+    if (any(!identical(sort(reactParamLog$smpFiltering), sort(input$smpChoicesFiltering)),
+            !identical(sort(reactParamLog$featFiltering), sort(input$featChoicesFiltering)),
+            !identical(reactParamLog$featCompleteCutoff, input$featCompleteCutoffFiltering),
+            !identical(reactParamLog$featValidCutoff, input$featValidCutoffFiltering),
+            !identical(reactParamLog$featValidStatus, input$featValidStatusFiltering),
+            !identical(reactParamLog$imputation, input$imputation),
+            !identical(reactParamLog$normalization, input$normalization))) {
+      # Revert processed temporary MetAlyzer object and parameter log back to origins
+      reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
+      doneImputation(0)
+      doneNormalization(0)
+      
+      reactParamLog$smpFiltering <- c()
+      reactParamLog$featFiltering <- c()
+      reactParamLog$featCompleteCutoff <- 0
+      reactParamLog$featValidCutoff <- 0
+      reactParamLog$featValidStatus <- c()
+      reactParamLog$imputation <- F
+      reactParamLog$normalization <- 'None'
+    }
+  })
   # Do sample filtering (place this chunk before 'Do feature filtering', so that
   # feature filtering is executed based on sample filtered data)
   observeEvent(input$updateProcessing, {
     req(input$smpChoicesFiltering)
-    # Rerun data processing if any parameter is changed, so that processing can follow
-    # order from sample filtering, feature filtering, imputation, to normalization
-    # if (any(!identical(reactParamLog$smpFiltering, input$smpChoicesFiltering),
-    #         !identical(reactParamLog$featFiltering, input$featChoicesFiltering),
-    #         !identical(reactParamLog$featCompleteCutoff, input$featCompleteCutoffFiltering),
-    #         !identical(reactParamLog$featValidCutoff, input$featValidCutoffFiltering),
-    #         !identical(reactParamLog$featValidStatus, input$featValidStatusFiltering),
-    #         !identical(reactParamLog$imputation, input$imputation),
-    #         !identical(reactParamLog$normalization, input$normalization))) {
-    #   reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
-    #   doneImputation(0)
-    #   doneNormalization(0)
-    # 
-    #   reactParamLog$smpFiltering <- c()
-    #   reactParamLog$featFiltering <- c()
-    #   reactParamLog$featCompleteCutoff <- 0
-    #   reactParamLog$featValidCutoff <- 0
-    #   reactParamLog$featValidStatus <- c()
-    #   reactParamLog$imputation <- F
-    #   reactParamLog$normalization <- 'None'
-    # }
-    
     for (selectedChoice in input$smpChoicesFiltering) {
       selectedChoiceGp <- smpChoicePack()$smpChoices2Gps[selectedChoice]
       # Prepare up-to-date choices of selected choice group to avoid error that
@@ -626,11 +627,11 @@ server <- function(input, output, session) {
       reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
       
       # Log parameters
-      reactParamLog$smpFiltering <- unique(c(reactParamLog$smpFiltering, input$smpChoicesFiltering))
-      reactParamLog$featFiltering <- unique(c(reactParamLog$featFiltering, input$featChoicesFiltering))
+      reactParamLog$smpFiltering <- input$smpChoicesFiltering
+      reactParamLog$featFiltering <- input$featChoicesFiltering
       reactParamLog$featCompleteCutoff <- input$featCompleteCutoffFiltering
       reactParamLog$featValidCutoff <- input$featValidCutoffFiltering
-      reactParamLog$featValidStatus <- c(reactParamLog$featValidStatus, input$featValidStatusFiltering)
+      reactParamLog$featValidStatus <- input$featValidStatusFiltering
       reactParamLog$imputation <- input$imputation
       reactParamLog$normalization <- input$normalization
     } else {
@@ -664,7 +665,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
     # Set parameters for imputation and normalization back to default
     updateMaterialSwitch(session, 'imputation', value = T)
-    updateSelectInput(session, 'normalization', selected = 'Total ion count (TIC) log₂ normalization')
+    updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
     
     # Empty parameter log
     reactParamLog$smpFiltering <- c()
@@ -718,10 +719,7 @@ server <- function(input, output, session) {
       # Do log2 transformation on data for 'calc_log2FC' if normalization was not performed
       if (doneNormalization() == 0) {
         oriConc <- metadata(metabObj)$aggregated_data$Concentration
-        if (sum(oriConc %in% 0) > 0) {
-          metadata(metabObj)$aggregated_data$Concentration <- oriConc + 0.0001
-        }
-        metabObj <- data_normalization(metabObj)
+        metadata(metabObj)$aggregated_data$Concentration <- glog2(oriConc)
       }
       # Extract samples of interest
       selectedChoiceGp <- input$smpChoiceGpsLog2FC
@@ -732,7 +730,6 @@ server <- function(input, output, session) {
         metabObj <- MetAlyzer::filterMetaData(metabObj, is.na(.data[[selectedChoiceGp]]) |
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
-
       metabObj <- calc_log2FC(metalyzer_se = metabObj,
                               categorical = selectedChoiceGp)
       reactLog2FCTbl(log2FC(metabObj))
