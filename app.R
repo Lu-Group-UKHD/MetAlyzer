@@ -172,12 +172,13 @@ ui <- fluidPage(
                            tags$br(),
                            tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
-                             style = "display: flex; align-items: center;",
-                             column(width = 7, selectInput('metabChoicesVulcano',
+                             style = "display: flex; align-items: flex-end;",
+                             # style = "display: flex; align-items: center;",
+                             column(width = 6, selectInput('metabChoicesVulcano',
                                                            'Select metabolite(s) to highlight:',
                                                            choices = character(0), multiple = T)),
-                             column(width = 5, checkboxInput('highlightVulcano', 'Highlight',
-                                                             value = FALSE, width = '100%'))
+                             column(width = 6, materialSwitch('highlightVulcano', 'Highlight',
+                                                              value = F, status = 'primary'))
                            ),
                            tags$h4('Determine x- and y- cutoff for vulcano plot'),
                            fluidRow(
@@ -733,6 +734,7 @@ server <- function(input, output, session) {
       metabObj <- calc_log2FC(metalyzer_se = metabObj,
                               categorical = selectedChoiceGp)
       reactLog2FCTbl(log2FC(metabObj))
+      
       # Update the slider input, for custom inputs
       updateSliderInput(session, "plotSignificanceXCutoff", 
                         min = 0, 
@@ -751,8 +753,8 @@ server <- function(input, output, session) {
       ))
     }
   })
-  # Update choices for Metabolite Identifiers
   
+  # Update choices for Metabolite Identifiers
   observe({
     req(featChoices())
     updateSelectInput(session, 'metaboliteSelection', choices = featChoices())
@@ -764,39 +766,6 @@ server <- function(input, output, session) {
     IDChoices <- colnames(IDTable)
     
     updateSelectInput(session, 'IDChoices', choices = IDChoices)
-  })
-  
-  # Update choices for metabolite highlighting
-  observe({
-    req(featChoices())
-    updateSelectInput(session, 'metabChoicesVulcano', choices = featChoices())
-  })
-  # Create new column for highlighting metabolites
-  observeEvent(input$highlightVulcano, {
-    req(reactLog2FCTbl())
-    if (!is.null(input$metabChoicesVulcano)) {
-      selectedChoices <- input$metabChoicesVulcano
-      highlightTbl <- reactLog2FCTbl()
-      
-      highlightTbl$highlight <- FALSE
-      highlightTbl$highlight[highlightTbl$Metabolite %in% selectedChoices] <- TRUE
-      highlightTbl$highlight[highlightTbl$Class %in% selectedChoices] <- TRUE
-      
-      reactVulcanoHighlight(highlightTbl)
-    }
-  })
-  observeEvent(input$metabChoicesVulcano, {
-    req(reactLog2FCTbl())
-    if (input$highlightVulcano) {
-      selectedChoices <- input$metabChoicesVulcano
-      highlightTbl <- reactLog2FCTbl()
-      
-      highlightTbl$highlight <- FALSE
-      highlightTbl$highlight[highlightTbl$Metabolite %in% selectedChoices] <- TRUE
-      highlightTbl$highlight[highlightTbl$Class %in% selectedChoices] <- TRUE
-      
-      reactVulcanoHighlight(highlightTbl)
-    }
   })
   
   
@@ -973,6 +942,75 @@ server <- function(input, output, session) {
   output$textLog2FC <- renderText({
     'Please calculate Log₂(FC) first.'
   })
+  
+  # Update choices for metabolite highlighting
+  observe({
+    req(featChoices())
+    updateSelectInput(session, 'metabChoicesVulcano', choices = featChoices())
+  })
+  # Create new column for highlighting metabolites in vulcano and scatter plots
+  observe({
+    req(reactLog2FCTbl())
+    selectedChoices <- input$metabChoicesVulcano
+    highlightTbl <- reactLog2FCTbl()
+    if (!is.null(selectedChoices)) {
+      highlightTbl$highlight <- FALSE
+      highlightTbl$highlight[highlightTbl$Metabolite %in% selectedChoices] <- TRUE
+      highlightTbl$highlight[highlightTbl$Class %in% selectedChoices] <- TRUE
+    } else if (is.null(selectedChoices) | input$highlightVulcano) {
+      highlightTbl$highlight <- FALSE
+    }
+    reactVulcanoHighlight(highlightTbl)
+  })
+  
+  # Vulcano plot
+  output$plotVolcano <- renderPlotly({
+    req(reactLog2FCTbl())
+    if (!input$highlightVulcano) {
+      plotly_vulcano(reactLog2FCTbl(),
+                     cutoff_x = input$plotSignificanceXCutoff,
+                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+    } else {
+      plotly_vulcano(reactVulcanoHighlight(),
+                     cutoff_x = input$plotSignificanceXCutoff,
+                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+    }
+  })
+  
+  # Scatter plot
+  output$plotScatter <- renderPlotly({
+    req(reactLog2FCTbl())
+    if (!input$highlightVulcano) {
+      plot <- plotly_scatter(reactLog2FCTbl())
+    } else {
+      plot <- plotly_scatter(reactVulcanoHighlight())
+    }
+    hide_legend(plot$Plot)
+  })
+  output$plotScatterLegend <- renderImage({
+    req(reactLog2FCTbl()) 
+    plot <- plotly_scatter(reactLog2FCTbl())
+    legend <- plot$Legend
+    # A temp file to save the output.
+    # This file will be removed later by renderImage
+    outfile <- tempfile(fileext='.svg')
+    ggsave(file=outfile, plot=legend)
+    
+    # Return a list containing the filename
+    list(src = normalizePath(outfile),
+         contentType = 'image/svg+xml',
+         width = 571.675,
+         height = 400,
+         alt = "",
+         deleteFile = TRUE)
+  }, deleteFile = TRUE)
+  
+  # Network plot
+  output$plotNetwork <- renderPlotly({
+    req(reactLog2FCTbl())
+    plotly_network(reactLog2FCTbl())
+  })
+  
   # Download the log2(FC) visuals as html
   output$downloadVulcanoPlot <- downloadHandler(
     filename = function() {
@@ -983,12 +1021,12 @@ server <- function(input, output, session) {
       if (input$highlightVulcano) {
         req(reactVulcanoHighlight())
         final_plot <- plotly_vulcano(reactVulcanoHighlight(), 
-                       cutoff_x = input$plotSignificanceXCutoff,
-                       cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+                                     cutoff_x = input$plotSignificanceXCutoff,
+                                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
       } else {
         final_plot <- plotly_vulcano(reactLog2FCTbl(), 
-                       cutoff_x = input$plotSignificanceXCutoff,
-                       cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+                                     cutoff_x = input$plotSignificanceXCutoff,
+                                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
       }
       
       # Save the Plotly plot as an HTML file
@@ -1033,57 +1071,6 @@ server <- function(input, output, session) {
       )
     }
   )
-  # Vulcano plot
-  output$plotVolcano <- renderPlotly({
-    req(reactLog2FCTbl())
-    if (input$highlightVulcano) {
-      req(reactVulcanoHighlight())
-      plotly_vulcano(reactVulcanoHighlight(), 
-                     cutoff_x = input$plotSignificanceXCutoff,
-                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
-    } else {
-      plotly_vulcano(reactLog2FCTbl(), 
-                     cutoff_x = input$plotSignificanceXCutoff,
-                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
-    }
-  })
-  
-  # Scatter plot
-  output$plotScatter <- renderPlotly({
-    req(reactLog2FCTbl())
-    if (input$highlightVulcano) {
-      req(reactVulcanoHighlight())
-      plot <- plotly_scatter(reactVulcanoHighlight())
-      hide_legend(plot$Plot)
-    } else {
-      plot <- plotly_scatter(reactLog2FCTbl())
-      hide_legend(plot$Plot)
-    }
-  })
-  output$plotScatterLegend <- renderImage({
-    req(reactLog2FCTbl()) 
-    plot <- plotly_scatter(reactLog2FCTbl())
-    legend <- plot$Legend
-    # A temp file to save the output.
-    # This file will be removed later by renderImage
-    
-    outfile <- tempfile(fileext='.svg')
-    ggsave(file=outfile, plot=legend)
-    
-    # Return a list containing the filename
-    list(src = normalizePath(outfile),
-          contentType = 'image/svg+xml',
-          width = 571.675,
-          height = 400,
-          alt = "",
-          deleteFile = TRUE)
-  }, deleteFile = TRUE)
-  
-  # Network plot
-  output$plotNetwork <- renderPlotly({
-    req(reactLog2FCTbl())
-    plotly_network(reactLog2FCTbl())
-  })
 }
 
 shinyApp(ui = ui, server = server)
