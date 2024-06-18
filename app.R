@@ -71,18 +71,6 @@ ui <- fluidPage(
                                # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
                                #                               observed values in each metabolite.')),
                                # bsTooltip('normalization', 'Median scaling is conducted followed by log2 transformation.')
-                             ),
-                             bsCollapsePanel(
-                               #### Create independent tab for log
-                               'Filtering Log', style = 'info',
-                               fluidRow(
-                                 column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Sample</h5>')),
-                                 column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Features</h5>'))
-                               ),
-                               fluidRow(
-                                 column(width=6, verbatimTextOutput('smpFilterLog')),
-                                 column(width=6, verbatimTextOutput('featFilterLog')),
-                               )
                              )
                            ),
                            fluidRow(
@@ -171,27 +159,23 @@ ui <- fluidPage(
                            ),
                            tags$br(),
                            tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
+                           #### Highlighting is not applied to scatter plot? 
                            fluidRow(
                              style = "display: flex; align-items: flex-end;",
-                             # style = "display: flex; align-items: center;",
                              column(width = 6, selectInput('metabChoicesVulcano',
                                                            'Select metabolite(s) to highlight:',
                                                            choices = character(0), multiple = T)),
                              column(width = 6, materialSwitch('highlightVulcano', 'Highlight',
                                                               value = F, status = 'primary'))
                            ),
-                           tags$h4('Determine x- and y- cutoff for vulcano plot'),
+                           tags$h4('Select cutoffs for vulcano plot:', style = 'font-weight:bold;font-size:14px'),
+                           #### Cutoff for log2(FC) got wrong. Log2 transformation needs not to be implemented on selected value in function
                            fluidRow(
-                             column(width = 6, sliderInput('plotSignificanceXCutoff',
-                                                           'Select log2FC x-cutoff',
-                                                           min = 0, max = 10, value = 1.5, step = 0.5)
-                             ),
-                             column(width = 6, selectInput('plotSignificanceYCutoff',
-                                                           'Select % p value significance',
-                                                           choices = c(0.2, 0.15, 0.10, 0.05, 0.01, 0.001),
-                                                           multiple = F,
-                                                           selected = 0.05)
-                             )
+                             column(width = 6, sliderInput('plotVolcanoLog2FCCutoff', 'Log₂(FC)',
+                                                           min = 0, max = 10, value = 1, step = 0.1, ticks = F)),
+                             column(width = 6, selectInput('plotVolcanoPValCutoff', 'P-value',
+                                                           choices = c('0.0001', '0.001', '0.01', '0.05', '0.1'), #to avoid scientific notation
+                                                           multiple = F, selected = 0.05))
                            )
           )
         ),
@@ -199,43 +183,52 @@ ui <- fluidPage(
           conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
                            div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
           conditionalPanel(condition = "input.computeLog2FC",
-                           div(style = "text-align:center; margin-top: 1rem;",
-                               tags$h4('Vulcano Plot'),
-                               plotlyOutput('plotVolcano') %>%
-                                 withSpinner(color="#56070C"),
-                               fluidRow(style="display:flex; justify-content:center; margin-top: 1rem;",
-                                        column(width = 3, downloadButton("downloadVulcanoPlot", "Download Interactive Vulcano Plot"))
-                               )
-                           ),
+                           tags$h4(strong('Vulcano plot'), style = "margin-top:1rem;"),
+                           plotlyOutput('plotVolcano') %>%
+                             withSpinner(color="#56070C"),
+                           #### Provide option of downloading static plot
+                           fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
+                                    column(width = 2, downloadButton("downloadVulcanoPlot", "Download vulcano plot"))),
                            tags$br(),
-                           div(style = "text-align:center; margin-top: 1rem;",
-                               tags$h4('Scatter Plot'),
-                               fluidRow(
-                                 column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
-                                          shinycssloaders::withSpinner(color="#56070C")),
-                                 column(width = 3, style = "margin-left: -175px; z-index:1;",
-                                        imageOutput('plotScatterLegend'))
-                               ),
-                               fluidRow(style="display:flex; justify-content:center; margin-bottom: 1rem; margin-top: 1rem;",
-                                        column(width = 3, downloadButton("downloadScatterPlot", "Download Interactive Scatter Plot"))
-                               )
-                           )
+                           tags$h4(strong('Scatter plot'), style = "margin-top:1rem;"),
+                           fluidRow(
+                             column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
+                                      shinycssloaders::withSpinner(color="#56070C")),
+                             column(width = 3, style = "margin-left: -175px; z-index:1;",
+                                    imageOutput('plotScatterLegend'))
+                           ),
+                           fluidRow(style="display:flex; justify-content:right; margin-top:1rem; margin-bottom:1rem;",
+                                    column(width = 2, downloadButton("downloadScatterPlot", "Download scatter plot")))
           )
         )
       )
     ), # TabPanel 2 End
     tabPanel(
+      #### Add title to scale, i.e., log2(FC)?
       'Network',
+      # Lower network plot a bit
       tags$br(),
-      #### If I add this App breaks ??
-      #conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
-      #                 div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
-      conditionalPanel(condition = "output.ifValidUploadedFile",
+      conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
+                       div(textOutput('textLog2FC_2'), style = 'color:IndianRed;font-weight:bold;font-size:110%;text-align:center')),
+      conditionalPanel(condition = "input.computeLog2FC",
                        div(style = "height: 100vh; width: 100%;",
                            plotlyOutput('plotNetwork') %>%
                              withSpinner(color="#56070C"),
                            div(style = "width: 100%; margin-top: 405px; display: flex; justify-content: center;",
-                               downloadButton("downloadNetworkPlot", "Download Interactive Network Plot"))
+                               downloadButton("downloadNetworkPlot", "Download network Plot")))
+      )
+    ),
+    tabPanel(
+      #### To be worked
+      'Log',
+      conditionalPanel(condition = "output.ifValidUploadedFile",
+                       fluidRow(
+                         column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Sample</h5>')),
+                         column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Features</h5>'))
+                       ),
+                       fluidRow(
+                         column(width=6, verbatimTextOutput('smpFilterLog')),
+                         column(width=6, verbatimTextOutput('featFilterLog')),
                        )
       )
     )
@@ -736,14 +729,8 @@ server <- function(input, output, session) {
       reactLog2FCTbl(log2FC(metabObj))
       
       # Update the slider input, for custom inputs
-      updateSliderInput(session, "plotSignificanceXCutoff", 
-                        min = 0, 
-                        max = round(max(na.omit(reactLog2FCTbl()$log2FC)),1), 
-                        value = 1.5)
-      updateSliderInput(session, "plotSignificanceYCutoff", 
-                        min = 0, 
-                        max = round(max(na.omit(reactLog2FCTbl()$pval)),2), 
-                        value = 0.05)
+      updateSliderInput(session, "plotVolcanoLog2FCCutoff",
+                        max = floor(max(na.omit(reactLog2FCTbl()$log2FC))))
     } else {
       showModal(modalDialog(
         title = 'Log₂(FC) computation failed...',
@@ -942,6 +929,9 @@ server <- function(input, output, session) {
   output$textLog2FC <- renderText({
     'Please calculate Log₂(FC) first.'
   })
+  output$textLog2FC_2 <- renderText({
+    'Please calculate Log₂(FC) first.'
+  })
   
   # Update choices for metabolite highlighting
   observe({
@@ -968,12 +958,12 @@ server <- function(input, output, session) {
     req(reactLog2FCTbl())
     if (!input$highlightVulcano) {
       plotly_vulcano(reactLog2FCTbl(),
-                     cutoff_x = input$plotSignificanceXCutoff,
-                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+                     cutoff_x = input$plotVolcanoLog2FCCutoff,
+                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
     } else {
       plotly_vulcano(reactVulcanoHighlight(),
-                     cutoff_x = input$plotSignificanceXCutoff,
-                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+                     cutoff_x = input$plotVolcanoLog2FCCutoff,
+                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
     }
   })
   
@@ -1021,12 +1011,12 @@ server <- function(input, output, session) {
       if (input$highlightVulcano) {
         req(reactVulcanoHighlight())
         final_plot <- plotly_vulcano(reactVulcanoHighlight(), 
-                                     cutoff_x = input$plotSignificanceXCutoff,
-                                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+                                     cutoff_x = input$plotVolcanoLog2FCCutoff,
+                                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
       } else {
         final_plot <- plotly_vulcano(reactLog2FCTbl(), 
-                                     cutoff_x = input$plotSignificanceXCutoff,
-                                     cutoff_y = as.numeric(input$plotSignificanceYCutoff))
+                                     cutoff_x = input$plotVolcanoLog2FCCutoff,
+                                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
       }
       
       # Save the Plotly plot as an HTML file
