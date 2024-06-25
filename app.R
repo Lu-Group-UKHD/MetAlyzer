@@ -11,6 +11,7 @@ library(bslib)
 library(htmlwidgets)
 library(svglite)
 library(writexl)
+library(vsn)
 
 ui <- fluidPage(
   titlePanel('Biocrates Metabolomics Analysis'),
@@ -222,13 +223,8 @@ ui <- fluidPage(
       #### To be worked
       'Log',
       conditionalPanel(condition = "output.ifValidUploadedFile",
-                       fluidRow(
-                         column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Sample</h5>')),
-                         column(width=6, style = "display: flex; justify-content: center;", HTML('<h5>Features</h5>'))
-                       ),
-                       fluidRow(
-                         column(width=6, verbatimTextOutput('smpFilterLog')),
-                         column(width=6, verbatimTextOutput('featFilterLog')),
+                       div(style="display: flex; justify-content: center; width: 80%",
+                         tableOutput("logHistoryTable")
                        )
       )
     )
@@ -243,6 +239,17 @@ server <- function(input, output, session) {
   reactParamLog <- reactiveValues(smpFiltering = c(), featFiltering = c(), featCompleteCutoff = 0,
                                   featValidCutoff = 0, featValidStatus = c(), imputation = F,
                                   normalization = 'None')
+  logHistory <- reactiveVal(data.frame(
+    Process = integer(),
+    smpFiltering = character(),
+    featFiltering = character(),
+    featCompleteCutoff = numeric(),
+    featValidCutoff = numeric(),
+    featValidStatus = character(),
+    imputation = logical(),
+    normalization = character(),
+    stringsAsFactors = FALSE
+  ))
   
   
   # Show fileInput only when example data is not used
@@ -293,6 +300,7 @@ server <- function(input, output, session) {
     reactParamLog$featValidStatus <- c()
     reactParamLog$imputation <- F
     reactParamLog$normalization <- 'None'
+    reactParamLog$revert <- F
   })
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
@@ -327,6 +335,7 @@ server <- function(input, output, session) {
       reactParamLog$featValidStatus <- c()
       reactParamLog$imputation <- F
       reactParamLog$normalization <- 'None'
+      reactParamLog$revert <- F
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -621,13 +630,29 @@ server <- function(input, output, session) {
       reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
       
       # Log parameters
-      reactParamLog$smpFiltering <- input$smpChoicesFiltering
-      reactParamLog$featFiltering <- input$featChoicesFiltering
+      reactParamLog$smpFiltering <- paste(input$smpChoicesFiltering, collapse = ", ")
+      reactParamLog$featFiltering <- paste(input$featChoicesFiltering, collapse = ", ")
       reactParamLog$featCompleteCutoff <- input$featCompleteCutoffFiltering
       reactParamLog$featValidCutoff <- input$featValidCutoffFiltering
-      reactParamLog$featValidStatus <- input$featValidStatusFiltering
+      reactParamLog$featValidStatus <- paste(input$featValidStatusFiltering,  collapse = ", ")
       reactParamLog$imputation <- input$imputation
       reactParamLog$normalization <- input$normalization
+      
+      newLog <- data.frame(
+        Process = nrow(logHistory()) + 1,
+        smpFiltering = I(list(reactParamLog$smpFiltering)),
+        featFiltering = I(list(reactParamLog$featFiltering)),
+        featCompleteCutoff = reactParamLog$featCompleteCutoff,
+        featValidCutoff = reactParamLog$featValidCutoff,
+        featValidStatus = I(list(reactParamLog$featValidStatus)),
+        imputation = reactParamLog$imputation,
+        normalization = reactParamLog$normalization,
+        stringsAsFactors = FALSE
+      )
+      
+      updatedLogHistory <- rbind(logHistory(), newLog)
+      
+      logHistory(updatedLogHistory)
     } else {
       # Revert temporary MetAlyzer object to origin for redoing filtering
       reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
@@ -669,6 +694,7 @@ server <- function(input, output, session) {
     reactParamLog$featValidStatus <- c()
     reactParamLog$imputation <- F
     reactParamLog$normalization <- 'None'
+    reactParamLog$revert <- T
   })
   
   
@@ -764,14 +790,21 @@ server <- function(input, output, session) {
   #         legend.text = element_text(size = 15))
   
   # Create log for specified parameters
-  output$smpFilterLog <- renderPrint({
+  output$smpFilterLog <- renderUI({
     req(reactParamLog$smpFiltering)
-    cat(paste(reactParamLog$smpFiltering, collapse = "\n"))
   })
-  output$featFilterLog <- renderPrint({
-    req(reactParamLog$featFiltering)
-    cat(paste(reactParamLog$featFiltering, collapse = "\n"))
+  
+  
+  sortedLog <- reactive({
+    req(logHistory())
+    log_df <- logHistory()
+    log_df[order(-log_df$Process), ]
   })
+  
+  output$logHistoryTable <- renderTable({
+    sortedLog()
+  })
+  
   
   # Show data overviews
   # Data distribution
