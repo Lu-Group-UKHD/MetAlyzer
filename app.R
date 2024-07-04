@@ -105,13 +105,13 @@ ui <- fluidPage(
         ),
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile == undefined",
-            HTML(HTML('<br>
-                      <h3>This tool is here to help you analyze and explore your Biocrates data.</h3>
-                      <br>
-                      <p>Please ensure your Excel file contains the cell <b>"Class"</b> and the column 
-                      <b>"Sample Type"</b> with correct indentation, as these are used as anchor cells!</p>
-                      <br>
-                      <p>Additional information is available by hovering over all action elements.</p>')
+            HTML('<br>
+                  <h3>This tool is here to help you analyze and explore your Biocrates data.</h3>
+                  <br>
+                  <p>Please ensure your Excel file contains the cell <b>"Class"</b> and the column 
+                  <b>"Sample Type"</b> with correct indentation, as these are used as anchor cells!</p>
+                  <br>
+                  <p>Additional information is available by hovering over all action elements.</p>'
             )
           ),
           conditionalPanel(condition = "output.ifValidUploadedFile",
@@ -223,9 +223,48 @@ ui <- fluidPage(
       #### To be worked
       'Log',
       conditionalPanel(condition = "output.ifValidUploadedFile",
-                       div(style="display: flex; justify-content: center; width: 80%",
-                         tableOutput("logHistoryTable")
-                       )
+                       div(
+                         HTML('
+                              <br>
+                              <h3 style="margin-left: 8%;">Processing History and Analysis</h3>
+                              <h5 style="margin-left: 10%;">This section stores all parameters recorded after 
+                              each processing session. You can track and analyze the changes over time.</h5>
+                              <h5 style="margin-left: 10%;"><strong>Instructions:</strong> Click on a row to view the plots 
+                              and parameters at that specific point during the process. These plots provide visual insights 
+                              into the data at each stage.</h5>
+                              <br>
+                         ')
+                       ),
+                       fluidRow(
+                         column(width = 6, DT::dataTableOutput("logTable")),
+                         column(width = 6,
+                                conditionalPanel(condition = "typeof input.logTable_rows_selected === 'undefined' || input.logTable_rows_selected.length == 0",
+                                                 HTML('<br>
+                                          <h4 style="color: red; text-align: center;">Please select a row</h4>'
+                                                 )
+                                ),
+                                conditionalPanel(condition = "typeof input.logTable_rows_selected !== 'undefined' && input.logTable_rows_selected.length > 0",
+                                                 bsCollapse(
+                                                   open = , multiple = T,
+                                                   bsCollapsePanel('Sample metadata', style = 'primary',
+                                                                   DT::dataTableOutput('tblSmpMetadatLog') %>%
+                                                                     withSpinner(color="#56070C")),
+                                                   bsCollapsePanel('Data distribution', style = 'primary',
+                                                                   plotlyOutput('plotDatDistLog') %>%
+                                                                     withSpinner(color="#56070C")),
+                                                   bsCollapsePanel('Data completeness', style = 'primary',
+                                                                   plotlyOutput('plotDatCompleteLog') %>%
+                                                                     withSpinner(color="#56070C")),
+                                                   bsCollapsePanel('Quantification status', style = 'primary',
+                                                                   plotlyOutput('plotQuanStatusLog') %>%
+                                                                     withSpinner(color="#56070C"))
+                                                 )      
+                                )
+                         )
+                       ),
+                       
+                       
+                       
       )
     )
   )
@@ -238,19 +277,23 @@ server <- function(input, output, session) {
   reactVulcanoHighlight <- reactiveVal()
   reactParamLog <- reactiveValues(smpFiltering = c(), featFiltering = c(), featCompleteCutoff = 0,
                                   featValidCutoff = 0, featValidStatus = c(), imputation = F,
-                                  normalization = 'None')
-  logHistory <- reactiveVal(data.frame(
-    Process = integer(),
-    smpFiltering = character(),
-    featFiltering = character(),
-    featCompleteCutoff = numeric(),
-    featValidCutoff = numeric(),
-    featValidStatus = character(),
-    imputation = logical(),
-    normalization = character(),
-    stringsAsFactors = FALSE
-  ))
-  
+                                  normalization = 'None', procMetaboObj = NULL)
+  logHistory <- reactiveValues(
+    dataframe = data.frame(
+      Process = integer(),
+      smpFiltering = character(),
+      featFiltering = character(),
+      featCompleteCutoff = numeric(),
+      featValidCutoff = numeric(),
+      featValidStatus = character(),
+      imputation = logical(),
+      normalization = character(),
+      stringsAsFactors = FALSE
+    ),
+    datasets = list(),
+    smpMetadatTbl = list(),
+    metabAggreTbl = list()
+  )
   
   # Show fileInput only when example data is not used
   output$updateFileInput <- renderUI({
@@ -300,7 +343,6 @@ server <- function(input, output, session) {
     reactParamLog$featValidStatus <- c()
     reactParamLog$imputation <- F
     reactParamLog$normalization <- 'None'
-    reactParamLog$revert <- F
   })
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
@@ -335,7 +377,6 @@ server <- function(input, output, session) {
       reactParamLog$featValidStatus <- c()
       reactParamLog$imputation <- F
       reactParamLog$normalization <- 'None'
-      reactParamLog$revert <- F
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -620,32 +661,44 @@ server <- function(input, output, session) {
       reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
       
       # Log parameters
-      reactParamLog$smpFiltering <- paste(input$smpChoicesFiltering, collapse = ", ")
-      reactParamLog$featFiltering <- paste(input$featChoicesFiltering, collapse = ", ")
-      reactParamLog$featCompleteCutoff <- input$featCompleteCutoffFiltering
-      reactParamLog$featValidCutoff <- input$featValidCutoffFiltering
-      reactParamLog$featValidStatus <- paste(input$featValidStatusFiltering,  collapse = ", ")
-      reactParamLog$imputation <- input$imputation
-      reactParamLog$normalization <- input$normalization
-      
-      newLog <- data.frame(
-        Process = nrow(logHistory()) + 1,
-        smpFiltering = I(list(reactParamLog$smpFiltering)),
-        featFiltering = I(list(reactParamLog$featFiltering)),
-        featCompleteCutoff = reactParamLog$featCompleteCutoff,
-        featValidCutoff = reactParamLog$featValidCutoff,
-        featValidStatus = I(list(reactParamLog$featValidStatus)),
-        imputation = reactParamLog$imputation,
-        normalization = reactParamLog$normalization,
-        stringsAsFactors = FALSE
-      )
-      
-      updatedLogHistory <- rbind(logHistory(), newLog)
-      
-      logHistory(updatedLogHistory)
+      if (any(!identical(sort(reactParamLog$smpFiltering), sort(input$smpChoicesFiltering)),
+              !identical(sort(reactParamLog$featFiltering), sort(input$featChoicesFiltering)),
+              !identical(reactParamLog$featCompleteCutoff, input$featCompleteCutoffFiltering),
+              !identical(reactParamLog$featValidCutoff, input$featValidCutoffFiltering),
+              !identical(reactParamLog$featValidStatus, input$featValidStatusFiltering),
+              !identical(reactParamLog$imputation, input$imputation),
+              !identical(reactParamLog$normalization, input$normalization)))  {
+        reactParamLog$smpFiltering <- input$smpChoicesFiltering
+        reactParamLog$featFiltering <- input$featChoicesFiltering
+        reactParamLog$featCompleteCutoff <- input$featCompleteCutoffFiltering
+        reactParamLog$featValidCutoff <- input$featValidCutoffFiltering
+        reactParamLog$featValidStatus <- input$featValidStatusFiltering
+        reactParamLog$imputation <- input$imputation
+        reactParamLog$normalization <- input$normalization
+        
+
+        
+        newLog <- data.frame(
+          Process = nrow(logHistory$dataframe) + 1,
+          smpFiltering = I(list(paste(input$smpChoicesFiltering, collapse = ', '))),
+          featFiltering = I(list(paste(input$featChoicesFiltering, collapse = ', '))),
+          featCompleteCutoff = reactParamLog$featCompleteCutoff,
+          featValidCutoff = reactParamLog$featValidCutoff,
+          featValidStatus = I(list(paste(input$featValidStatusFiltering, collapse = ', '))),
+          imputation = reactParamLog$imputation,
+          normalization = reactParamLog$normalization,
+          stringsAsFactors = FALSE
+        )
+
+        logHistory$dataframe <- rbind(logHistory$dataframe, newLog)
+        
+        logHistory$datasets[[length(logHistory$datasets) + 1]] <- reactMetabObj$tmpMetabObj
+        logHistory$smpMetadatTbl[[length(logHistory$smpMetadatTbl) + 1]] <- datOverviewPack()$smpMetadatTbl
+        logHistory$metabAggreTbl[[length(logHistory$metabAggreTbl) + 1]] <- datOverviewPack()$metabAggreTbl
+      } 
     } else {
-      # Revert temporary MetAlyzer object to origin for redoing filtering
-      reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
+        # Revert temporary MetAlyzer object to origin for redoing filtering
+        reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
     }
   })
   # Revert processed data and specified parameters back to origins
@@ -783,20 +836,90 @@ server <- function(input, output, session) {
   #         axis.ticks = element_line(linewidth = 0.8),
   #         legend.text = element_text(size = 15))
   
-  # Create log for specified parameters
-  output$smpFilterLog <- renderUI({
-    req(reactParamLog$smpFiltering)
-  })
-  
-  
+  # Plot Log Elemets
   sortedLog <- reactive({
-    req(logHistory())
-    log_df <- logHistory()
+    req(logHistory$dataframe)
+    log_df <- logHistory$dataframe
     log_df[order(-log_df$Process), ]
   })
   
-  output$logHistoryTable <- renderTable({
-    sortedLog()
+  output$logTable <- DT::renderDataTable({
+    DT::datatable(sortedLog(), rownames = F, options = list(dom='t',ordering=F),
+                  selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
+  })
+  
+  output$plotDatDistLog <- renderPlotly({
+    req(datOverviewPack()$metabAggreTbl, input$gpColsDatDist, input$logTable_rows_selected)
+    
+    #Because of sorted dataframe
+    clickedRow <- sort(logHistory$dataframe$Process, decreasing = T)[input$logTable_rows_selected] 
+    actMetabAggreTbl <- logHistory$metabAggreTbl[[clickedRow]]
+    
+    g <- ggplot(actMetabAggreTbl, aes(x=ID, y=Concentration)) +
+      geom_boxplot()
+
+    g <- g +
+      labs(x = 'Sample', y = 'Metabolite abundance') +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    # Put abundance on log10 scale for better visualization if data is not normalized 
+    if (logHistory$dataframe$normalization[clickedRow] == F) {
+      g <- g + scale_y_log10()
+    }
+    ggplotly(g)
+  })
+  
+  output$tblSmpMetadatLog <- DT::renderDataTable({
+    req(datOverviewPack()$smpMetadatTbl)
+    smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
+    DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
+                  selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
+  })
+  
+  output$plotQuanStatusLog <- renderPlotly({
+    req(datOverviewPack()$metabAggreTbl)
+    
+    clickedRow <- sort(logHistory$dataframe$Process, decreasing = T)[input$logTable_rows_selected] 
+    actMetabAggreTbl <- logHistory$metabAggreTbl[[clickedRow]]
+    
+    smpStatusCountTbl <- actMetabAggreTbl %>%
+      dplyr::group_by(ID, Status) %>%
+      dplyr::summarise(Count = dplyr::n()) %>%
+      dplyr::ungroup()
+    # Prepare colors for quantification statuses
+    #### Add color for NA quantification status
+    status2Color <- c(Valid = '#33a02c', LOQ = '#1f78b4', LOD = '#ff7f00', Invalid = '#e31a1c')
+    statusCols <- status2Color[names(status2Color) %in% unique(smpStatusCountTbl$Status)]
+    ggplotly(
+      ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
+        geom_col(position = "stack") +
+        scale_fill_manual(values = statusCols) +
+        labs(x = "Sample") +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    )
+  })
+  
+  output$plotDatCompleteLog <- renderPlotly({
+    req(datOverviewPack()$metabAggreTbl)
+    
+    clickedRow <- sort(logHistory$dataframe$Process, decreasing = T)[input$logTable_rows_selected]
+    actMetabAggreTbl <- logHistory$metabAggreTbl[[clickedRow]]
+    
+    smpCompleteCountTbl <- actMetabAggreTbl %>%
+      dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% c(0, NA) ~ 'Observed',
+                                                    Concentration %in% c(0, NA) ~ 'Missing')) %>%
+      dplyr::group_by(ID, Completeness) %>%
+      dplyr::summarise(Count = dplyr::n()) %>%
+      dplyr::ungroup()
+    ggplotly(
+      ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
+        geom_col(position = 'stack') +
+        scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
+        labs(x = 'Sample') +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    )
   })
   
   
