@@ -104,15 +104,16 @@ ui <- fluidPage(
           )
         ),
         mainPanel(
-          conditionalPanel(condition = "output.ifValidUploadedFile == undefined",
-            HTML('<br>
-                  <h3>This tool is here to help you analyze and explore your Biocrates data.</h3>
-                  <br>
-                  <p>Please ensure your Excel file contains the cell <b>"Class"</b> and the column 
-                  <b>"Sample Type"</b> with correct indentation, as these are used as anchor cells!</p>
-                  <br>
-                  <p>Additional information is available by hovering over all action elements.</p>'
-            )
+          # JavaScript: Double equals (==) is loose equality with type coercion and
+          # triple equals (===) is strict equality without type coercion
+          conditionalPanel(condition = "output.ifValidUploadedFile === undefined",
+                           HTML('<br>
+                                <h3>This tool is here to help you analyze and explore your Biocrates data.</h3>
+                                <br>
+                                <p>Please ensure your Excel file contains the cell <b>"Class"</b> and the column 
+                                <b>"Sample Type"</b> with correct indentation, as these are used as anchor cells!</p>
+                                <br>
+                                <p>Additional information is available by hovering over all action elements.</p>')
           ),
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            bsCollapse(
@@ -143,8 +144,8 @@ ui <- fluidPage(
     tabPanel(
       'Log₂(FC)',
       sidebarLayout(
-        sidebarPanel(
-          conditionalPanel(condition = "output.ifValidUploadedFile",
+        conditionalPanel(condition = "output.ifValidUploadedFile",
+                         sidebarPanel(
                            tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
                              column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
@@ -178,7 +179,7 @@ ui <- fluidPage(
                                                            choices = c('0.0001', '0.001', '0.01', '0.05', '0.1'), #to avoid scientific notation
                                                            multiple = F, selected = 0.05))
                            )
-          )
+                         )
         ),
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
@@ -223,32 +224,28 @@ ui <- fluidPage(
       #### To be worked
       'Log',
       conditionalPanel(condition = "output.ifValidUploadedFile",
-                       div(
-                         HTML('
-                              <br>
-                              <h3 style="margin-left: 8%;">Processing History and Analysis</h3>
-                              <h5 style="margin-left: 10%;">This section stores all parameters recorded after 
-                              each processing session. You can track and analyze the changes over time.</h5>
-                              <h5 style="margin-left: 10%;"><strong>Instructions:</strong> Click on a row to view the plots 
-                              and parameters at that specific point during the process. These plots provide visual insights 
-                              into the data at each stage.</h5>
-                              <br>
-                         ')
+                       fluidRow(
+                         column(width = 7, HTML('<br>
+                                                <h3 style="margin-left: 2%;">Processing History</h3>
+                                                <h5 style="margin-left: 2%;">This section logs processing
+                                                parameters used in different trials (every time you hit Process button).</h5>
+                                                <h5 style="margin-left: 2%;"><strong>Instructions:</strong> Click on a row to
+                                                view the processed data at the specific point.</h5>
+                                                <br>')),
+                         column(width = 2, div(style = "width: 60%; margin-top: 30%;",
+                                               actionButton('clearParamLog', 'Clear', width = '100%'))),
+                         bsTooltip('clearParamLog', 'The parameter log table will be cleared.')
                        ),
                        fluidRow(
-                         column(width = 6, DT::dataTableOutput("logTable")),
-                         column(width = 6,
-                                conditionalPanel(condition = "typeof input.logTable_rows_selected === 'undefined' || input.logTable_rows_selected.length == 0",
+                         column(width = 7, DT::dataTableOutput("tblParamLog")),
+                         column(width = 5,
+                                conditionalPanel(condition = "typeof input.tblParamLog_rows_selected === 'undefined' || input.tblParamLog_rows_selected.length == 0",
                                                  HTML('<br>
-                                          <h4 style="color: red; text-align: center;">Please select a row</h4>'
-                                                 )
+                                                      <h4 style="color: IndianRed; text-align: left;">Please select a row.</h4>')
                                 ),
-                                conditionalPanel(condition = "typeof input.logTable_rows_selected !== 'undefined' && input.logTable_rows_selected.length > 0",
+                                conditionalPanel(condition = "typeof input.tblParamLog_rows_selected !== 'undefined' && input.tblParamLog_rows_selected.length > 0",
                                                  bsCollapse(
-                                                   open = , multiple = T,
-                                                   bsCollapsePanel('Sample metadata', style = 'primary',
-                                                                   DT::dataTableOutput('tblSmpMetadatLog') %>%
-                                                                     withSpinner(color="#56070C")),
+                                                   multiple = T,
                                                    bsCollapsePanel('Data distribution', style = 'primary',
                                                                    plotlyOutput('plotDatDistLog') %>%
                                                                      withSpinner(color="#56070C")),
@@ -258,13 +255,10 @@ ui <- fluidPage(
                                                    bsCollapsePanel('Quantification status', style = 'primary',
                                                                    plotlyOutput('plotQuanStatusLog') %>%
                                                                      withSpinner(color="#56070C"))
-                                                 )      
+                                                 )
                                 )
                          )
-                       ),
-                       
-                       
-                       
+                       )
       )
     )
   )
@@ -275,24 +269,26 @@ server <- function(input, output, session) {
   reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL, tmpMetabObj = NULL)
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
-  reactParamLog <- reactiveValues(smpFiltering = c(), featFiltering = c(), featCompleteCutoff = 0,
-                                  featValidCutoff = 0, featValidStatus = c(), imputation = F,
-                                  normalization = 'None', procMetaboObj = NULL)
-  logHistory <- reactiveValues(
-    dataframe = data.frame(
-      Process = integer(),
-      smpFiltering = character(),
-      featFiltering = character(),
-      featCompleteCutoff = numeric(),
-      featValidCutoff = numeric(),
-      featValidStatus = character(),
-      imputation = logical(),
-      normalization = character(),
-      stringsAsFactors = FALSE
-    ),
-    datasets = list(),
-    smpMetadatTbl = list(),
-    metabAggreTbl = list()
+  # Create reactive parameter list for detecting any parameter change by users,
+  # which is to make data always follow built processing procedure
+  reactParamList <- reactiveValues(smpFiltering = c(), featFiltering = c(), featCompleteCutoff = 0,
+                                   featValidCutoff = 0, featValidStatus = c(), imputation = F,
+                                   normalization = 'None')
+  # Create reactive container to store processing parameters and processed data
+  # of different trials for logging history and comparing results
+  reactAnalysisLog <- reactiveValues(
+    paramLogTbl = data.frame(idx = integer(),
+                             smpFiltering = character(),
+                             featFiltering = character(),
+                             featCompleteCutoff = numeric(),
+                             featValidCutoff = numeric(),
+                             featValidStatus = character(),
+                             imputation = character(),
+                             normalization = character(),
+                             stringsAsFactors = FALSE),
+    # metabObjList = list(),
+    # smpMetadatTblList = list(),
+    metabAggreTblList = list()
   )
   
   # Show fileInput only when example data is not used
@@ -336,13 +332,13 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
     
     # Empty parameter log
-    reactParamLog$smpFiltering <- c()
-    reactParamLog$featFiltering <- c()
-    reactParamLog$featCompleteCutoff <- 0
-    reactParamLog$featValidCutoff <- 0
-    reactParamLog$featValidStatus <- c()
-    reactParamLog$imputation <- F
-    reactParamLog$normalization <- 'None'
+    reactParamList$smpFiltering <- c()
+    reactParamList$featFiltering <- c()
+    reactParamList$featCompleteCutoff <- 0
+    reactParamList$featValidCutoff <- 0
+    reactParamList$featValidStatus <- c()
+    reactParamList$imputation <- F
+    reactParamList$normalization <- 'None'
   })
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
@@ -370,13 +366,13 @@ server <- function(input, output, session) {
       updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
       
       # Empty parameter log
-      reactParamLog$smpFiltering <- c()
-      reactParamLog$featFiltering <- c()
-      reactParamLog$featCompleteCutoff <- 0
-      reactParamLog$featValidCutoff <- 0
-      reactParamLog$featValidStatus <- c()
-      reactParamLog$imputation <- F
-      reactParamLog$normalization <- 'None'
+      reactParamList$smpFiltering <- c()
+      reactParamList$featFiltering <- c()
+      reactParamList$featCompleteCutoff <- 0
+      reactParamList$featValidCutoff <- 0
+      reactParamList$featValidStatus <- c()
+      reactParamList$imputation <- F
+      reactParamList$normalization <- 'None'
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -517,28 +513,37 @@ server <- function(input, output, session) {
   # to avoid data normalized more than one time
   doneImputation <- reactiveVal(0)
   doneNormalization <- reactiveVal(0)
+  # Create reactive values to monitor if any parameter is changed
+  ifParamChange <- reactiveVal(0)
+  
   # Rerun data processing if any parameter is changed, so that processing can follow
   # order from sample filtering, feature filtering, imputation, to normalization
+  # Note that every first trial must be logged because output of selectInput will
+  # never be c(), instead, NULL when nothing is selected
   observeEvent(input$updateProcessing, {
-    if (any(!identical(sort(reactParamLog$smpFiltering), sort(input$smpChoicesFiltering)),
-            !identical(sort(reactParamLog$featFiltering), sort(input$featChoicesFiltering)),
-            !identical(reactParamLog$featCompleteCutoff, input$featCompleteCutoffFiltering),
-            !identical(reactParamLog$featValidCutoff, input$featValidCutoffFiltering),
-            !identical(reactParamLog$featValidStatus, input$featValidStatusFiltering),
-            !identical(reactParamLog$imputation, input$imputation),
-            !identical(reactParamLog$normalization, input$normalization))) {
+    if (any(!identical(sort(reactParamList$smpFiltering), sort(input$smpChoicesFiltering)),
+            !identical(sort(reactParamList$featFiltering), sort(input$featChoicesFiltering)),
+            !identical(reactParamList$featCompleteCutoff, input$featCompleteCutoffFiltering),
+            !identical(reactParamList$featValidCutoff, input$featValidCutoffFiltering),
+            !identical(reactParamList$featValidStatus, input$featValidStatusFiltering),
+            !identical(reactParamList$imputation, input$imputation),
+            !identical(reactParamList$normalization, input$normalization))) {
       # Revert processed temporary MetAlyzer object and parameter log back to origins
       reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
       doneImputation(0)
       doneNormalization(0)
       
-      reactParamLog$smpFiltering <- c()
-      reactParamLog$featFiltering <- c()
-      reactParamLog$featCompleteCutoff <- 0
-      reactParamLog$featValidCutoff <- 0
-      reactParamLog$featValidStatus <- c()
-      reactParamLog$imputation <- F
-      reactParamLog$normalization <- 'None'
+      reactParamList$smpFiltering <- c()
+      reactParamList$featFiltering <- c()
+      reactParamList$featCompleteCutoff <- 0
+      reactParamList$featValidCutoff <- 0
+      reactParamList$featValidStatus <- c()
+      reactParamList$imputation <- F
+      reactParamList$normalization <- 'None'
+      
+      # Turn reactive ifParamChange to 1, so used parameters and processed data
+      # will be logged
+      ifParamChange(1)
     }
   })
   # Do sample filtering (place this chunk before 'Do feature filtering', so that
@@ -660,45 +665,45 @@ server <- function(input, output, session) {
       # Update main MetAlyzer object for further analysis
       reactMetabObj$metabObj <- reactMetabObj$tmpMetabObj
       
-      # Log parameters
-      if (any(!identical(sort(reactParamLog$smpFiltering), sort(input$smpChoicesFiltering)),
-              !identical(sort(reactParamLog$featFiltering), sort(input$featChoicesFiltering)),
-              !identical(reactParamLog$featCompleteCutoff, input$featCompleteCutoffFiltering),
-              !identical(reactParamLog$featValidCutoff, input$featValidCutoffFiltering),
-              !identical(reactParamLog$featValidStatus, input$featValidStatusFiltering),
-              !identical(reactParamLog$imputation, input$imputation),
-              !identical(reactParamLog$normalization, input$normalization)))  {
-        reactParamLog$smpFiltering <- input$smpChoicesFiltering
-        reactParamLog$featFiltering <- input$featChoicesFiltering
-        reactParamLog$featCompleteCutoff <- input$featCompleteCutoffFiltering
-        reactParamLog$featValidCutoff <- input$featValidCutoffFiltering
-        reactParamLog$featValidStatus <- input$featValidStatusFiltering
-        reactParamLog$imputation <- input$imputation
-        reactParamLog$normalization <- input$normalization
+      
+      # Log parameters and processed data
+      if (ifParamChange() == 1) {
+        # Log parameters
+        reactParamList$smpFiltering <- input$smpChoicesFiltering
+        reactParamList$featFiltering <- input$featChoicesFiltering
+        reactParamList$featCompleteCutoff <- input$featCompleteCutoffFiltering
+        reactParamList$featValidCutoff <- input$featValidCutoffFiltering
+        reactParamList$featValidStatus <- input$featValidStatusFiltering
+        reactParamList$imputation <- input$imputation
+        reactParamList$normalization <- input$normalization
         
-
-        
-        newLog <- data.frame(
-          Process = nrow(logHistory$dataframe) + 1,
+        newParamLog <- data.frame(
+          idx = nrow(reactAnalysisLog$paramLogTbl) + 1,
+          #### What is effect of I(list())?
           smpFiltering = I(list(paste(input$smpChoicesFiltering, collapse = ', '))),
           featFiltering = I(list(paste(input$featChoicesFiltering, collapse = ', '))),
-          featCompleteCutoff = reactParamLog$featCompleteCutoff,
-          featValidCutoff = reactParamLog$featValidCutoff,
+          featCompleteCutoff = reactParamList$featCompleteCutoff,
+          featValidCutoff = reactParamList$featValidCutoff,
           featValidStatus = I(list(paste(input$featValidStatusFiltering, collapse = ', '))),
-          imputation = reactParamLog$imputation,
-          normalization = reactParamLog$normalization,
+          imputation = as.character(reactParamList$imputation),
+          normalization = reactParamList$normalization,
           stringsAsFactors = FALSE
         )
-
-        logHistory$dataframe <- rbind(logHistory$dataframe, newLog)
+        reactAnalysisLog$paramLogTbl <- rbind(reactAnalysisLog$paramLogTbl, newParamLog)
         
-        logHistory$datasets[[length(logHistory$datasets) + 1]] <- reactMetabObj$tmpMetabObj
-        logHistory$smpMetadatTbl[[length(logHistory$smpMetadatTbl) + 1]] <- datOverviewPack()$smpMetadatTbl
-        logHistory$metabAggreTbl[[length(logHistory$metabAggreTbl) + 1]] <- datOverviewPack()$metabAggreTbl
+        # Log processed data
+        logIdx <- nrow(reactAnalysisLog$paramLogTbl)
+        # reactAnalysisLog$metabObjList[[logIdx]] <- reactMetabObj$metabObj
+        # reactAnalysisLog$smpMetadatTblList[[logIdx]] <- datOverviewPack()$smpMetadatTbl
+        reactAnalysisLog$metabAggreTblList[[logIdx]] <- datOverviewPack()$metabAggreTbl
+        
+        # Return reactive ifParamChange to 0, so this chunk will run only if any
+        # parameter is changed
+        ifParamChange(0)
       } 
     } else {
-        # Revert temporary MetAlyzer object to origin for redoing filtering
-        reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
+      # Revert temporary MetAlyzer object to origin for redoing filtering
+      reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
     }
   })
   # Revert processed data and specified parameters back to origins
@@ -708,6 +713,7 @@ server <- function(input, output, session) {
     reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
     doneImputation(0)
     doneNormalization(0)
+    ifParamChange(0)
     
     # Set parameters for feature filtering back to default
     if ('Metabolism Indicators' %in% unlist(featChoices())) {
@@ -730,14 +736,31 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
     
     # Empty parameter log
-    reactParamLog$smpFiltering <- c()
-    reactParamLog$featFiltering <- c()
-    reactParamLog$featCompleteCutoff <- 0
-    reactParamLog$featValidCutoff <- 0
-    reactParamLog$featValidStatus <- c()
-    reactParamLog$imputation <- F
-    reactParamLog$normalization <- 'None'
-    reactParamLog$revert <- T
+    reactParamList$smpFiltering <- c()
+    reactParamList$featFiltering <- c()
+    reactParamList$featCompleteCutoff <- 0
+    reactParamList$featValidCutoff <- 0
+    reactParamList$featValidStatus <- c()
+    reactParamList$imputation <- F
+    reactParamList$normalization <- 'None'
+  })
+  # Clear parameter log table
+  observeEvent(input$clearParamLog, {
+    reactAnalysisLog$paramLogTbl <- data.frame(idx = integer(),
+                                               smpFiltering = character(),
+                                               featFiltering = character(),
+                                               featCompleteCutoff = numeric(),
+                                               featValidCutoff = numeric(),
+                                               featValidStatus = character(),
+                                               imputation = character(),
+                                               normalization = character(),
+                                               stringsAsFactors = FALSE)
+    reactAnalysisLog$metabObjList = list()
+    reactAnalysisLog$smpMetadatTblList = list()
+    reactAnalysisLog$metabAggreTblList = list()
+    # Turn reactive ifParamChange to 1, so current unchanged parameters can be logged
+    # if Process button is hit
+    ifParamChange(1)
   })
   
   
@@ -836,52 +859,49 @@ server <- function(input, output, session) {
   #         axis.ticks = element_line(linewidth = 0.8),
   #         legend.text = element_text(size = 15))
   
-  # Plot Log Elemets
-  sortedLog <- reactive({
-    req(logHistory$dataframe)
-    log_df <- logHistory$dataframe
-    log_df[order(-log_df$Process), ]
-  })
-  
-  output$logTable <- DT::renderDataTable({
-    DT::datatable(sortedLog(), rownames = F, options = list(dom='t',ordering=F),
+  # Display Log Elements
+  # Log of parameters
+  output$tblParamLog <- DT::renderDataTable({
+    paramLogTbl <- reactAnalysisLog$paramLogTbl
+    # Reverse parameter log table to display latest log on top
+    paramLogTbl <- paramLogTbl[order(-paramLogTbl$idx),] %>%
+      dplyr::mutate(imputation = dplyr::case_when(imputation %in% 'TRUE' ~ 'True',
+                                                  imputation %in% 'FALSE' ~ 'False'),
+                    featCompleteCutoff = paste0(featCompleteCutoff, '%'),
+                    featValidCutoff = paste0(featValidCutoff, '%'))
+    colnames(paramLogTbl) <- c('Process', 'Sample Removed', 'Feature Removed',
+                               'Completeness Cutoff', 'Validity Cutoff',
+                               'Validity Status', 'Imputation', 'Normalization')
+    DT::datatable(paramLogTbl, rownames = F, options = list(dom = 't', ordering = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
   
+  # Log of processed data distribution
   output$plotDatDistLog <- renderPlotly({
-    req(datOverviewPack()$metabAggreTbl, input$gpColsDatDist, input$logTable_rows_selected)
-    
-    #Because of sorted dataframe
-    clickedRow <- sort(logHistory$dataframe$Process, decreasing = T)[input$logTable_rows_selected] 
-    actMetabAggreTbl <- logHistory$metabAggreTbl[[clickedRow]]
-    
+    req(input$tblParamLog_rows_selected)
+    clickedRow <- input$tblParamLog_rows_selected
+    # Because of reversed parameter log table
+    logIdx <- sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
+    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[logIdx]]
     g <- ggplot(actMetabAggreTbl, aes(x=ID, y=Concentration)) +
-      geom_boxplot()
-
-    g <- g +
+      geom_boxplot() +
       labs(x = 'Sample', y = 'Metabolite abundance') +
       theme_bw() +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     # Put abundance on log10 scale for better visualization if data is not normalized 
-    if (logHistory$dataframe$normalization[clickedRow] == F) {
+    if (reactAnalysisLog$paramLogTbl$normalization[logIdx] == 'None') {
       g <- g + scale_y_log10()
     }
     ggplotly(g)
   })
   
-  output$tblSmpMetadatLog <- DT::renderDataTable({
-    req(datOverviewPack()$smpMetadatTbl)
-    smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
-    DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
-                  selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
-  })
-  
+  # Log of processed data quantification status
   output$plotQuanStatusLog <- renderPlotly({
-    req(datOverviewPack()$metabAggreTbl)
-    
-    clickedRow <- sort(logHistory$dataframe$Process, decreasing = T)[input$logTable_rows_selected] 
-    actMetabAggreTbl <- logHistory$metabAggreTbl[[clickedRow]]
-    
+    req(input$tblParamLog_rows_selected)
+    clickedRow <- input$tblParamLog_rows_selected
+    # Because of reversed parameter log table
+    logIdx <- sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
+    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[logIdx]]
     smpStatusCountTbl <- actMetabAggreTbl %>%
       dplyr::group_by(ID, Status) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
@@ -900,12 +920,13 @@ server <- function(input, output, session) {
     )
   })
   
+  # Log of processed data completeness
   output$plotDatCompleteLog <- renderPlotly({
-    req(datOverviewPack()$metabAggreTbl)
-    
-    clickedRow <- sort(logHistory$dataframe$Process, decreasing = T)[input$logTable_rows_selected]
-    actMetabAggreTbl <- logHistory$metabAggreTbl[[clickedRow]]
-    
+    req(input$tblParamLog_rows_selected)
+    clickedRow <- input$tblParamLog_rows_selected
+    # Because of reversed parameter log table
+    logIdx <- sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
+    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[logIdx]]
     smpCompleteCountTbl <- actMetabAggreTbl %>%
       dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% c(0, NA) ~ 'Observed',
                                                     Concentration %in% c(0, NA) ~ 'Missing')) %>%
