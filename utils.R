@@ -190,9 +190,9 @@ plotly_scatter <- function(Log2FCTab) {
     geom_hline(yintercept = 0, linewidth = 0.5, color = 'black') +
     geom_point(size = 0.5, aes(text = paste0(Metabolite, 
                                              "\nClass: ", Class, 
-                                             "\nlog2 Fold Change: ", round(log2FC, digits=5),  
-                                             "\nadj. p-value: ", round(qval, digits=5),
-                                             "\np-value: ", round(pval, digits=5)))) + 
+                                             "\nLog2(FC): ", round(log2FC, digits=2),  
+                                             "\nAdj. p-value: ", round(qval, digits=4),
+                                             "\nP-value: ", round(pval, digits=4)))) + 
     scale_color_manual(paste0('Significance\n(linear model fit with FDR correction)'),
                        labels = signif_labels,
                        values = names(signif_colors),
@@ -212,7 +212,7 @@ plotly_scatter <- function(Log2FCTab) {
           panel.grid.minor.x = element_blank(),
           panel.grid.minor.y = element_line('#ECECEC'),
           panel.background = element_blank()) +
-    labs(x = 'Metabolites')
+    labs(x = 'Metabolite', y = 'Log2(FC)')
 
   ## Interactive: Create interactive plot
   plotly_plot <- ggplotly(p_scatter, tooltip = "text", showlegend = FALSE)
@@ -280,16 +280,16 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                                            color = .data$highlight)) +
       geom_point(size = 1, aes(text = paste0(Metabolite, 
                                             "\nClass: ", Class, 
-                                            "\nlog2 Fold Change: ", round(log2FC, digits=5), 
-                                            "\nadj. p-value: ", round(qval, digits=5),
-                                            "\np-value: ", round(pval, digits=5)))) +
-      geom_vline(xintercept=c(-log2(cutoff_x), log2(cutoff_x)), col="black", linetype="dashed") +
+                                            "\nLog2(FC): ", round(log2FC, digits=2), 
+                                            "\nAdj. p-value: ", round(qval, digits=4),
+                                            "\nP-value: ", round(pval, digits=4)))) +
+      geom_vline(xintercept=c(-cutoff_x, cutoff_x), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
       scale_color_manual('',
                          breaks = c("Other Metabolites", "Highlighted Metabolite(s)"),
                          values = c("#d3d3d3","#56070C")) +
       theme_bw() +
-      labs(x = 'log2(FC)', y = "-log10(p)")
+      labs(x = 'Log2(FC)', y = "-Log10(P-value)")
     
     ## Interactive: Create interactive plot
     p_vulcano_highlighted <- ggplotly(p_fc_vulcano_highlighted, tooltip = "text")
@@ -299,7 +299,7 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
     # Data Vulcano: Prepare Dataframe for vulcano plot
     Log2FCTab$Class <- as.character(Log2FCTab$Class)
     Log2FCTab$Class[Log2FCTab$qval > cutoff_y] <- "Not Significant"
-    Log2FCTab$Class[abs(Log2FCTab$log2FC) < log2(cutoff_x)] <- "Not Significant"
+    Log2FCTab$Class[abs(Log2FCTab$log2FC) < cutoff_x] <- "Not Significant"
 
     breaks <- unique(Log2FCTab$Class)
     values <- class_colors[names(class_colors) %in% Log2FCTab$Class]
@@ -309,19 +309,19 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                            aes(x = .data$log2FC,
                                y = -log10(.data$qval),
                                color = .data$Class)) +
-      geom_vline(xintercept=c(-log2(cutoff_x), log2(cutoff_x)), col="black", linetype="dashed") +
+      geom_vline(xintercept=c(-cutoff_x, cutoff_x), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
       geom_point(size = 1, aes(text = paste0(Metabolite, 
                                             "\nClass: ", Class, 
-                                            "\nlog2 Fold Change: ", round(log2FC, digits=5), 
-                                            "\nadj. p-value: ", round(qval, digits=5),
-                                            "\np-value: ", round(pval, digits=5)))) +
+                                            "\nLog2(FC): ", round(log2FC, digits=2), 
+                                            "\nAdj. p-value: ", round(qval, digits=4),
+                                            "\nP-value: ", round(pval, digits=4)))) +
       scale_color_manual('Classes',
                          breaks = breaks,
                          values = values,
                          drop = FALSE) +
       theme_bw() +
-      labs(x = 'log2(FC)', y = "-log10(p)")
+      labs(x = 'Log2(FC)', y = "-Log10(P-value)")
     
     ## Interactive: Create interactive plot
     p_vulcano <- ggplotly(p_fc_vulcano, tooltip = "text")
@@ -549,10 +549,10 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       ay = 0,
       bgcolor = nodes$color[i],
       opacity = 1,
-      hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
+      hovertext = paste0("Log2(FC): ", round(nodes$FC_thresh[i], 2),
                          "\nPathway: ", nodes$Pathway[i],
-                         "\nadj. p-value: ", round(nodes$q_value[i], 5),
-                         "\np-value: ", round(nodes$p_value[i], 5))
+                         "\nAdj. p-value: ", round(nodes$q_value[i], 4),
+                         "\nP-value: ", round(nodes$p_value[i], 4))
     )
   }
   

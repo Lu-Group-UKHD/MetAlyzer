@@ -160,8 +160,8 @@ ui <- fluidPage(
                              column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
                            ),
                            tags$br(),
-                           tags$h4('Log₂(FC) Visualization', style = 'color:steelblue;font-weight:bold'),
-                           #### Highlighting is not applied to scatter plot? 
+                           tags$h4('Vulcano plot', style = 'color:steelblue;font-weight:bold'), #Log₂(FC) Visualization
+                           #### Highlighting in scatter plot is to be fixed 
                            fluidRow(
                              style = "display: flex; align-items: flex-end;",
                              column(width = 6, selectInput('metabChoicesVulcano',
@@ -170,8 +170,7 @@ ui <- fluidPage(
                              column(width = 6, materialSwitch('highlightVulcano', 'Highlight',
                                                               value = F, status = 'primary'))
                            ),
-                           tags$h4('Select cutoffs for vulcano plot:', style = 'font-weight:bold;font-size:14px'),
-                           #### Cutoff for log2(FC) got wrong. Log2 transformation needs not to be implemented on selected value in function
+                           tags$h4('Select cutoffs:', style = 'font-weight:bold;font-size:14px'),
                            fluidRow(
                              column(width = 6, sliderInput('plotVolcanoLog2FCCutoff', 'Log₂(FC)',
                                                            min = 0, max = 10, value = 1, step = 0.1, ticks = F)),
@@ -221,7 +220,6 @@ ui <- fluidPage(
       )
     ),
     tabPanel(
-      #### To be worked
       'Log',
       conditionalPanel(condition = "output.ifValidUploadedFile",
                        fluidRow(
@@ -1115,11 +1113,12 @@ server <- function(input, output, session) {
   # Scatter plot
   output$plotScatter <- renderPlotly({
     req(reactLog2FCTbl())
-    if (!input$highlightVulcano) {
-      plot <- plotly_scatter(reactLog2FCTbl())
-    } else {
-      plot <- plotly_scatter(reactVulcanoHighlight())
-    }
+    # if (!input$highlightVulcano) {
+    #   plot <- plotly_scatter(reactLog2FCTbl())
+    # } else {
+    #   plot <- plotly_scatter(reactVulcanoHighlight())
+    # }
+    plot <- plotly_scatter(reactLog2FCTbl())
     hide_legend(plot$Plot)
   })
   output$plotScatterLegend <- renderImage({
@@ -1178,12 +1177,13 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       # Define a variable to store the final plot
-      if (input$highlightVulcano) {
-        req(reactVulcanoHighlight())
-        final_plot <- plotly_scatter(reactVulcanoHighlight())$Plot
-      } else {
-        final_plot <- plotly_scatter(reactLog2FCTbl())$Plot
-      }
+      # if (input$highlightVulcano) {
+      #   req(reactVulcanoHighlight())
+      #   final_plot <- plotly_scatter(reactVulcanoHighlight())$Plot
+      # } else {
+      #   final_plot <- plotly_scatter(reactLog2FCTbl())$Plot
+      # }
+      final_plot <- plotly_scatter(reactLog2FCTbl())$Plot
       
       # Save the Plotly plot as an HTML file
       htmlwidgets::saveWidget(
