@@ -246,13 +246,16 @@ ui <- fluidPage(
                                 conditionalPanel(condition = "typeof input.tblParamLog_rows_selected !== 'undefined' && input.tblParamLog_rows_selected.length > 0",
                                                  bsCollapse(
                                                    multiple = T,
-                                                   bsCollapsePanel('Data distribution', style = 'primary',
+                                                   bsCollapsePanel('Features Removed', style = 'info',
+                                                                   textOutput('textRmFeatsLog') %>%
+                                                                     withSpinner(color="#56070C")),
+                                                   bsCollapsePanel('Data distribution', style = 'info',
                                                                    plotlyOutput('plotDatDistLog') %>%
                                                                      withSpinner(color="#56070C")),
-                                                   bsCollapsePanel('Data completeness', style = 'primary',
+                                                   bsCollapsePanel('Data completeness', style = 'info',
                                                                    plotlyOutput('plotDatCompleteLog') %>%
                                                                      withSpinner(color="#56070C")),
-                                                   bsCollapsePanel('Quantification status', style = 'primary',
+                                                   bsCollapsePanel('Quantification status', style = 'info',
                                                                    plotlyOutput('plotQuanStatusLog') %>%
                                                                      withSpinner(color="#56070C"))
                                                  )
@@ -279,13 +282,15 @@ server <- function(input, output, session) {
   reactAnalysisLog <- reactiveValues(
     paramLogTbl = data.frame(idx = integer(),
                              smpFiltering = character(),
-                             featFiltering = character(),
+                             featClassFiltering = character(),
+                             featFilteringNum = numeric(),
                              featCompleteCutoff = numeric(),
                              featValidCutoff = numeric(),
                              featValidStatus = character(),
                              imputation = character(),
                              normalization = character(),
                              stringsAsFactors = FALSE),
+    rmFeatList = list(),
     # metabObjList = list(),
     # smpMetadatTblList = list(),
     metabAggreTblList = list()
@@ -677,14 +682,40 @@ server <- function(input, output, session) {
         reactParamList$imputation <- input$imputation
         reactParamList$normalization <- input$normalization
         
+        
+        # Prepare removed feature list
+        selectedFeats <- input$featChoicesFiltering
+        featClasses <- unique(rowData(reactMetabObj$oriMetabObj)$metabolic_classes)
+        rmFeatClasses <- selectedFeats[selectedFeats %in% featClasses]
+        # Prepare removed feature class list
+        oriFeatSpace <- rownames(reactMetabObj$oriMetabObj)
+        filtFeatSpace <- rownames(reactMetabObj$metabObj)
+        rmFeats <- oriFeatSpace[!oriFeatSpace %in% filtFeatSpace]
+        
+        # Prevent empty cells for better readability
+        selectedSmps <- input$smpChoicesFiltering
+        if (length(selectedSmps) == 0) {
+          selectedSmps <- 'None'
+        }
+        
+        if (length(rmFeatClasses) == 0) {
+          rmFeatClasses <- 'None'
+        }
+        
+        selectedValidStatus <- input$featValidStatusFiltering
+        if (length(selectedValidStatus) == 0) {
+          selectedValidStatus <- 'None'
+        }
+        
         newParamLog <- data.frame(
           idx = nrow(reactAnalysisLog$paramLogTbl) + 1,
           #### What is effect of I(list())?
-          smpFiltering = I(list(paste(input$smpChoicesFiltering, collapse = ', '))),
-          featFiltering = I(list(paste(input$featChoicesFiltering, collapse = ', '))),
+          smpFiltering = I(list(paste(selectedSmps, collapse = ' | '))),
+          featClassFiltering = paste(rmFeatClasses, collapse = ' | '),
+          featFilteringNum = length(rmFeats),
           featCompleteCutoff = reactParamList$featCompleteCutoff,
           featValidCutoff = reactParamList$featValidCutoff,
-          featValidStatus = I(list(paste(input$featValidStatusFiltering, collapse = ', '))),
+          featValidStatus = I(list(paste(selectedValidStatus, collapse = ' | '))),
           imputation = as.character(reactParamList$imputation),
           normalization = reactParamList$normalization,
           stringsAsFactors = FALSE
@@ -693,6 +724,7 @@ server <- function(input, output, session) {
         
         # Log processed data
         logIdx <- nrow(reactAnalysisLog$paramLogTbl)
+        reactAnalysisLog$rmFeatList[[logIdx]] <- rmFeats
         # reactAnalysisLog$metabObjList[[logIdx]] <- reactMetabObj$metabObj
         # reactAnalysisLog$smpMetadatTblList[[logIdx]] <- datOverviewPack()$smpMetadatTbl
         reactAnalysisLog$metabAggreTblList[[logIdx]] <- datOverviewPack()$metabAggreTbl
@@ -748,15 +780,17 @@ server <- function(input, output, session) {
   observeEvent(input$clearParamLog, {
     reactAnalysisLog$paramLogTbl <- data.frame(idx = integer(),
                                                smpFiltering = character(),
-                                               featFiltering = character(),
+                                               featClassFiltering = character(),
+                                               featFilteringNum = numeric(),
                                                featCompleteCutoff = numeric(),
                                                featValidCutoff = numeric(),
                                                featValidStatus = character(),
                                                imputation = character(),
                                                normalization = character(),
                                                stringsAsFactors = FALSE)
-    reactAnalysisLog$metabObjList = list()
-    reactAnalysisLog$smpMetadatTblList = list()
+    reactAnalysisLog$rmFeatList <- list()
+    # reactAnalysisLog$metabObjList = list()
+    # reactAnalysisLog$smpMetadatTblList = list()
     reactAnalysisLog$metabAggreTblList = list()
     # Turn reactive ifParamChange to 1, so current unchanged parameters can be logged
     # if Process button is hit
@@ -869,27 +903,43 @@ server <- function(input, output, session) {
                                                   imputation %in% 'FALSE' ~ 'False'),
                     featCompleteCutoff = paste0(featCompleteCutoff, '%'),
                     featValidCutoff = paste0(featValidCutoff, '%'))
-    colnames(paramLogTbl) <- c('Process', 'Sample Removed', 'Feature Removed',
-                               'Completeness Cutoff', 'Validity Cutoff',
-                               'Validity Status', 'Imputation', 'Normalization')
+    colnames(paramLogTbl) <- c('Process', 'Samples Removed', 'Feature Classes Removed',
+                               'Count of Features Removed', 'Completeness Cutoff',
+                               'Validity Cutoff', 'Validity Statuses', 'Imputation', 'Normalization')
     DT::datatable(paramLogTbl, rownames = F, options = list(dom = 't', ordering = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
   
-  # Log of processed data distribution
-  output$plotDatDistLog <- renderPlotly({
+  # Prepare row index clicked
+  clickedRowIdx <- reactive({
     req(input$tblParamLog_rows_selected)
     clickedRow <- input$tblParamLog_rows_selected
     # Because of reversed parameter log table
-    logIdx <- sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
-    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[logIdx]]
+    sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
+  })
+  
+  # Log of all removed features
+  output$textRmFeatsLog <- renderText({
+    req(clickedRowIdx())
+    rmFeats <- reactAnalysisLog$rmFeatList[[clickedRowIdx()]]
+    # Place it here so that empty removed feature list got length of 0 in parameter log table
+    if (length(rmFeats) == 0) {
+      rmFeats <- 'None'
+    }
+    paste(sort(rmFeats), collapse = ' | ')
+  })
+  
+  # Log of processed data distribution
+  output$plotDatDistLog <- renderPlotly({
+    req(clickedRowIdx())
+    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[clickedRowIdx()]]
     g <- ggplot(actMetabAggreTbl, aes(x=ID, y=Concentration)) +
       geom_boxplot() +
       labs(x = 'Sample', y = 'Metabolite abundance') +
       theme_bw() +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     # Put abundance on log10 scale for better visualization if data is not normalized 
-    if (reactAnalysisLog$paramLogTbl$normalization[logIdx] == 'None') {
+    if (reactAnalysisLog$paramLogTbl$normalization[clickedRowIdx()] == 'None') {
       g <- g + scale_y_log10()
     }
     ggplotly(g)
@@ -897,11 +947,8 @@ server <- function(input, output, session) {
   
   # Log of processed data quantification status
   output$plotQuanStatusLog <- renderPlotly({
-    req(input$tblParamLog_rows_selected)
-    clickedRow <- input$tblParamLog_rows_selected
-    # Because of reversed parameter log table
-    logIdx <- sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
-    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[logIdx]]
+    req(clickedRowIdx())
+    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[clickedRowIdx()]]
     smpStatusCountTbl <- actMetabAggreTbl %>%
       dplyr::group_by(ID, Status) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
@@ -922,11 +969,8 @@ server <- function(input, output, session) {
   
   # Log of processed data completeness
   output$plotDatCompleteLog <- renderPlotly({
-    req(input$tblParamLog_rows_selected)
-    clickedRow <- input$tblParamLog_rows_selected
-    # Because of reversed parameter log table
-    logIdx <- sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
-    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[logIdx]]
+    req(clickedRowIdx())
+    actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[clickedRowIdx()]]
     smpCompleteCountTbl <- actMetabAggreTbl %>%
       dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% c(0, NA) ~ 'Observed',
                                                     Concentration %in% c(0, NA) ~ 'Missing')) %>%
