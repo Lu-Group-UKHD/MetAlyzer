@@ -189,7 +189,7 @@ ui <- fluidPage(
                            tags$h4(strong('Vulcano plot'), style = "margin-top:1rem;"),
                            plotlyOutput('plotVolcano') %>%
                              withSpinner(color="#56070C"),
-                           #### Provide option of downloading static plot
+                           #### Provide option of downloading static plot?
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
                                     column(width = 2, downloadButton("downloadVulcanoPlot", "Download vulcano plot"))),
                            tags$br(),
@@ -200,6 +200,7 @@ ui <- fluidPage(
                              column(width = 3, style = "margin-left: -175px; z-index:1;",
                                     imageOutput('plotScatterLegend'))
                            ),
+                           #### Downloaded scatter plot is to be fixed
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem; margin-bottom:1rem;",
                                     column(width = 2, downloadButton("downloadScatterPlot", "Download scatter plot")))
           )

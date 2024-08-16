@@ -58,9 +58,7 @@ calc_log2FC <- function(metalyzer_se, categorical) {
   return(metalyzer_se)
 }
 
-
 #' @title Plotly Log2FC Scatter Plot
-#'
 #' @description This function returns a list with interactive 
 #' scatterplot based on log2 fold change data.
 #' 
@@ -116,7 +114,7 @@ plotly_scatter <- function(Log2FCTab) {
     }
     return(color)
   })
-
+  
   ## Data: Add pseudo x-value to data as a order of metabolites
   ordered_classes <- c(names(lc_colors), names(fia_colors))
   p_data <- lapply(ordered_classes, function(class) {
@@ -169,8 +167,8 @@ plotly_scatter <- function(Log2FCTab) {
     filter(.data$Class %in% names(lc_colors)) %>%
     select(.data$x) %>%
     max()
-
-  ylims <- c(min(Log2FCTab$log2FC) - 0.75, max(Log2FCTab$log2FC) + 0,75)
+  
+  ylims <- c(min(Log2FCTab$log2FC) - 0.75, max(Log2FCTab$log2FC) + 0.75)
   
   ## Plot: Create ggplot object
   p_scatter <- ggplot(p_data,
@@ -182,22 +180,22 @@ plotly_scatter <- function(Log2FCTab) {
               aes(xmin = .data$Start, xmax = .data$End,
                   ymin = ylims[1], ymax = ylims[2],
                   fill = .data$Class,
-                  text = paste0(Class, "\n", Technique, "\nNumber of Metabolites: ", n)),
+                  text = paste0(Class, "\nTechnique: ", Technique, "\nNumber of metabolites: ", n)),
               show.legend = TRUE,
               alpha = 0.4) +
     geom_vline(xintercept = 0, linewidth = 0.5, color = 'black') +
     geom_vline(xintercept = lc_fia_border+3, linewidth = 0.5, color = 'black', linetype="dotted") +
     geom_hline(yintercept = 0, linewidth = 0.5, color = 'black') +
-    geom_point(size = 0.5, aes(text = paste0(Metabolite, 
-                                             "\nClass: ", Class, 
-                                             "\nLog2(FC): ", round(log2FC, digits=2),  
-                                             "\nAdj. p-value: ", round(qval, digits=4),
-                                             "\nP-value: ", round(pval, digits=4)))) + 
+    geom_point(size = 1, aes(text = paste0(Metabolite, 
+                                           "\nClass: ", Class, 
+                                           "\nLog2(FC): ", round(log2FC, digits=2),  
+                                           "\nAdj. p-value: ", round(qval, digits=4),
+                                           "\nP-value: ", round(pval, digits=4)))) + 
     scale_color_manual(paste0('Significance\n(linear model fit with FDR correction)'),
                        labels = signif_labels,
                        values = names(signif_colors),
                        guide = guide_legend(order=1)) +
-    scale_fill_manual('Classes',
+    scale_fill_manual('Class',
                       breaks = breaks,
                       values = values,
                       drop = FALSE,
@@ -213,10 +211,10 @@ plotly_scatter <- function(Log2FCTab) {
           panel.grid.minor.y = element_line('#ECECEC'),
           panel.background = element_blank()) +
     labs(x = 'Metabolite', y = 'Log2(FC)')
-
+  
   ## Interactive: Create interactive plot
   plotly_plot <- ggplotly(p_scatter, tooltip = "text", showlegend = FALSE)
-
+  
   # TODO: Find god to figure out why this is not working
   ## Highlight Metabolites by changing symbol
   #if ("highlight" %in% colnames(p_data)) {
@@ -237,16 +235,15 @@ plotly_scatter <- function(Log2FCTab) {
   #    }
   #  }
   #}
-
+  
   # Grab Legend ggplot
   scatter_legend <- ggpubr::get_legend(p_scatter)
   legend <- grid.arrange(scatter_legend, ncol=1)
   
   return(list(Plot = plotly_plot, Legend = legend))
 }
-#' @title Plotly Log2FC Vulcano Plot
 
-#'
+#' @title Plotly Log2FC Vulcano Plot
 #' @descritpion This function returns a list with interactive 
 #' vulcanoplot based on log2 fold change data.
 #' 
@@ -270,7 +267,7 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
   
   if("highlight" %in% colnames(Log2FCTab)) {
     # rename factor levels for improving Legend understanding
-    Log2FCTab$highlight <- factor(Log2FCTab$highlight, levels = c(FALSE, TRUE), labels = c("Other Metabolites", "Highlighted Metabolite(s)"))
+    Log2FCTab$highlight <- factor(Log2FCTab$highlight, levels = c(FALSE, TRUE), labels = c("Other metabolites", "Highlighted metabolite(s)"))
   
     ## Plot: Create vulcano ggplot object with highlighted points
     p_fc_vulcano_highlighted <- ggplot(Log2FCTab %>%
@@ -278,18 +275,18 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                                        aes(x = .data$log2FC,
                                            y = -log10(.data$qval),
                                            color = .data$highlight)) +
-      geom_point(size = 1, aes(text = paste0(Metabolite, 
-                                            "\nClass: ", Class, 
-                                            "\nLog2(FC): ", round(log2FC, digits=2), 
-                                            "\nAdj. p-value: ", round(qval, digits=4),
-                                            "\nP-value: ", round(pval, digits=4)))) +
+      geom_point(size = 1.5, aes(text = paste0(Metabolite, 
+                                               "\nClass: ", Class, 
+                                               "\nLog2(FC): ", round(log2FC, digits=2), 
+                                               "\nAdj. p-value: ", round(qval, digits=4),
+                                               "\nP-value: ", round(pval, digits=4)))) +
       geom_vline(xintercept=c(-cutoff_x, cutoff_x), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
       scale_color_manual('',
-                         breaks = c("Other Metabolites", "Highlighted Metabolite(s)"),
+                         breaks = c("Other metabolites", "Highlighted metabolite(s)"),
                          values = c("#d3d3d3","#56070C")) +
       theme_bw() +
-      labs(x = 'Log2(FC)', y = "-Log10(P-value)")
+      labs(x = 'Log2(FC)', y = "-Log10(p-value)")
     
     ## Interactive: Create interactive plot
     p_vulcano_highlighted <- ggplotly(p_fc_vulcano_highlighted, tooltip = "text")
@@ -311,17 +308,17 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                                color = .data$Class)) +
       geom_vline(xintercept=c(-cutoff_x, cutoff_x), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
-      geom_point(size = 1, aes(text = paste0(Metabolite, 
-                                            "\nClass: ", Class, 
-                                            "\nLog2(FC): ", round(log2FC, digits=2), 
-                                            "\nAdj. p-value: ", round(qval, digits=4),
-                                            "\nP-value: ", round(pval, digits=4)))) +
-      scale_color_manual('Classes',
+      geom_point(size = 1.5, aes(text = paste0(Metabolite, 
+                                               "\nClass: ", Class, 
+                                               "\nLog2(FC): ", round(log2FC, digits=2), 
+                                               "\nAdj. p-value: ", round(qval, digits=4),
+                                               "\nP-value: ", round(pval, digits=4)))) +
+      scale_color_manual('Class',
                          breaks = breaks,
                          values = values,
                          drop = FALSE) +
       theme_bw() +
-      labs(x = 'Log2(FC)', y = "-Log10(P-value)")
+      labs(x = 'Log2(FC)', y = "-Log10(p-value)")
     
     ## Interactive: Create interactive plot
     p_vulcano <- ggplotly(p_fc_vulcano, tooltip = "text")
@@ -331,7 +328,6 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
 }
 
 #' @title Plotly Log2FC Network Plot
-#'
 #' @description This function returns a list with interactive 
 #' networkplot based on log2 fold change data.
 #' 
@@ -531,7 +527,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
   # Add the edges
   p_network <- layout(
     network,
-    title = 'Log₂(FC) with FDR Correction',
+    title = 'Log₂(FC) with FDR correction',
     shapes = edges_area_combined,
     xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
     yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
