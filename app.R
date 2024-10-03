@@ -212,11 +212,21 @@ ui <- fluidPage(
       'Network',
       # Lower network plot a bit
       tags$br(),
+      
+      # Add a slider to control the plot height
+      div(style = "display: flex; justify-content: center; align-items: center; margin-bottom: 20px;",
+          sliderInput("plotHeight", 
+                      "Adjust Plot Height [px]", 
+                      min = 400, max = 2000, 
+                      value = 1000, step = 100)
+      ),
+      
       conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
                        div(textOutput('textLog2FC_2'), style = 'color:IndianRed;font-weight:bold;font-size:110%;text-align:center')),
       conditionalPanel(condition = "input.computeLog2FC",
-                       div(style = "height: 100vh; width: 100%;",
-                           plotlyOutput('plotNetwork') %>%
+                       div(style = "width: 100%;",
+                           # Use the height value from the slider to control the plot's height
+                           plotlyOutput('plotNetwork', height = "auto") %>%
                              withSpinner(color="#56070C"),
                            div(style = "width: 100%; margin-top: 405px; display: flex; justify-content: center;",
                                downloadButton("downloadNetworkPlot", "Download network Plot")))
@@ -1208,7 +1218,12 @@ server <- function(input, output, session) {
   # Network plot
   output$plotNetwork <- renderPlotly({
     req(reactLog2FCTbl())
-    plotly_network(reactLog2FCTbl())
+    
+    # Fetch the slider input for height
+    plot_height <- input$plotHeight
+    
+    # Use the height value for plot layout
+    plotly_network(reactLog2FCTbl(), plot_height = plot_height)
   })
   
   # Download the log2(FC) visuals as html
