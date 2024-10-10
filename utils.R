@@ -540,6 +540,22 @@ plotly_network <- function(Log2FCTab,
                          "\nadj. p-value: ", round(nodes$q_value[i], 5))
     )
   }
+  for (i in 1:nrow(nodes)) {
+    p_network <- p_network %>% add_annotations(
+      text = nodes$Label[i],
+      x = nodes$x[i],
+      y = nodes$y[i],
+      arrowhead = 0,
+      font = list(size = metabolite_node_size, color = "white"),
+      ax = 0,
+      ay = 0,
+      bgcolor = nodes$color[i],
+      opacity = 1,
+      hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
+                         "\nPathway: ", nodes$Pathway[i],
+                         "\nadj. p-value: ", round(nodes$q_value[i], 5))
+    )
+  }
   
   # Add annotations for the pathways
   for (i in 1:nrow(pathways)) {

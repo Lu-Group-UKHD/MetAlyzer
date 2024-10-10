@@ -212,13 +212,55 @@ ui <- fluidPage(
       'Network',
       # Lower network plot a bit
       tags$br(),
-      
-      # Add a slider to control the plot height
-      div(style = "display: flex; justify-content: center; align-items: center; margin-bottom: 20px;",
-          sliderInput("plotHeight", 
-                      "Adjust Plot Height [px]", 
-                      min = 400, max = 2000, 
-                      value = 1000, step = 100)
+      conditionalPanel(condition = "input.computeLog2FC",
+        bsCollapse(open = "",
+          bsCollapsePanel("Advanced Styles",
+                          div(style = "display: flex; 
+                                       flex-wrap: wrap; 
+                                       justify-content: center; 
+                                       align-items: center; 
+                                       margin-bottom: 20px; 
+                                       width: 80%; 
+                                       margin-left: auto;
+                                       margin-right: auto",
+                              # Plot Height Slider
+                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                  sliderInput("plotHeight", 
+                                              "Adjust Plot Height [px]", 
+                                              min = 400, max = 2000, 
+                                              value = 1000, step = 100)
+                              ),
+                              # Metabolite Node Size Slider
+                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                  sliderInput("metaboliteNodeSize", 
+                                              "Metabolite Node Size", 
+                                              min = 5, max = 50, 
+                                              value = 11, step = 1)
+                              ),
+                              # Connection Width Slider
+                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                  sliderInput("connectionWidth", 
+                                              "Connection Width", 
+                                              min = 0.5, max = 5, 
+                                              value = 1.25, step = 0.25)
+                              ),
+                              # Pathway Text Size Slider
+                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                  sliderInput("pathwayTextSize", 
+                                              "Pathway Text Size", 
+                                              min = 10, max = 50, 
+                                              value = 20, step = 1)
+                              ),
+                              # Pathway Width Slider
+                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                  sliderInput("pathwayWidth", 
+                                              "Pathway Width", 
+                                              min = 5, max = 30, 
+                                              value = 10, step = 1)
+                              )
+                          )
+          )
+        )
       ),
       
       conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
@@ -228,7 +270,7 @@ ui <- fluidPage(
                            # Use the height value from the slider to control the plot's height
                            plotlyOutput('plotNetwork', height = "auto") %>%
                              withSpinner(color="#56070C"),
-                           div(style = "width: 100%; margin-top: 405px; display: flex; justify-content: center;",
+                           div(style = "width: 100%; margin-top: 50px; display: flex; justify-content: center;",
                                downloadButton("downloadNetworkPlot", "Download network Plot")))
       )
     ),
@@ -403,14 +445,18 @@ server <- function(input, output, session) {
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
-        'Is the uploaded .xlsx file generated from MetIDQ™ software?',
-        easyClose = T,
+        tags$strong('Please check if the uploaded file is exported from MetIDQ Software.'),
+        checkboxInput("check1", "Is the file exported from MetIDQ?", value = FALSE),
+        checkboxInput("check2", "Does the file contain the 'Class' cell?", value = FALSE),
+        checkboxInput("check3", "Does the file contain the 'Sample Type' column?", value = FALSE),
+        checkboxInput("check4", "The Sample Type column contains the value 'Sample'? (only for rows with samples)", value = FALSE),
+        checkboxInput("check5", "Are there NO duplicate Metabolite columns?", value = FALSE),
+        easyClose = TRUE,
         footer = NULL
       ))
       reactMetabObj$metabObj <- NULL
     }
   })
-  
   
   # Retrieve abundance data and sample metadata and compute feature completeness
   # level and quantification status validity level for showing data overviews
@@ -1223,7 +1269,14 @@ server <- function(input, output, session) {
     plot_height <- input$plotHeight
     
     # Use the height value for plot layout
-    plotly_network(reactLog2FCTbl(), plot_height = plot_height)
+    plotly_network(
+      reactLog2FCTbl(), 
+      metabolite_node_size = input$metaboliteNodeSize,
+      connection_width = input$connectionWidth,
+      pathway_text_size = input$pathwayTextSize,
+      pathway_width = input$pathwayWidth,
+      plot_height = input$plotHeight
+    )
   })
   
   # Download the log2(FC) visuals as html
@@ -1281,7 +1334,14 @@ server <- function(input, output, session) {
     content = function(file) {
       # Save the Plotly plot as an HTML file
       htmlwidgets::saveWidget(
-        widget = plotly_network(reactLog2FCTbl()),
+        widget = plotly_network(
+          reactLog2FCTbl(), 
+          metabolite_node_size = input$metaboliteNodeSize,
+          connection_width = input$connectionWidth,
+          pathway_text_size = input$pathwayTextSize,
+          pathway_width = input$pathwayWidth,
+          plot_height = input$plotHeight
+        ),
         file = file,
         selfcontained = TRUE
       )
