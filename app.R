@@ -225,39 +225,41 @@ ui <- fluidPage(
                                        margin-right: auto",
                               # Plot Height Slider
                               div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("plotHeight", 
-                                              "Adjust Plot Height [px]", 
-                                              min = 400, max = 2000, 
-                                              value = 1000, step = 100)
+                                  sliderInput("networkPlotHeight", 
+                                              "Plot Height [100px]", 
+                                              min = 4, max = 20, 
+                                              value = 10, step = 1)
                               ),
                               # Metabolite Node Size Slider
                               div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("metaboliteNodeSize", 
+                                  sliderInput("networkMetaboliteNodeSize", 
                                               "Metabolite Node Size", 
                                               min = 5, max = 50, 
                                               value = 11, step = 1)
                               ),
                               # Connection Width Slider
                               div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("connectionWidth", 
+                                  sliderInput("networkConnectionWidth", 
                                               "Connection Width", 
                                               min = 0.5, max = 5, 
                                               value = 1.25, step = 0.25)
                               ),
                               # Pathway Text Size Slider
                               div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("pathwayTextSize", 
+                                  sliderInput("networkPathwayTextSize", 
                                               "Pathway Text Size", 
                                               min = 10, max = 50, 
                                               value = 20, step = 1)
                               ),
                               # Pathway Width Slider
                               div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("pathwayWidth", 
+                                  sliderInput("networkPathwayWidth", 
                                               "Pathway Width", 
                                               min = 5, max = 30, 
                                               value = 10, step = 1)
-                              )
+                              ),
+                              actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
+                              bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
                           )
           )
         )
@@ -1264,19 +1266,23 @@ server <- function(input, output, session) {
   # Network plot
   output$plotNetwork <- renderPlotly({
     req(reactLog2FCTbl())
-    
-    # Fetch the slider input for height
-    plot_height <- input$plotHeight
-    
     # Use the height value for plot layout
     plotly_network(
       reactLog2FCTbl(), 
-      metabolite_node_size = input$metaboliteNodeSize,
-      connection_width = input$connectionWidth,
-      pathway_text_size = input$pathwayTextSize,
-      pathway_width = input$pathwayWidth,
-      plot_height = input$plotHeight
+      metabolite_node_size = input$networkMetaboliteNodeSize,
+      connection_width = input$networkConnectionWidth,
+      pathway_text_size = input$networkPathwayTextSize,
+      pathway_width = input$networkPathwayWidth,
+      plot_height = input$networkPlotHeight*100
     )
+  })
+  # Revert changed network plot style parameters back to default
+  observeEvent(input$defaultNetworkPlotStyles, {
+    updateSliderInput(session, 'networkPlotHeight', value = 10)
+    updateSliderInput(session, 'networkMetaboliteNodeSize', value = 11)
+    updateSliderInput(session, 'networkConnectionWidth', value = 1.25)
+    updateSliderInput(session, 'networkPathwayTextSize', value = 20)
+    updateSliderInput(session, 'networkPathwayWidth', value = 10)
   })
   
   # Download the log2(FC) visuals as html
@@ -1336,11 +1342,11 @@ server <- function(input, output, session) {
       htmlwidgets::saveWidget(
         widget = plotly_network(
           reactLog2FCTbl(), 
-          metabolite_node_size = input$metaboliteNodeSize,
-          connection_width = input$connectionWidth,
-          pathway_text_size = input$pathwayTextSize,
-          pathway_width = input$pathwayWidth,
-          plot_height = input$plotHeight
+          metabolite_node_size = input$networkMetaboliteNodeSize,
+          connection_width = input$networkConnectionWidth,
+          pathway_text_size = input$networkPathwayTextSize,
+          pathway_width = input$networkPathwayWidth,
+          plot_height = input$networkPlotHeight*100
         ),
         file = file,
         selfcontained = TRUE
