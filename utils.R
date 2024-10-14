@@ -333,9 +333,19 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
 #' 
 #' @param Log2FCTab A data frame containing log2 fold change data
 #' @param q_value A numeric value specifying the cutoff for q-value
-plotly_network <- function(Log2FCTab, q_value=0.05) {
-  pathway_file <- MetAlyzer::pathway()
-  
+#' @param metabolite_node_size The text size of the metabolite Nodes
+#' @param connection_width The line width of connections between metabolites
+#' @param pathway_text_size The text size of pathway annotations
+#' @param pathway_width The line width of pathway-specific connection coloring
+#' @param plot_height The height of the Plot in pixel [px]
+plotly_network <- function(Log2FCTab,
+                           q_value=0.05,
+                           metabolite_node_size=11,
+                           connection_width=1.25,
+                           pathway_text_size=20,
+                           pathway_width=10,
+                           plot_height=800) {
+  pathway_file <- get_data_file_path("Pathway_120924.xlsx")
   ## Read network nodes, edges and annotations
   pathways <- read_named_region(pathway_file, "Pathways_Header")
   invalid_annotations <- which(
@@ -403,61 +413,41 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                       !is.na(.data$log2FC),
                       !is.na(.data$qval),
                       .data$qval <= q_value)
-
+  
   nodes$FC_thresh <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
     tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
     } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
-        # Not significantly changed but measured
-        l2fc <- 0
+      # Not significantly changed but measured
+      l2fc <- 0
     } else {
-        # Not measured
-        l2fc <- NA
+      # Not measured
+      l2fc <- NA
     }
     return(l2fc)
   })
-
-  ## Add q-value to nodes_df
+  
+  ## Add p-value to nodes_df
   nodes$q_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
     tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       qval <- sum(tmp_df$qval) / nrow(tmp_df)
     } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
-        # Not significantly changed but measured
-        qval <- sum(Log2FCTab$qval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
+      # Not significantly changed but measured
+      qval <- sum(Log2FCTab$qval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
-        # Not measured
-        qval <- NA
+      # Not measured
+      qval <- NA
     }
     return(qval)
   })
-
-  ## Add p-value to nodes_df
-  nodes$p_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 significantly changed
-      pval <- sum(tmp_df$pval) / nrow(tmp_df)
-    } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
-        # Not significantly changed but measured
-        pval <- sum(Log2FCTab$pval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
-    } else {
-        # Not measured
-        pval <- NA
-    }
-    return(pval)
-  })
-
+  
   ## Draw network
   # Create a plot of the network using ggplotly
-  label_size <- 20
-  area_size <- 10
-  edge_size <- 1.25
-  annotation_size <- 11
-
+  
   # Preparing Hexcodes for Annotation Colors
   nodes$color <- sapply(nodes$FC_thresh, function(value) {
     if (is.na(value)) {
@@ -471,7 +461,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       return(color_scale[color_index])
     }
   })
-
+  
   # Prepare the Edges List
   area_shapes <- list()
   for (i in seq_along(edges$Color)) {
@@ -489,7 +479,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       y1 = edges$y_end[i],
       line = list(
         color = edges$Color[i],
-        width = area_size
+        width = pathway_width
       )
     )
     area_shapes[[i]] <- area_shape
@@ -505,7 +495,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       y1 = edges$y_end[i],
       line = list(
         color = "grey",
-        width = edge_size
+        width = connection_width
       )
     )
     edge_shapes[[i]] <- edge_shape
@@ -522,12 +512,12 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
                                    colorbar = list(title = ""),
                                    colorscale='Viridis',
                                    showscale = TRUE),
-                     height = 800)
-
+                     height = plot_height)
+  
   # Add the edges
   p_network <- layout(
     network,
-    title = 'Log₂(FC) with FDR correction',
+    title = 'Log2(FC) with FDR Correction',
     shapes = edges_area_combined,
     xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
     yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
@@ -540,15 +530,30 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       x = nodes$x[i],
       y = nodes$y[i],
       arrowhead = 0,
-      font = list(size = annotation_size, color = "white"),
+      font = list(size = metabolite_node_size, color = "white"),
       ax = 0,
       ay = 0,
       bgcolor = nodes$color[i],
       opacity = 1,
-      hovertext = paste0("Log2(FC): ", round(nodes$FC_thresh[i], 2),
+      hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
                          "\nPathway: ", nodes$Pathway[i],
-                         "\nAdj. p-value: ", round(nodes$q_value[i], 4),
-                         "\nP-value: ", round(nodes$p_value[i], 4))
+                         "\nadj. p-value: ", round(nodes$q_value[i], 5))
+    )
+  }
+  for (i in 1:nrow(nodes)) {
+    p_network <- p_network %>% add_annotations(
+      text = nodes$Label[i],
+      x = nodes$x[i],
+      y = nodes$y[i],
+      arrowhead = 0,
+      font = list(size = metabolite_node_size, color = "white"),
+      ax = 0,
+      ay = 0,
+      bgcolor = nodes$color[i],
+      opacity = 1,
+      hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
+                         "\nPathway: ", nodes$Pathway[i],
+                         "\nadj. p-value: ", round(nodes$q_value[i], 5))
     )
   }
   
@@ -561,7 +566,7 @@ plotly_network <- function(Log2FCTab, q_value=0.05) {
       xref = "x",
       yref = "y",
       showarrow = FALSE,
-      font = list(size = label_size, color = pathways$Color[i])
+      font = list(size = pathway_text_size, color = pathways$Color[i])
     )
   }
   
@@ -709,4 +714,34 @@ data_normalization <- function(metalyzer_se, norm_method) {
     dplyr::select(ID, Metabolite, Class, Concentration, Status)
   metalyzer_se@metadata$aggregated_data <- aggregated_data
   return(metalyzer_se)
+}
+#' @title Get the File Path of a File Inside the Data Folder
+#' @description This function returns the file path for a specified file inside the `data` folder of a Shiny app.
+#' It works both locally during development and when the app is deployed on shinyapps.io. The function first tries 
+#' to access the file using a relative path. If the file is not found, it falls back to the working directory to ensure 
+#' compatibility with the Shiny server environment.
+#'
+#' @param file_name A string representing the name of the file you want to access (e.g., "example.csv").
+#' @return A string representing the full path to the specified file.
+#' 
+#' @details This function is particularly useful in Shiny apps where the file needs to be accessed from both
+#' the local environment and the hosted environment on shinyapps.io. It ensures that the file can be correctly 
+#' located regardless of where the app is running.
+#' 
+#' @examples
+#' # Get path to the file "Pathway_120924.xlsx" in the data folder
+#' file_path <- get_data_file_path("Pathway_120924.xlsx")
+#' 
+#' # Read the CSV file
+#' data <- read.csv(file_path)
+#' 
+#' @export
+get_data_file_path <- function(file_name) {
+  data_path <- file.path("data", file_name)
+  
+  if (file.exists(data_path)) {
+    return(data_path)
+  } else {
+    return(file.path(getwd(), data_path))
+  }
 }
