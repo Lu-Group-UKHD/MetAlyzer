@@ -65,14 +65,14 @@ ui <- fluidPage(
                                'Imputation and Normalization', style = 'info',
                                materialSwitch('imputation', 'Half-minimum (HM) imputation',
                                               value = T, status = 'primary', right = T),
-                               #### Median normalization has to be fixed!
+                               #### Needs further discussion on median normalization
                                selectInput('normalization', 'Select normalization method to use:',
-                                           choices = c('None', 'Median log₂ normalization',
-                                                       'Total ion count (TIC) log₂ normalization'),
-                                           selected = 'Median log₂ normalization', multiple = F)
+                                           choices = c('None', 'Median normalization',
+                                                       'Total ion count (TIC) normalization'),
+                                           selected = 'Median normalization', multiple = F)
                                # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
                                #                               observed values in each metabolite.')),
-                               # bsTooltip('normalization', 'Median scaling is conducted followed by log2 transformation.')
+                               # bsTooltip('normalization', '')
                              )
                            ),
                            fluidRow(
@@ -392,7 +392,7 @@ server <- function(input, output, session) {
     updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
     updateMaterialSwitch(session, 'imputation', value = T)
-    updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
+    updateSelectInput(session, 'normalization', selected = 'Median normalization')
     
     updateSelectInput(session, 'featIdChoicesExport', selected = character(0))
     
@@ -431,7 +431,7 @@ server <- function(input, output, session) {
       updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
       updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
       updateMaterialSwitch(session, 'imputation', value = T)
-      updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
+      updateSelectInput(session, 'normalization', selected = 'Median normalization')
       
       updateCheckboxInput(session, 'ifUploadedFilePrior2023', value = F)
       updateSelectInput(session, 'featIdChoicesExport', selected = character(0))
@@ -729,10 +729,10 @@ server <- function(input, output, session) {
         doneImputation(1)
       }
       if (doneNormalization() == 0) {
-        if (input$normalization == 'Total ion count (TIC) log₂ normalization') {
+        if (input$normalization == 'Total ion count (TIC) normalization') {
           reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'TIC')
           doneNormalization(1)
-        } else if (input$normalization == 'Median log₂ normalization') {
+        } else if (input$normalization == 'Median normalization') {
           reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'median')
           doneNormalization(1)
         }
@@ -835,7 +835,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
     # Set parameters for imputation and normalization back to default
     updateMaterialSwitch(session, 'imputation', value = T)
-    updateSelectInput(session, 'normalization', selected = 'Median log₂ normalization')
+    updateSelectInput(session, 'normalization', selected = 'Median normalization')
     
     # Empty parameter log
     reactParamList$smpFiltering <- c()

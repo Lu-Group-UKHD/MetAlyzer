@@ -697,10 +697,23 @@ data_normalization <- function(metalyzer_se, norm_method) {
     fit <- vsnMatrix(data_mat)
     norm_data <- predict(fit, data_mat)
   } else if (norm_method %in% 'median') {
-    # Do median normalization that is median scaling followed by log2 transformation
-    norm_data <- limma::normalizeBetweenArrays(data_mat, method = 'scale') %>%
-      # Use generalized log2 transformation to avoid -Inf
-      glog2()
+    # Do median normalization that conducts median scaling on log2 transformed data
+    # Use generalized log2 transformation to avoid -Inf
+    log2_data <- glog2(data_mat)
+    median_smpConc <- apply(log2_data, 2, function(smp_conc) {median(smp_conc, na.rm = T)})
+    median_allVals <- median(log2_data, na.rm = T)
+    norm_data <- sapply(seq_len(ncol(log2_data)), function(i) {
+      log2_data[, i] - median_smpConc[i] + median_allVals
+    })
+    colnames(norm_data) <- colnames(data_mat)
+    
+    # Substantial negative values exist in log2 transformed data due to values smaller
+    # than 1 in original data, which will cause problem in limma::normalizeBetweenArrays
+    # that somehow also performs log transformation..
+    #' Warning message:
+    #' In log(apply(x, 2, median, na.rm = TRUE)) : NaNs produced
+    # norm_data <- glog2(data_mat) %>%
+    #   limma::normalizeBetweenArrays(method = 'scale')
   }
   # Convert matrix to aggregated long data
   aggregated_data <- tibble::as_tibble(norm_data, rownames = 'Metabolite') %>%
