@@ -629,25 +629,24 @@ read_named_region <- function(file_path, named_region) {
 
 
 #' @title Impute aggregated data in SE MetAlyzer object
-#' @description This function imputes zero-valued concentrations (missing values)
-#' using half-minimum (HM). If all values are zeros, they are set to NA. The imputed
-#' values are stored in column 'Concentration' of aggregated data.
+#' @description This function imputes NA concentrations using half-minimum (HM).
+#' If values of a feature are all NA, they stay NA. The imputed values are stored
+#' in column 'Concentration' of aggregated data.
 #'
 #' @param metalyzer_se A MetAlyzer object
-#' @param impute_NA A logical value whether to impute NA values
 #' @import dplyr
-data_imputation <- function(metalyzer_se) { #impute_NA = F
+data_imputation <- function(metalyzer_se) {
   aggregated_data <- metalyzer_se@metadata$aggregated_data
   # Prepare HM values for corresponding features
   #### Note that aggregated data is already grouped by Metabolite by MetAlyzer
-  HM_feats <- dplyr::filter(aggregated_data, Concentration > 0, !is.na(Concentration)) %>%
+  HM_feats <- dplyr::filter(aggregated_data, Concentration >= 0, !is.na(Concentration)) %>%
     dplyr::summarise(HM = min(Concentration) * 0.5)
   # Do HM imputation, which replaces missing values with half of minimum of observed
   # values in corresponding variables
   aggregated_data <- dplyr::left_join(aggregated_data, HM_feats, by = 'Metabolite') %>%
-    #### How we deal with those NA values? Let them stay NA for now
-    dplyr::mutate(Concentration = dplyr::case_when(Concentration %in% 0 ~ HM,
-                                                   !Concentration %in% 0 ~ Concentration)) %>%
+    #### Let NaN stay NaN for now
+    dplyr::mutate(Concentration = dplyr::case_when(Concentration %in% NA ~ HM,
+                                                   !Concentration %in% NA ~ Concentration)) %>%
     dplyr::select(-HM) %>%
     dplyr::ungroup()
   metalyzer_se@metadata$aggregated_data <- aggregated_data

@@ -376,6 +376,10 @@ server <- function(input, output, session) {
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
     metabObj <- MetAlyzer_dataset(file_path = example_extraction_data(), silent = T)
+    # Exclude 'Metabolism Indicators' from subsequent processing and analysis
+    metabObj <- MetAlyzer::filterMetabolites(metabObj,
+                                             drop_metabolites = 'Metabolism Indicators',
+                                             drop_NA_concentration = F)
     reactMetabObj$metabObj <- metabObj
     # Make copy of original data for filtering reset
     reactMetabObj$oriMetabObj <- metabObj
@@ -415,6 +419,12 @@ server <- function(input, output, session) {
                                     sheet = 1, silent = T),
       silent = T)
     if (!is(validUploadedFile, 'try-error')) {
+      # Exclude 'Metabolism Indicators' from subsequent processing and analysis
+      if ('Metabolism Indicators' %in% unique(rowData(metabObj)$metabolic_classes)) {
+        metabObj <- MetAlyzer::filterMetabolites(metabObj,
+                                                 drop_metabolites = 'Metabolism Indicators',
+                                                 drop_NA_concentration = F)
+      }
       reactMetabObj$metabObj <- metabObj
       # Make copy of original data for filtering reset
       reactMetabObj$oriMetabObj <- metabObj
@@ -480,8 +490,9 @@ server <- function(input, output, session) {
     
     # Compute completeness level of each feature for doing filtering
     featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
-      dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% c(0, NA) ~ 1),
-                    Miss = dplyr::case_when(Concentration %in% c(0, NA) ~ 1)) %>%
+      #### 0 is true zero in biocrates data
+      dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% NA ~ 1), #c(0, NA)
+                    Miss = dplyr::case_when(Concentration %in% NA ~ 1)) %>% #c(0, NA)
       dplyr::group_by(Metabolite) %>%
       dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
       dplyr::mutate(TotalCount = ncol(reactMetabObj$metabObj),
@@ -564,12 +575,13 @@ server <- function(input, output, session) {
   observe({
     req(featChoices())
     if (nrow(reactMetabObj$metabObj) == nrow(reactMetabObj$oriMetabObj)) {
-      if ('Metabolism Indicators' %in% unlist(featChoices())) {
-        updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
-                          selected = 'Metabolism Indicators')
-      } else {
+      #### 'Metabolism Indicators' are excluded from subsequent processing and analysis for now
+      # if ('Metabolism Indicators' %in% unlist(featChoices())) {
+      #   updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
+      #                     selected = 'Metabolism Indicators')
+      # } else {
         updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
-      }
+      # }
     }
   })
   # Update choices for sample filtering
@@ -818,12 +830,12 @@ server <- function(input, output, session) {
     ifParamChange(0)
     
     # Set parameters for feature filtering back to default
-    if ('Metabolism Indicators' %in% unlist(featChoices())) {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
-                        selected = 'Metabolism Indicators')
-    } else {
+    # if ('Metabolism Indicators' %in% unlist(featChoices())) {
+    #   updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
+    #                     selected = 'Metabolism Indicators')
+    # } else {
       updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
-    }
+    # }
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
     updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
@@ -1042,8 +1054,8 @@ server <- function(input, output, session) {
     req(clickedRowIdx())
     actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[clickedRowIdx()]]
     smpCompleteCountTbl <- actMetabAggreTbl %>%
-      dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% c(0, NA) ~ 'Observed',
-                                                    Concentration %in% c(0, NA) ~ 'Missing')) %>%
+      dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed', #c(0, NA)
+                                                    Concentration %in% NA ~ 'Missing')) %>% #c(0, NA)
       dplyr::group_by(ID, Completeness) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
@@ -1116,8 +1128,8 @@ server <- function(input, output, session) {
   output$plotDatComplete <- renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
     smpCompleteCountTbl <- datOverviewPack()$metabAggreTbl %>%
-      dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% c(0, NA) ~ 'Observed',
-                                                    Concentration %in% c(0, NA) ~ 'Missing')) %>%
+      dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed', #c(0, NA)
+                                                    Concentration %in% NA ~ 'Missing')) %>% #c(0, NA)
       dplyr::group_by(ID, Completeness) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
