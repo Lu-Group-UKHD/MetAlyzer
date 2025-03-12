@@ -161,9 +161,10 @@ plotly_scatter <- function(metalyzer_se,
         geom_vline(xintercept = lc_fia_border+3, linewidth = 0.5, color = 'black', linetype="dotted") +
         geom_hline(yintercept = 0, linewidth = 0.5, color = 'black') +
         geom_point(size = 0.5, aes(text = paste0(.data$Metabolite, 
-                                                "\nClass: ", .data$Class, 
-                                                "\nlog2 Fold Change: ", round(log2FC, digits=5),  
-                                                "\nadj. p-value: ", round(.data$qval, digits=5)))) + 
+                                                "\nClass: ", .data$Class,
+                                                "\nlog2 Fold Change: ", round(.data$log2FC, digits=2),
+                                                "\nadj. p-value: ", round(.data$qval, digits=4),
+                                                "\np-value: ", round(pval, digits=4)))) +
         scale_color_manual(paste0('Significance\n(linear model fit with FDR correction)'),
                         labels = signif_labels,
                         values = names(signif_colors),
@@ -253,9 +254,10 @@ plotly_vulcano <- function(metalyzer_se,
     log2FC_df$qval[is.na(log2FC_df$qval)] <- 1
     
     # Data Vulcano: Prepare Dataframe for vulcano plot
-    log2FC_df$Class <- as.character(log2FC_df$Class)
-    log2FC_df$Class[log2FC_df$qval > cutoff_y] <- "Not Significant"
-    log2FC_df$Class[abs(log2FC_df$log2FC) < log2(cutoff_x)] <- "Not Significant"
+    log2FC_df$Class <- log2FC_df$Class
+    log2FC_df$ClassColor <- log2FC_df$Class
+    log2FC_df$ClassColor[log2FC_df$qval > cutoff_y] <- "Not Significant"
+    log2FC_df$ClassColor[abs(log2FC_df$log2FC) < cutoff_x] <- "Not Significant"
     
     breaks <- unique(log2FC_df$Class)
     values <- class_colors[names(class_colors) %in% log2FC_df$Class]
@@ -264,13 +266,14 @@ plotly_vulcano <- function(metalyzer_se,
     p_fc_vulcano <- ggplot(log2FC_df,
                             aes(x = .data$log2FC,
                                 y = -log10(.data$qval),
-                                color = .data$Class)) +
+                                color = .data$ClassColor)) +
         geom_vline(xintercept=c(-log2(cutoff_x), log2(cutoff_x)), col="black", linetype="dashed") +
         geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
         geom_point(size = 1, aes(text = paste0(.data$Metabolite, 
-                                            "\nClass: ", .data$Class, 
-                                            "\nlog2 Fold Change: ", round(log2FC, digits=5), 
-                                            "\nadj. p-value: ", round(.data$qval, digits=5)))) +
+                                            "\nClass: ", .data$Class,
+                                            "\nlog2 Fold Change: ", round(.data$log2FC, digits=2),
+                                            "\nadj. p-value: ", round(.data$qval, digits=4),
+                                            "\np-value: ", round(pval, digits=4)))) +
         scale_color_manual('Classes',
                             breaks = breaks,
                             values = values,
