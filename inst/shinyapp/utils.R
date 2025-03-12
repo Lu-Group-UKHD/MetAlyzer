@@ -254,11 +254,11 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
   # Make Colors unique for each class
   polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
   polarity_df <- utils::read.csv(polarity_file) %>%
-  select(.data$Class,
-          .data$Polarity) %>%
-  mutate(Class = factor(.data$Class),
-          Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
-  arrange(.data$Polarity)
+    select(.data$Class,
+           .data$Polarity) %>%
+    mutate(Class = factor(.data$Class),
+           Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
+    arrange(.data$Polarity)
   class_colors <- metalyzer_colors()
   names(class_colors) <- levels(polarity_df$Class)
   ## Data: Replace NAs
@@ -268,7 +268,7 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
   if("highlight" %in% colnames(Log2FCTab)) {
     # rename factor levels for improving Legend understanding
     Log2FCTab$highlight <- factor(Log2FCTab$highlight, levels = c(FALSE, TRUE), labels = c("Other metabolites", "Highlighted metabolite(s)"))
-  
+    
     ## Plot: Create vulcano ggplot object with highlighted points
     p_fc_vulcano_highlighted <- ggplot(Log2FCTab %>%
                                          arrange(desc(highlight)),
@@ -290,18 +290,18 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
     
     ## Interactive: Create interactive plot
     p_vulcano_highlighted <- ggplotly(p_fc_vulcano_highlighted, tooltip = "text")
-
+    
     return(p_vulcano_highlighted)
   } else {
     # Data Vulcano: Prepare Dataframe for vulcano plot
-    Log2FCTab$Class <- as.character(Log2FCTab$Class)
-    Log2FCTab$ClassColor <- as.character(Log2FCTab$Class)
+    Log2FCTab$Class <- Log2FCTab$Class
+    Log2FCTab$ClassColor <- Log2FCTab$Class
     Log2FCTab$ClassColor[Log2FCTab$qval > cutoff_y] <- "Not Significant"
     Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < cutoff_x] <- "Not Significant"
-
+    
     breaks <- unique(Log2FCTab$Class)
     values <- class_colors[names(class_colors) %in% Log2FCTab$Class]
-
+    
     ## Plot: Create vulcano ggplot object
     p_fc_vulcano <- ggplot(Log2FCTab,
                            aes(x = .data$log2FC,
@@ -349,7 +349,7 @@ plotly_network <- function(Log2FCTab,
                            pathway_width=10,
                            plot_height=800,
                            plot_column_name="log2FC") {
-  pathway_file <- get_data_file_path("Pathway_040225.xlsx")
+  pathway_file <- get_data_file_path("Pathway_120325.xlsx")
   ## Read network nodes, edges and annotations
   pathways <- read_named_region(pathway_file, "Pathways_Header")
   invalid_annotations <- which(
@@ -416,17 +416,18 @@ plotly_network <- function(Log2FCTab,
   signif_df <- filter(Log2FCTab,
                       !is.na(.data$log2FC),
                       !is.na(.data$qval),
+                      !is.na(.data$pval),
                       .data$qval <= q_value)
-
+  
   
   nodes$log2FC <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
     tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
-    } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
       # Not significantly changed but measured
-      l2fc <- 0
+      l2fc <- sum(Log2FCTab$log2FC[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
       # Not measured
       l2fc <- NA
@@ -440,7 +441,7 @@ plotly_network <- function(Log2FCTab,
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       qval <- sum(tmp_df$qval) / nrow(tmp_df)
-    } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
       # Not significantly changed but measured
       qval <- sum(Log2FCTab$qval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
@@ -449,29 +450,46 @@ plotly_network <- function(Log2FCTab,
     }
     return(qval)
   })
-
-  nodes$add_col <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-  tmp_df <- filter(Log2FCTab, .data$Metabolite %in% m_vec)
-  if (nrow(tmp_df) > 0) {
-    # Alteast 1 significantly changed
-    value <- sum(tmp_df[plot_column_name]) / nrow(tmp_df)
-  } else {
-    # Not measured
-    value <- NA
-  }
-  return(value)
+  
+  ## Add p-value to nodes_df
+  nodes$pval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 significantly changed
+      pval <- sum(tmp_df$pval) / nrow(tmp_df)
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
+      # Not significantly changed but measured
+      pval <- sum(Log2FCTab$pval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
+    } else {
+      # Not measured
+      pval <- NA
+    }
+    return(pval)
   })
-
+  
+  nodes$add_col <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    tmp_df <- filter(Log2FCTab, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 value per Node
+      value <- sum(tmp_df[plot_column_name]) / nrow(tmp_df)
+    } else {
+      # Not measured
+      value <- NA
+    }
+    return(value)
+  })
+  
   # In case the plotted column is log2FC or qval, as they are calculated differently
   if (plot_column_name == "log2FC") {
     nodes$add_col = nodes$log2FC
   } else if (plot_column_name == "qval") {
     nodes$add_col = nodes$qval
+  } else if (plot_column_name == "pval") {
+    nodes$add_col = nodes$pval
   }
-
+  
   ## Draw network
   # Create a plot of the network using ggplotly
-
   
   # Preparing Hexcodes for Annotation Colors
   nodes$color <- sapply(nodes$add_col, function(value) {
@@ -562,23 +580,8 @@ plotly_network <- function(Log2FCTab,
       opacity = 1,
       hovertext = paste0("log2 Fold Change: ", round(nodes$log2FC[i], 5),
                          "\nPathway: ", nodes$Pathway[i],
-                         "\nadj. p-value: ", nodes$qval[i])
-    )
-  }
-  for (i in 1:nrow(nodes)) {
-    p_network <- p_network %>% add_annotations(
-      text = nodes$Label[i],
-      x = nodes$x[i],
-      y = nodes$y[i],
-      arrowhead = 0,
-      font = list(size = metabolite_node_size, color = "white"),
-      ax = 0,
-      ay = 0,
-      bgcolor = nodes$color[i],
-      opacity = 1,
-      hovertext = paste0("log2 Fold Change: ", round(nodes$log2FC[i], 5),
-                         "\nPathway: ", nodes$Pathway[i],
-                         "\nadj. p-value: ", nodes$qval[i])
+                         "\nadj. p-value: ", round(nodes$qval[i], 5),
+                         "\np-value: ", round(nodes$pval[i], 5))
     )
   }
   
@@ -766,19 +769,21 @@ data_normalization <- function(metalyzer_se, norm_method) {
 #' located regardless of where the app is running.
 #' 
 #' @examples
-#' # Get path to the file "Pathway_040225.xlsx" in the data folder
-#' file_path <- get_data_file_path("Pathway_040225.xlsx")
+#' # Get path to the file "Pathway_120325.xlsx" in the data folder
+#' file_path <- get_data_file_path("Pathway_120325.xlsx")
 #' 
 #' # Read the CSV file
 #' data <- read.csv(file_path)
 #' 
 #' @export
 get_data_file_path <- function(file_name) {
-  data_path <- file.path("data", file_name)
+  app_data_dir <- system.file("shinyapp", "data", package = "MetAlyzer")
+  
+  data_path <- file.path(app_data_dir, file_name)
   
   if (file.exists(data_path)) {
     return(data_path)
   } else {
-    return(file.path(getwd(), data_path))
+    return(file.path(getwd(), "data", file_name))
   }
 }

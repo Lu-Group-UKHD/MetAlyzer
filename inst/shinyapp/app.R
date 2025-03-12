@@ -213,9 +213,9 @@ ui <- fluidPage(
       # Lower network plot a bit
       tags$br(),
       conditionalPanel(condition = "input.computeLog2FC",
-        bsCollapse(open = "",
-          bsCollapsePanel("Advanced Styles",
-                          div(style = "display: flex; 
+                       bsCollapse(open = "",
+                                  bsCollapsePanel("Advanced Styles",
+                                                  div(style = "display: flex; 
                                        flex-wrap: wrap; 
                                        justify-content: center; 
                                        align-items: center; 
@@ -223,46 +223,46 @@ ui <- fluidPage(
                                        width: 80%; 
                                        margin-left: auto;
                                        margin-right: auto",
-                              # Plot Height Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkPlotHeight", 
-                                              "Plot Height [100px]", 
-                                              min = 4, max = 20, 
-                                              value = 10, step = 1)
-                              ),
-                              # Metabolite Node Size Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkMetaboliteNodeSize", 
-                                              "Metabolite Node Size", 
-                                              min = 5, max = 50, 
-                                              value = 11, step = 1)
-                              ),
-                              # Connection Width Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkConnectionWidth", 
-                                              "Connection Width", 
-                                              min = 0.5, max = 5, 
-                                              value = 1.25, step = 0.25)
-                              ),
-                              # Pathway Text Size Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkPathwayTextSize", 
-                                              "Pathway Text Size", 
-                                              min = 10, max = 50, 
-                                              value = 20, step = 1)
-                              ),
-                              # Pathway Width Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkPathwayWidth", 
-                                              "Pathway Width", 
-                                              min = 5, max = 30, 
-                                              value = 10, step = 1)
-                              ),
-                              actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
-                              bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
-                          )
-          )
-        )
+                                                      # Plot Height Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkPlotHeight", 
+                                                                      "Plot Height [100px]", 
+                                                                      min = 4, max = 20, 
+                                                                      value = 10, step = 1)
+                                                      ),
+                                                      # Metabolite Node Size Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkMetaboliteNodeSize", 
+                                                                      "Metabolite Node Size", 
+                                                                      min = 5, max = 50, 
+                                                                      value = 11, step = 1)
+                                                      ),
+                                                      # Connection Width Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkConnectionWidth", 
+                                                                      "Connection Width", 
+                                                                      min = 0.5, max = 5, 
+                                                                      value = 1.25, step = 0.25)
+                                                      ),
+                                                      # Pathway Text Size Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkPathwayTextSize", 
+                                                                      "Pathway Text Size", 
+                                                                      min = 10, max = 50, 
+                                                                      value = 20, step = 1)
+                                                      ),
+                                                      # Pathway Width Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkPathwayWidth", 
+                                                                      "Pathway Width", 
+                                                                      min = 5, max = 30, 
+                                                                      value = 10, step = 1)
+                                                      ),
+                                                      actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
+                                                      bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
+                                                  )
+                                  )
+                       )
       ),
       
       conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
@@ -580,7 +580,7 @@ server <- function(input, output, session) {
       #   updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
       #                     selected = 'Metabolism Indicators')
       # } else {
-        updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
       # }
     }
   })
@@ -834,7 +834,7 @@ server <- function(input, output, session) {
     #   updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
     #                     selected = 'Metabolism Indicators')
     # } else {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+    updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
     # }
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
     updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
@@ -957,7 +957,8 @@ server <- function(input, output, session) {
   })
   # Update choices for feature identifiers to include in exported annotation csv file
   featIdTbl <- reactive({
-    readr::read_csv('data/BiocratesFeatureTable.csv')
+    app_data_dir <- system.file("shinyapp", "data", package = "MetAlyzer")
+    readr::read_csv(file.path(app_data_dir, 'BiocratesFeatureTable.csv'))
   })
   output$loadFeatIdChoicesExport <- renderUI({
     annoChoices <- colnames(featIdTbl())
