@@ -68,7 +68,7 @@ polarity <- function() {
 
 #' @title Get pathway file path
 #'
-#' @description This function returns the pathway.xlsx file path.
+#' @description This function returns the latest pathway.xlsx file path.
 #'
 #' @return pathway.xlsx file path
 #' @export
@@ -76,5 +76,5 @@ polarity <- function() {
 #' @examples
 #' fpath <- pathway()
 pathway <- function() {
-  system.file("extdata", "Pathway_101024.xlsx", package = "MetAlyzer")
+  system.file("extdata", "Pathway_120325.xlsx", package = "MetAlyzer")
 }

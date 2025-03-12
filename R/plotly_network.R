@@ -10,6 +10,8 @@
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
 #' @param plot_height The height of the Plot in pixel [px]
+#' @param plot_column_name Column name in the Log2FC dataframe to plot; 
+#' for multiple metabolites per node, the mean is used.
 #' @return plotly object
 #' 
 #' @import dplyr
@@ -46,7 +48,8 @@ plotly_network <- function(metalyzer_se,
     connection_width=1.25,
     pathway_text_size=20,
     pathway_width=10,
-    plot_height=800) {
+    plot_height=800,
+    plot_column_name="log2FC") {
     log2FC_df <- metalyzer_se@metadata$log2FC 
     
     pathway_file <- MetAlyzer::pathway()
@@ -116,50 +119,88 @@ plotly_network <- function(metalyzer_se,
     signif_df <- filter(log2FC_df,
                         !is.na(.data$log2FC),
                         !is.na(.data$qval),
+                        !is.na(.data$pval),
                         .data$qval <= q_value)
 
-    nodes$FC_thresh <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    nodes$log2FC <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
         tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
         if (nrow(tmp_df) > 0) {
         # Alteast 1 significantly changed
         l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
-        } else if (any(m_vec %in% log2FC_df$Metabolite)) {
-            # Not significantly changed but measured
-            l2fc <- 0
+        } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+        # Not significantly changed but measured
+        l2fc <- sum(log2FC_df$log2FC[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
         } else {
-            # Not measured
-            l2fc <- NA
+        # Not measured
+        l2fc <- NA
         }
         return(l2fc)
     })
-
+    
     ## Add p-value to nodes_df
-    nodes$q_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    nodes$qval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
         tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
         if (nrow(tmp_df) > 0) {
         # Alteast 1 significantly changed
         qval <- sum(tmp_df$qval) / nrow(tmp_df)
-        } else if (any(m_vec %in% log2FC_df$Metabolite)) {
-            # Not significantly changed but measured
-            qval <- sum(log2FC_df$qval[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
+        } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+        # Not significantly changed but measured
+        qval <- sum(log2FC_df$qval[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
         } else {
-            # Not measured
-            qval <- NA
+        # Not measured
+        qval <- NA
         }
         return(qval)
     })
+
+    ## Add p-value to nodes_df
+    nodes$pval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+        tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
+        if (nrow(tmp_df) > 0) {
+        # Alteast 1 significantly changed
+        pval <- sum(tmp_df$pval) / nrow(tmp_df)
+        } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+        # Not significantly changed but measured
+        pval <- sum(log2FC_df$pval[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
+        } else {
+        # Not measured
+        pval <- NA
+        }
+        return(pval)
+    })
+
+    nodes$add_col <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+        tmp_df <- filter(log2FC_df, .data$Metabolite %in% m_vec)
+        if (nrow(tmp_df) > 0) {
+        # Alteast 1 value per Node
+        value <- sum(tmp_df[plot_column_name]) / nrow(tmp_df)
+        } else {
+        # Not measured
+        value <- NA
+        }
+        return(value)
+    })
+
+    # In case the plotted column is log2FC or qval, as they are calculated differently
+    if (plot_column_name == "log2FC") {
+        nodes$add_col = nodes$log2FC
+    } else if (plot_column_name == "qval") {
+        nodes$add_col = nodes$qval
+    } else if (plot_column_name == "pval") {
+        nodes$add_col = nodes$pval
+    }
 
     ## Draw network
     # Create a plot of the network using ggplotly
 
     # Preparing Hexcodes for Annotation Colors
-    nodes$color <- sapply(nodes$FC_thresh, function(value) {
+    nodes$color <- sapply(nodes$add_col, function(value) {
         if (is.na(value)) {
         return("grey")
         } else {
         # Using the viridis color scale, adjust 'option' based on your preference
         color_scale <- viridis(10, option = "D")
-        nodes_range <- na.omit(nodes$FC_thresh)
+        nodes_range <- na.omit(nodes$add_col)
         
         color_index <- findInterval(value, seq(min(nodes_range), max(nodes_range)+0.1, length.out = length(color_scale) + 1))
         return(color_scale[color_index])
@@ -212,7 +253,7 @@ plotly_network <- function(metalyzer_se,
                         y = nodes$y,
                         type = "scatter",
                         mode = "markers",
-                        marker = list(color = nodes$FC_thresh, 
+                        marker = list(color = nodes$add_col, 
                                     colorbar = list(title = ""),
                                     colorscale='Viridis',
                                     showscale = TRUE),
@@ -239,9 +280,11 @@ plotly_network <- function(metalyzer_se,
         ay = 0,
         bgcolor = nodes$color[i],
         opacity = 1,
-        hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
-                            "\nPathway: ", nodes$Pathway[i],
-                            "\nadj. p-value: ", round(nodes$q_value[i], 5))
+        hovertext = paste0("log2 Fold Change: ", round(nodes$log2FC[i], 5),
+                         "\nPathway: ", nodes$Pathway[i],
+                         "\nadj. p-value: ", nodes$qval[i],
+                         "\np-value: ", round(nodes$pval[i], 5),
+                         "\n", plot_column_name, ":", nodes$add_col[i])
         )
     }
     

@@ -8,7 +8,7 @@
 #' @param connection_width The line width of connections between metabolites
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
-#' @param scale_colors A vector of length 3 with colors for low, mid and high 
+#' @param plot_column_name Column name in the Log2FC dataframe to plot; 
 #' of the gradient.
 #' @return ggplot object
 #' 
@@ -45,8 +45,8 @@ plot_network <- function(
     metabolite_text_size=3,
     connection_width=0.75,
     pathway_text_size=6,
-    pathway_width=4,
-    scale_colors = c("green", "black", "magenta") 
+    pathway_width=3,
+    plot_column_name="log2FC"
   ) {
   log2FC_df <- metalyzer_se@metadata$log2FC
   
@@ -118,22 +118,77 @@ plot_network <- function(
   signif_df <- filter(log2FC_df,
                       !is.na(.data$log2FC),
                       !is.na(.data$qval),
+                      !is.na(.data$pval),
                       .data$qval <= q_value)
 
-    nodes$FC_thresh <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+  
+  nodes$log2FC <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
     tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
-    } else if (any(m_vec %in% log2FC_df$Metabolite)) {
-        # Not significantly changed but measured
-        l2fc <- 0
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+      # Not significantly changed but measured
+      l2fc <- sum(log2FC_df$log2FC[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
-        # Not measured
-        l2fc <- NA
+      # Not measured
+      l2fc <- NA
     }
     return(l2fc)
   })
+  
+  ## Add p-value to nodes_df
+  nodes$qval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 significantly changed
+      qval <- sum(tmp_df$qval) / nrow(tmp_df)
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+      # Not significantly changed but measured
+      qval <- sum(log2FC_df$qval[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
+    } else {
+      # Not measured
+      qval <- NA
+    }
+    return(qval)
+  })
+
+  ## Add p-value to nodes_df
+  nodes$pval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 significantly changed
+      pval <- sum(tmp_df$pval) / nrow(tmp_df)
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+      # Not significantly changed but measured
+      pval <- sum(log2FC_df$pval[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
+    } else {
+      # Not measured
+      pval <- NA
+    }
+    return(pval)
+  })
+
+  nodes$add_col <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    tmp_df <- filter(log2FC_df, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 value per Node
+      value <- sum(tmp_df[plot_column_name]) / nrow(tmp_df)
+    } else {
+      # Not measured
+      value <- NA
+    }
+    return(value)
+  })
+
+  # In case the plotted column is log2FC or qval, as they are calculated differently
+  if (plot_column_name == "log2FC") {
+    nodes$add_col = nodes$log2FC
+  } else if (plot_column_name == "qval") {
+    nodes$add_col = nodes$qval
+  } else if (plot_column_name == "pval") {
+    nodes$add_col = nodes$pval
+  }
 
   ## Draw network
 
@@ -154,9 +209,8 @@ plot_network <- function(
           yend = .data$y_end,
           color = .data$Color
         ),
-        # color = "lightblue",
         linewidth = pathway_width,
-        # alpha = 0.3,
+        alpha = 0.3,
         curvature = radius,
         show.legend = FALSE
       ) +
@@ -182,16 +236,12 @@ plot_network <- function(
         x = .data$x,
         y = .data$y,
         label = .data$Label,
-        fill = .data$FC_thresh
+        fill = .data$add_col
       ),
       size = metabolite_text_size,
       color = "white"
     ) +
-    scale_fill_gradient2(
-      low = scale_colors[1],
-      mid = scale_colors[2],
-      high = scale_colors[3]
-    ) +
+    scale_fill_viridis_c(option = "D", name = paste0(plot_column_name)) +
 
     # Add annotations
     geom_text(
