@@ -9,7 +9,7 @@
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
 #' @param plot_column_name Column name in the Log2FC dataframe to plot; 
-#' of the gradient.
+#' @param exlude_pathways Pathway names that are exluded from plotting
 #' @return ggplot object
 #' 
 #' @import dplyr
@@ -46,7 +46,8 @@ plot_network <- function(
     connection_width=0.75,
     pathway_text_size=6,
     pathway_width=3,
-    plot_column_name="log2FC"
+    plot_column_name="log2FC",
+    exclude_pathways=NULL 
   ) {
   log2FC_df <- metalyzer_se@metadata$log2FC
   
@@ -113,6 +114,12 @@ plot_network <- function(
     }
     return(color)
   })
+  pathways <- filter(pathways, !Label %in% exclude_pathways)
+  excluded_labels <- nodes$Label[nodes$Pathway %in% exclude_pathways]
+  edges <- edges %>%
+    filter(!(Node1 %in% excluded_labels | Node2 %in% excluded_labels))
+  
+  nodes <- filter(nodes, !Pathway %in% exclude_pathways)
 
   ## Add log2FC to nodes_df
   signif_df <- filter(log2FC_df,
