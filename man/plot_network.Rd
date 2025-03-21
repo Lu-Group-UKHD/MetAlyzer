@@ -5,18 +5,19 @@
 \title{Plot Pathway Network}
 \usage{
 plot_network(
-  metalyzer_se,
+  log2fc_df,
   q_value = 0.05,
   metabolite_text_size = 3,
   connection_width = 0.75,
   pathway_text_size = 6,
-  pathway_width = 4,
-  scale_colors = c("green", "black", "magenta")
+  pathway_width = 3,
+  plot_column_name = "log2FC",
+  exclude_pathways = NULL,
+  color_scale = "viridis",
+  color_option = "D"
 )
 }
 \arguments{
-\item{metalyzer_se}{A Metalyzer object}
-
 \item{q_value}{The q-value threshold for significance}
 
 \item{metabolite_text_size}{The text size of metabolite labels}
@@ -27,8 +28,11 @@ plot_network(
 
 \item{pathway_width}{The line width of pathway-specific connection coloring}
 
-\item{scale_colors}{A vector of length 3 with colors for low, mid and high 
-of the gradient.}
+\item{plot_column_name}{Column name in the Log2FC dataframe to plot;}
+
+\item{metalyzer_se}{A Metalyzer object}
+
+\item{exlude_pathways}{Pathway names that are exluded from plotting}
 }
 \value{
 ggplot object
@@ -54,5 +58,6 @@ metalyzer_se <- calculate_log2FC(
   impute_NA = FALSE
 )
 
+log2fc_df <- metalyzer_se@metadata$log2FC
 network <- plot_network(metalyzer_se, q_value = 0.05)
 }

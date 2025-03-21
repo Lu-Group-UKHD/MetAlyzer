@@ -10,6 +10,8 @@
 #' @param pathway_width The line width of pathway-specific connection coloring
 #' @param plot_column_name Column name in the Log2FC dataframe to plot; 
 #' @param exlude_pathways Pathway names that are exluded from plotting
+#' @param color_scale A string specifying the color scale to use. Options include `"viridis"`, `"plasma"`, `"magma"`, `"inferno"`, `"cividis"`, `"rocket"`, `"mako"`, and `"turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.
+#' @param gradient_colors A vector of length 2 or 3 specifying the colors for a custom gradient. If two colors are provided (`c(low, high)`), `scale_fill_gradient()` is used. If three colors are provided (`c(low, mid, high)`), `scale_fill_gradient2()` is used. If `NULL` or incorrectly specified, the viridis color scale is applied.
 #' @return ggplot object
 #' 
 #' @import dplyr
@@ -40,7 +42,7 @@
 #' )
 #' 
 #' log2fc_df <- metalyzer_se@metadata$log2FC
-#' network <- plot_network(metalyzer_se, q_value = 0.05)
+#' network <- plot_network(log2fc_df, q_value = 0.05)
 
 plot_network <- function(log2fc_df,
                          q_value = 0.05,
@@ -51,7 +53,7 @@ plot_network <- function(log2fc_df,
                          plot_column_name = "log2FC",
                          exclude_pathways = NULL,
                          color_scale = "viridis",
-                         color_option = "D") {
+                         gradient_colors = NULL) {
   
   pathway_file <- MetAlyzer::pathway()
 
@@ -251,12 +253,18 @@ plot_network <- function(log2fc_df,
       color = "white"
     ) +
     switch(color_scale,
-           "viridis" = scale_fill_viridis_c(option = color_option, name = paste0(plot_column_name)),
-           "plasma" = scale_fill_plasma(option = color_option, name = paste0(plot_column_name)),
-           "magma" = scale_fill_magma(option = color_option, name = paste0(plot_column_name)),
-           "inferno" = scale_fill_inferno(option = color_option, name = paste0(plot_column_name)),
-           "gradient" = scale_fill_gradient(low = "blue", high = "red", name = paste0(plot_column_name)),
-           scale_fill_viridis_c(option = color_option, name = paste0(plot_column_name))  # fallback to viridis
+           "gradient" = if (!is.null(gradient_colors) && length(gradient_colors) %in% c(2, 3)) {
+             if (length(gradient_colors) == 2) {
+               scale_fill_gradient(low = gradient_colors[1], high = gradient_colors[2], name = plot_column_name)
+             } else {
+               scale_fill_gradient2(low = gradient_colors[1], mid = gradient_colors[2], high = gradient_colors[3], 
+                                    midpoint = 0, name = plot_column_name)
+             }
+           } else {
+             message("gradient_colors is NULL or incorrectly specified. Falling back to viridis scale.")
+             scale_fill_viridis(option = "D", name = plot_column_name)  # default fallback
+           },
+           scale_fill_viridis(option = get_color_option(color_scale), name = plot_column_name)  # default to viridis
     ) +
 
     # Add annotations
@@ -334,4 +342,32 @@ read_named_region <- function(file_path, named_region) {
   }
   rownames(df) <- NULL
   return(df)
+}
+
+#' Get the color option based on the color scale
+#'
+#' This function maps a color scale name to a corresponding letter option.
+#' The function returns a letter representing the color scale from a predefined mapping.
+#' If the color scale provided is not recognized, the function fallsback to the viridis scale.
+#'
+#' @param color_scale A character string representing the name of the color scale.
+#'        It should be one of: "magma", "inferno", "plasma", "viridis", 
+#'        "cividis", "rocket", "mako", or "turbo".
+#'
+#' @return A character string representing the color option corresponding to the 
+#'         provided color scale. If the color scale is not recognized, it returns `NA`.
+#'
+get_color_option <- function(color_scale) {
+  color_map <- list(
+    magma = "A",
+    inferno = "B",
+    plasma = "C",
+    viridis = "D",
+    cividis = "E",
+    rocket = "F",
+    mako = "G",
+    turbo = "H"
+  )
+  
+  return(ifelse(color_scale %in% names(color_map), color_map[[color_scale]], "D"))
 }
