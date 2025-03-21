@@ -256,7 +256,7 @@ plot_scatter <- function(log2fc_df,
 #' This method creates a vulcano plot of the log2 fold change for each metabolite.
 #'
 #' @param log2fc_df DF with metabolites as row names and columns including log2FC, Class, qval columns.
-#' @param x_cutoff Number of the desired log fold change cutoff for assessing significance.
+#' @param x_cutoff Number of the desired log2 fold change cutoff for assessing significance.
 #' @param y_cutoff Number of the desired p value cutoff for assessing significance.
 #' @param show_labels_for Vector with Strings of Metabolite names or classes.
 #'
@@ -296,8 +296,8 @@ plot_vulcano <- function(log2fc_df,
 
   ## Data: only color classes that are significantly differentially expressed
 
-  log2fc_df$Class[log2fc_df$qval > y_cutoff] <- "Not Significant"
-  log2fc_df$Class[abs(log2fc_df$log2FC) < log2(x_cutoff)] <- "Not Significant"
+  log2fc_df$Class[log2fc_df$qval > y_cutoff] <- NA
+  log2fc_df$Class[abs(log2fc_df$log2FC) < x_cutoff] <- NA
 
   ## Data: Determine labels
   log2fc_df$labels <- ""  # Initialize labels as empty strings
@@ -324,16 +324,10 @@ plot_vulcano <- function(log2fc_df,
                        y = -log10(.data$qval),
                        color = .data$Class,
                        label = labels)) +
-      geom_vline(xintercept=c(-log2(x_cutoff), log2(x_cutoff)), col="black",
+      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black",
                  linetype="dashed") +
       geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
       geom_point(size = 1) +
-      scale_color_manual('Classes',
-                        breaks = breaks,
-                        values = values,
-                        drop = FALSE,
-                        guide = guide_legend(override.aes = list(size = 2),
-                                             order=2, ncol = 2)) +
       theme(plot.title = element_text(face = 'bold.italic', hjust = 0.5),
             legend.key = element_rect(fill = 'white')) +
       labs(x = 'log2(FC)', y = "-log10(p)") +

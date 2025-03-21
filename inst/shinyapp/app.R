@@ -1247,12 +1247,12 @@ server <- function(input, output, session) {
     req(reactLog2FCTbl())
     if (!input$highlightVulcano) {
       plotly_vulcano(reactLog2FCTbl(),
-                     cutoff_x = input$plotVolcanoLog2FCCutoff,
-                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
+                     x_cutoff = input$plotVolcanoLog2FCCutoff,
+                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
     } else {
       plotly_vulcano(reactVulcanoHighlight(),
-                     cutoff_x = input$plotVolcanoLog2FCCutoff,
-                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
+                     x_cutoff = input$plotVolcanoLog2FCCutoff,
+                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
     }
   })
   
@@ -1317,12 +1317,12 @@ server <- function(input, output, session) {
         if (input$highlightVulcano) {
           req(reactVulcanoHighlight())
           final_plot <- plotly_vulcano(reactVulcanoHighlight(), 
-                                       cutoff_x = input$plotVolcanoLog2FCCutoff,
-                                       cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
+                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         } else {
           final_plot <- plotly_vulcano(reactLog2FCTbl(), 
-                                       cutoff_x = input$plotVolcanoLog2FCCutoff,
-                                       cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
+                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         }
         htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
@@ -1330,7 +1330,7 @@ server <- function(input, output, session) {
           req(reactVulcanoHighlight())
           final_plot <- MetAlyzer::plot_vulcano(reactVulcanoHighlight(), 
                                        x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                       y_cutoff_y = as.numeric(input$plotVolcanoPValCutoff),
+                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff),
                                        show_labels_for = input$metabChoicesVulcano)
         } else {
           final_plot <- MetAlyzer::plot_vulcano(reactLog2FCTbl(), 

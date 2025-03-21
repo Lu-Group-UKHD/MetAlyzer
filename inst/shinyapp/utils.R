@@ -248,9 +248,9 @@ plotly_scatter <- function(Log2FCTab) {
 #' vulcanoplot based on log2 fold change data.
 #' 
 #' @param Log2FCTab A data frame containing log2 fold change data
-#' @param cutoff_y A numeric value specifying the cutoff for q-value
-#' @param cutoff_x A numeric value specifying the cutoff for log2 fold change
-plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
+#' @param y_cutoff A numeric value specifying the cutoff for q-value
+#' @param x_cutoff A numeric value specifying the cutoff for log2 fold change
+plotly_vulcano <- function(Log2FCTab, y_cutoff = 0.05, x_cutoff = 1.5) {
   # Make Colors unique for each class
   polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
   polarity_df <- utils::read.csv(polarity_file) %>%
@@ -280,8 +280,8 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                                                "\nLog2(FC): ", round(log2FC, digits=2), 
                                                "\nAdj. p-value: ", round(qval, digits=4),
                                                "\nP-value: ", round(pval, digits=4)))) +
-      geom_vline(xintercept=c(-cutoff_x, cutoff_x), col="black", linetype="dashed") +
-      geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
+      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
+      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
       scale_color_manual('',
                          breaks = c("Other metabolites", "Highlighted metabolite(s)"),
                          values = c("#d3d3d3","#56070C")) +
@@ -296,8 +296,8 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
     # Data Vulcano: Prepare Dataframe for vulcano plot
     Log2FCTab$Class <- Log2FCTab$Class
     Log2FCTab$ClassColor <- Log2FCTab$Class
-    Log2FCTab$ClassColor[Log2FCTab$qval > cutoff_y] <- "Not Significant"
-    Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < cutoff_x] <- "Not Significant"
+    Log2FCTab$ClassColor[Log2FCTab$qval > y_cutoff] <- "Not Significant"
+    Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < x_cutoff] <- "Not Significant"
     
     breaks <- unique(Log2FCTab$Class)
     values <- class_colors[names(class_colors) %in% Log2FCTab$Class]
@@ -307,8 +307,8 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                            aes(x = .data$log2FC,
                                y = -log10(.data$qval),
                                color = .data$ClassColor)) +
-      geom_vline(xintercept=c(-cutoff_x, cutoff_x), col="black", linetype="dashed") +
-      geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
+      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
+      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
       geom_point(size = 1.5, aes(text = paste0(Metabolite, 
                                                "\nClass: ", Class, 
                                                "\nLog2(FC): ", round(log2FC, digits=2), 
