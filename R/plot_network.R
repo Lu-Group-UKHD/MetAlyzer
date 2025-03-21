@@ -16,6 +16,8 @@
 #' @import ggplot2
 #' @import ggrepel
 #' @import SummarizedExperiment
+#' @import viridis
+#' @import viridisLite
 #' @importFrom rlang .data
 #' @export
 #' 
@@ -37,19 +39,19 @@
 #'   impute_NA = FALSE
 #' )
 #' 
+#' log2fc_df <- metalyzer_se@metadata$log2FC
 #' network <- plot_network(metalyzer_se, q_value = 0.05)
 
-plot_network <- function(
-    metalyzer_se,
-    q_value=0.05,
-    metabolite_text_size=3,
-    connection_width=0.75,
-    pathway_text_size=6,
-    pathway_width=3,
-    plot_column_name="log2FC",
-    exclude_pathways=NULL 
-  ) {
-  log2FC_df <- metalyzer_se@metadata$log2FC
+plot_network <- function(log2fc_df,
+                         q_value = 0.05,
+                         metabolite_text_size = 3,
+                         connection_width = 0.75,
+                         pathway_text_size = 6,
+                         pathway_width = 3,
+                         plot_column_name = "log2FC",
+                         exclude_pathways = NULL,
+                         color_scale = "viridis",
+                         color_option = "D") {
   
   pathway_file <- MetAlyzer::pathway()
 
@@ -122,7 +124,7 @@ plot_network <- function(
   nodes <- filter(nodes, !Pathway %in% exclude_pathways)
 
   ## Add log2FC to nodes_df
-  signif_df <- filter(log2FC_df,
+  signif_df <- filter(log2fc_df,
                       !is.na(.data$log2FC),
                       !is.na(.data$qval),
                       !is.na(.data$pval),
@@ -134,9 +136,9 @@ plot_network <- function(
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2fc_df$Metabolite)) {
       # Not significantly changed but measured
-      l2fc <- sum(log2FC_df$log2FC[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
+      l2fc <- sum(log2fc_df$log2FC[which(log2fc_df$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
       # Not measured
       l2fc <- NA
@@ -150,9 +152,9 @@ plot_network <- function(
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       qval <- sum(tmp_df$qval) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2fc_df$Metabolite)) {
       # Not significantly changed but measured
-      qval <- sum(log2FC_df$qval[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
+      qval <- sum(log2fc_df$qval[which(log2fc_df$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
       # Not measured
       qval <- NA
@@ -166,9 +168,9 @@ plot_network <- function(
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       pval <- sum(tmp_df$pval) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2FC_df$Metabolite)) {
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2fc_df$Metabolite)) {
       # Not significantly changed but measured
-      pval <- sum(log2FC_df$pval[which(log2FC_df$Metabolite %in% m_vec)]) / length(m_vec)
+      pval <- sum(log2fc_df$pval[which(log2fc_df$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
       # Not measured
       pval <- NA
@@ -177,7 +179,7 @@ plot_network <- function(
   })
 
   nodes$add_col <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(log2FC_df, .data$Metabolite %in% m_vec)
+    tmp_df <- filter(log2fc_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
       # Alteast 1 value per Node
       value <- sum(tmp_df[plot_column_name]) / nrow(tmp_df)
@@ -248,7 +250,14 @@ plot_network <- function(
       size = metabolite_text_size,
       color = "white"
     ) +
-    scale_fill_viridis_c(option = "D", name = paste0(plot_column_name)) +
+    switch(color_scale,
+           "viridis" = scale_fill_viridis_c(option = color_option, name = paste0(plot_column_name)),
+           "plasma" = scale_fill_plasma(option = color_option, name = paste0(plot_column_name)),
+           "magma" = scale_fill_magma(option = color_option, name = paste0(plot_column_name)),
+           "inferno" = scale_fill_inferno(option = color_option, name = paste0(plot_column_name)),
+           "gradient" = scale_fill_gradient(low = "blue", high = "red", name = paste0(plot_column_name)),
+           scale_fill_viridis_c(option = color_option, name = paste0(plot_column_name))  # fallback to viridis
+    ) +
 
     # Add annotations
     geom_text(
