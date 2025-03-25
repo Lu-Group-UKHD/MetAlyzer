@@ -1350,7 +1350,7 @@ server <- function(input, output, session) {
       if (input$formatScatter == "html") {
         htmlwidgets::saveWidget(plotly_scatter(reactLog2FCTbl())$Plot, file, selfcontained = TRUE)
       } else {
-        ggsave(filename = file, plot = MetAlyzer::plot_scatter(), device = input$formatScatter, dpi = 300)
+        ggsave(filename = file, plot = MetAlyzer::plot_scatter(reactLog2FCTbl()), device = input$formatScatter, dpi = 300, units = "cm", width = 32.0, height = 21.0)
       }
     }
   )
@@ -1373,7 +1373,7 @@ server <- function(input, output, session) {
         final_plot <- MetAlyzer::plot_network(
           reactLog2FCTbl()
         )
-        ggsave(filename = file, plot = final_plot, device = input$formatNetwork, dpi = 300)
+        ggsave(filename = file, plot = final_plot, device = input$formatNetwork, dpi = 300, units = "cm", width = 32.0, height = 21.0)
       }
     }
   )
