@@ -2,7 +2,8 @@
 #'
 #' @description This function plots the log2 fold change for each metabolite and visualizes it, in a pathway network.
 #'
-#' @param metalyzer_se A Metalyzer object
+#' @param log2fc_df A dataframe with log2FC, pval, qval, additional columns
+#' @param metabolite_col Columnname that holds the Metabolites
 #' @param q_value The q-value threshold for significance
 #' @param metabolite_text_size The text size of metabolite labels
 #' @param connection_width The line width of connections between metabolites
@@ -54,6 +55,7 @@
 #' network <- plot_network(log2fc_df, q_value = 0.05)
 
 plot_network <- function(log2fc_df,
+                         metabolite_col = "Metabolite",
                          q_value = 0.05,
                          metabolite_text_size = 3,
                          connection_width = 0.75,
@@ -142,82 +144,38 @@ plot_network <- function(log2fc_df,
     filter(!(Node1 %in% excluded_labels | Node2 %in% excluded_labels))
   
   nodes <- filter(nodes, !Pathway %in% exclude_pathways)
-
-  ## Add log2FC to nodes_df
-  signif_df <- filter(log2fc_df,
-                      !is.na(.data$log2FC),
-                      !is.na(.data$qval),
-                      !is.na(.data$pval),
-                      .data$qval <= q_value)
-
   
-  nodes$log2FC <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 significantly changed
-      l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2fc_df$Metabolite)) {
-      # Not significantly changed but measured
-      l2fc <- sum(log2fc_df$log2FC[which(log2fc_df$Metabolite %in% m_vec)]) / length(m_vec)
-    } else {
-      # Not measured
-      l2fc <- NA
-    }
-    return(l2fc)
-  })
+  nodes_separated <- tidyr::separate_rows(nodes, Metabolites, sep = "\\s*;\\s*")
   
-  ## Add p-value to nodes_df
-  nodes$qval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 significantly changed
-      qval <- sum(tmp_df$qval) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2fc_df$Metabolite)) {
-      # Not significantly changed but measured
-      qval <- sum(log2fc_df$qval[which(log2fc_df$Metabolite %in% m_vec)]) / length(m_vec)
-    } else {
-      # Not measured
-      qval <- NA
-    }
-    return(qval)
-  })
+  nodes_joined <- left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col))
 
-  ## Add p-value to nodes_df
-  nodes$pval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 significantly changed
-      pval <- sum(tmp_df$pval) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% log2fc_df$Metabolite)) {
-      # Not significantly changed but measured
-      pval <- sum(log2fc_df$pval[which(log2fc_df$Metabolite %in% m_vec)]) / length(m_vec)
-    } else {
-      # Not measured
-      pval <- NA
-    }
-    return(pval)
-  })
+  updated_nodes_list <- calculate_node_aggregates_conditional(nodes_joined, nodes, q_value)
 
-  nodes$add_col <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(log2fc_df, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 value per Node
-      value <- sum(tmp_df[plot_column_name]) / nrow(tmp_df)
-    } else {
-      # Not measured
-      value <- NA
-    }
-    return(value)
-  })
-
-  # In case the plotted column is log2FC or qval, as they are calculated differently
-  if (plot_column_name == "log2FC") {
-    nodes$add_col = nodes$log2FC
-  } else if (plot_column_name == "qval") {
-    nodes$add_col = nodes$qval
-  } else if (plot_column_name == "pval") {
-    nodes$add_col = nodes$pval
-  }
+  # --- Create the dataframe for excel export ---
+  nodes_separated_processed <- updated_nodes_list$nodes_separated
+  
+  nodes_list <- nodes_separated_processed %>%
+    group_by(Label) %>%
+    mutate(
+      any_significant_in_group = any(!is.na(qval) & qval <= q_value, na.rm = TRUE),
+      
+      # Determine 'used' status based on group significance
+      used = if_else(
+        any_significant_in_group,
+        # If group has significant: TRUE only if this row is significant
+        !is.na(qval) & qval <= q_value,
+        # If group has NO significant: TRUE if this row has any measurement
+        !is.na(log2FC) | !is.na(pval) | !is.na(qval)
+      ),
+      # Coalesce NA 'used' values to FALSE (e.g., if all metrics were NA) - handles edge cases
+      used = coalesce(used, FALSE)
+    ) %>%
+    # Optional: Remove the intermediate helper column
+    select(-any_significant_in_group) %>%
+    ungroup()
+                  
+  # --- The dataframe for plotting ---
+  nodes_original_processed <- updated_nodes_list$nodes
 
   ## Draw network
 
@@ -260,12 +218,12 @@ plot_network <- function(log2fc_df,
   network <- network +
     # Add labels at the position of the nodes
     geom_label(
-      data = nodes,
+      data = nodes_original_processed,
       aes(
         x = .data$x,
         y = .data$y,
         label = .data$Label,
-        fill = .data$add_col
+        fill = .data$node_add_col
       ),
       size = metabolite_text_size,
       color = "white"
@@ -316,7 +274,7 @@ plot_network <- function(log2fc_df,
               format = save_as,
               overwrite = overwrite)
   
-  return(network)
+  return(list("Network" = network, "Table" = nodes_list))
 
 }
 
@@ -524,4 +482,104 @@ save_plot <- function(plot,
   ggplot2::ggsave(filename = file_path, plot = plot, width = width, height = height, units = units)
   
   message("Plot saved at: ", file_path)
+}
+
+#' Calculate Node-Level Aggregate Statistics (Conditional on Significance)
+#'
+#' Calculates mean log2FC, p-value, and q-value for each node (Label),
+#' prioritizing significant metabolites (qval <= q_value). If none are significant,
+#' uses all measured metabolites for the node. Adds results to both dataframes.
+#'
+#' @param nodes_sep_df Dataframe with metabolites separated (e.g., 'nodes_final').
+#'   Must contain Label, log2FC, pval, qval.
+#' @param nodes_orig_df Original dataframe with potentially semi-colon separated metabolites.
+#'   Must contain Label.
+#' @param q_value Significance threshold for q-values (e.g., 0.05).
+#'
+#' @return A list containing two dataframes:
+#'   $nodes_separated: Input nodes_sep_df with 5 new columns:
+#'     node_log_value, node_p_value, node_q_value, node_add_col, used.
+#'   $nodes: Input nodes_orig_df with 4 new columns:
+#'     node_log_value, node_p_value, node_q_value, node_add_col.
+#'
+calculate_node_aggregates_conditional <- function(nodes_sep_df, nodes_orig_df, q_value) {
+
+  # --- Input Validation ---
+  if (!"Label" %in% names(nodes_sep_df) || !"Label" %in% names(nodes_orig_df)) {
+    stop("Both dataframes must contain a 'Label' column for grouping.")
+  }
+  required_cols <- c("log2FC", "pval", "qval")
+  if (!all(required_cols %in% names(nodes_sep_df))) {
+    stop("nodes_sep_df must contain columns: ", paste(required_cols, collapse=", "))
+  }
+  if (missing(q_value) || !is.numeric(q_value) || length(q_value) != 1) {
+    stop("Please provide a single numeric value for q_value threshold.")
+  }
+
+  # --- 1. Calculate Node-Level Aggregates using Conditional Logic ---
+
+  # Group by Label and apply the conditional mean logic for each metric
+  node_summary <- nodes_sep_df %>%
+    group_by(Label) %>%
+    summarise(
+      # Use the helper function for conditional mean calculation
+      node_log_value = calculate_conditional_mean(log2FC, qval, q_value),
+      node_p_value   = calculate_conditional_mean(pval,   qval, q_value),
+      # Apply the same logic to qval itself: average significant qvals if present, else average measured qvals.
+      node_q_value   = calculate_conditional_mean(qval,   qval, q_value),
+
+      # Create node_add_col - still no calculation specified, setting to NA
+      node_add_col = calculate_conditional_mean(.data[[plot_column_name]],   qval, q_value),
+
+      .groups = "drop" # Drop grouping after summarise
+    )
+
+  # --- 2. Update nodes_separated Dataframe ---
+
+  nodes_sep_updated <- nodes_sep_df %>%
+    # Join the calculated node-level aggregates back
+    left_join(node_summary, by = "Label")
+
+  # --- 3. Update Original Nodes Dataframe ---
+
+  nodes_orig_updated <- nodes_orig_df %>%
+      select(-any_of(c("node_log_value", "node_p_value", "node_q_value", "node_add_col"))) %>%
+      left_join(node_summary, by = "Label")
+
+  # --- 4. Return Updated Dataframes ---
+  return(list(nodes_separated = nodes_sep_updated, nodes = nodes_orig_updated))
+}
+#' Helper function to calculate conditional mean based on significance
+#'
+#' Calculates mean of a metric vector based on q-values. Prioritizes values
+#' where qval <= q_thresh. If none exist, uses all non-NA values.
+#'
+#' @param metric_vec Numeric vector of the metric to average (e.g., log2FC).
+#' @param qval_vec Numeric vector of corresponding q-values.
+#' @param q_thresh Significance threshold for q-values.
+#' @return The calculated conditional mean, or NA.
+calculate_conditional_mean <- function(metric_vec, qval_vec, q_thresh) {
+
+  # Validate inputs are reasonable (basic check)
+  if(length(metric_vec) != length(qval_vec)) {
+    stop("metric_vec and qval_vec must have the same length.")
+  }
+
+  # Identify rows that are BOTH significant AND measured for the specific metric
+  is_significant_and_measured <- !is.na(qval_vec) & qval_vec <= q_thresh & !is.na(metric_vec)
+
+  # Identify rows that are measured for the metric (regardless of significance)
+  is_measured <- !is.na(metric_vec)
+
+  if (any(is_significant_and_measured)) {
+    # Case 1: Significant & measured values exist -> Use mean of these values
+    mean_val <- mean(metric_vec[is_significant_and_measured], na.rm = FALSE) # NAs excluded by definition
+  } else if (any(is_measured)) {
+    # Case 2: No significant values, but measured values exist -> Use mean of all measured values
+    mean_val <- mean(metric_vec[is_measured], na.rm = FALSE) # NAs excluded by definition
+  } else {
+    # Case 3: No measured values exist for this metric in the group
+    mean_val <- NA_real_
+  }
+  return(mean_val)
 }
