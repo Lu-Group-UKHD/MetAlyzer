@@ -153,26 +153,38 @@ plot_network <- function(log2fc_df,
 
   # --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
+
+  nodes_separated_shortend <- nodes_separated_processed %>%
+    filter(!is.na(log2FC)) %>%  
+    select(-c(Class, x, y, Shape))  
   
-  nodes_list <- nodes_separated_processed %>%
+  nodes_collapsed <- nodes_separated_shortend %>%
     group_by(Label) %>%
-    mutate(
-      any_significant_in_group = any(!is.na(qval) & qval <= q_value, na.rm = TRUE),
+    filter(n() > 1) %>%
+    summarise(
+      collapsed_count = n(),
       
-      # Determine 'used' status based on group significance
-      used = if_else(
-        any_significant_in_group,
-        # If group has significant: TRUE only if this row is significant
-        !is.na(qval) & qval <= q_value,
-        # If group has NO significant: TRUE if this row has any measurement
-        !is.na(log2FC) | !is.na(pval) | !is.na(qval)
+      across(
+        .cols = everything(),
+        .fns = ~paste(unique(.), collapse = "; ")
       ),
-      # Coalesce NA 'used' values to FALSE (e.g., if all metrics were NA) - handles edge cases
-      used = coalesce(used, FALSE)
-    ) %>%
-    # Optional: Remove the intermediate helper column
-    select(-any_significant_in_group) %>%
-    ungroup()
+      .groups = 'drop'
+    )
+  
+  #nodes_list <- nodes_separated_processed %>%
+  #  group_by(Label) %>%
+  #  mutate(
+  #    any_significant_in_group = any(!is.na(qval) & qval <= q_value, na.rm = TRUE),
+  #    
+  #    used = if_else(
+  #      any_significant_in_group,
+  #      !is.na(qval) & qval <= q_value,
+  #      !is.na(log2FC) | !is.na(pval) | !is.na(qval)
+  #    ),
+  #    used = coalesce(used, FALSE)
+  #  ) %>%
+  #  select(-any_significant_in_group) %>%
+  #  ungroup()
                   
   # --- The dataframe for plotting ---
   nodes_original_processed <- updated_nodes_list$nodes
@@ -274,7 +286,7 @@ plot_network <- function(log2fc_df,
               format = save_as,
               overwrite = overwrite)
   
-  return(list("Network" = network, "Table" = nodes_list))
+  return(list("Network" = network, "Table" = nodes_collapsed))
 
 }
 
