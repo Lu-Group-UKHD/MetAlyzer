@@ -1,0 +1,50 @@
+#https://pkgdown.r-lib.org/articles/customise.html
+name: MetAlzyer
+url: https://nilsmechtel.github.io/MetAlzyer
+
+output_dir: docs
+
+template:
+  bootstrap: 5
+  bootswatch: journal #https://bootswatch.com/ has different themes you can use #solar, journal
+
+navbar:
+  bg: primary #If you want a different style you can check on bootstrap, e.g. for bootswatch: flatly = https://bootswatch.com/flatly/
+  structure:
+    left: [home, intro, articles, reference, tutorials, news] #intro: “Get Started”, which links to a vignette with the same name as the package.#reference, if there are any .Rd files. #articles, if there are any vignettes or articles.#tutorials, if there any tutorials. #news, if NEWS.md exists.
+    right: [search, github, homepage, homepage2]
+  components:
+    #Customize articles:
+    articles:
+      text: Tutorials
+      icon: fa-book-open # icons can be found here: https://fontawesome.com/icons?d=gallery
+      menu:
+      - text: MetAlyzer R Package User Guide
+        href: articles/user_guide.html
+      - text: MetAlzyer Shiny App User Guide
+        href: articles/shiny_app.html
+    #customize intro:
+    reference:
+      text: Reference
+      icon: "fa-solid fa-rocket"
+      href: reference/index.html
+    #Customize github:
+    github:
+      icon: "fa-brands fa-github"
+      href: https://github.com/nilsmechtel/MetAlyzer
+    #Customize homepage:
+
+home:
+  sidebar:
+    structure: [links, citation, authors, license, funding, toc] #other options: dev, links, community
+    components:
+      links:
+        title: Links
+        text: Browse [source code](https://github.com/nilsmechtel/MetAlyzer)
+      funding:
+        title: Funding
+        text: We are grateful for [***SmartCare***](https://smart-care.mscoresys.de/research/computational-data-analysis)
+
+
+#include:
+#  after_body: css/custom_styles.css # This line specifies the custom CSS file
