@@ -149,7 +149,7 @@ plot_network <- function(log2fc_df,
   
   nodes_joined <- left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col))
 
-  updated_nodes_list <- calculate_node_aggregates_conditional(nodes_joined, nodes, q_value)
+  updated_nodes_list <- calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, plot_column_name)
 
   # --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
@@ -169,7 +169,8 @@ plot_network <- function(log2fc_df,
         .fns = ~paste(unique(.), collapse = "; ")
       ),
       .groups = 'drop'
-    )
+    ) %>%
+    mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
   
   #nodes_list <- nodes_separated_processed %>%
   #  group_by(Label) %>%
@@ -507,6 +508,7 @@ save_plot <- function(plot,
 #' @param nodes_orig_df Original dataframe with potentially semi-colon separated metabolites.
 #'   Must contain Label.
 #' @param q_value Significance threshold for q-values (e.g., 0.05).
+#' @param plot_column_name plotted column
 #'
 #' @return A list containing two dataframes:
 #'   $nodes_separated: Input nodes_sep_df with 5 new columns:
@@ -514,7 +516,7 @@ save_plot <- function(plot,
 #'   $nodes: Input nodes_orig_df with 4 new columns:
 #'     node_log_value, node_p_value, node_q_value, node_add_col.
 #'
-calculate_node_aggregates_conditional <- function(nodes_sep_df, nodes_orig_df, q_value) {
+calculate_node_aggregates_conditional <- function(nodes_sep_df, nodes_orig_df, q_value, plot_column_name) {
 
   # --- Input Validation ---
   if (!"Label" %in% names(nodes_sep_df) || !"Label" %in% names(nodes_orig_df)) {
