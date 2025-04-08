@@ -25,6 +25,19 @@ example_mutation_data_xl <- function() {
   system.file("extdata", "mutation_data_MxP_Quant_500_XL.xlsx", package = "MetAlyzer")
 }
 
+#' @title Get example log2fc data
+#'
+#' @description This function returns the log2fc dataframe of the mutation_data_MxP_Quant_500_XL.xlsx file, created with the MetaVizPro package.
+#'
+#' @return example_log2fc_data.rds file path
+#' @export
+#'
+#' @examples
+#' fpath <- example_log2fc_data()
+example_log2fc_data <- function() {
+  system.file("extdata", "example_log2fc_data.rds", package = "MetAlyzer")
+}
+
 
 #' @title Get example meta data
 #'
