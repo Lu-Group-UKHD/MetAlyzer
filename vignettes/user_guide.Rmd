@@ -30,39 +30,45 @@ knitr::opts_chunk$set(echo=TRUE, cache=FALSE, collapse=TRUE, comment='#>', warni
 #If you haven't done this yet, install the MetAlyzer package
 #devtools::install_github("nilsmechtel/MetAlyzer")
 
-#Load libraries
 library(MetAlyzer)
-library(SummarizedExperiment) # @Luis: We shouldn't need to load the library here. Within the MetAlyzer package we install SummarizedExperiment as a dependency and within the functions we should use SummarizedExperiment::FunctionName().
-library(ggplot2)# @Luis: Same as above
-library(dplyr)
 ```
 
 
 ::: {style="text-align: justify"}
-The MetAlyzer R-package provides a robust toolkit for importing, handling, and analyzing metabolomics data generated using Biocrates Quant500L™ or Quant500XL™ kit and the BiocratesMetIDQ™ software. It structures the data into a SummarizedExperiment (SE) object, facilitating integration with Bioconductor workflows and enabling downstream statistical analysis and visualization.
+The MetAlyzer R-package provides a robust toolkit for importing, handling, and analyzing metabolomics data generated 
+using either the Biocrates Quant500L™ or Quant500XL™ kit and the Biocrates MetIDQ™ software. It structures the data into a 
+SummarizedExperiment (SE) object, facilitating integration with Bioconductor workflows and enabling downstream statistical 
+analysis and visualization. To aid in biological interpretation, MetAlyzer offers functions to generate key visualizations. 
+These include scatter plots, volcano plots to efficiently identify, and particularly a network plot. 
+These network visualizations are crucial for understanding the complex interconnections between metabolites, 
+helping to find pathway-level alterations and providing a systems perspective on the metabolic response under investigation.
 :::
-@Luis: I have added Biocrates kit in there. I think you support both L and XL kit? Maybe extend 1-2 sentences on the type of visualisations you provide and how they aid biological interpretation.
 
 ## Core Workflow: Loading and Exploring Data
 ::: {style="text-align: justify"}
 MetAlyzer's primary entry point is the MetAlyzer_dataset function, which reads MetIDQ™ .xlsx output files. 
-It intelligently parses concentration values and quantification status (e.g., "Valid", "LOD", "LOQ"), storing them within a SummarizedExperiment object.
+As the output files contain layered information, inform of concentration values and color-coded quantification status (e.g., "Valid", "LOD", "LOQ"), 
+it is a tedious task to reliably process this data computationally, as the mix of numerical values and status codes hinders direct machine readability by standard analysis tools.
+To conveniently read the data in we provide the function read_metidq(), structuring the data into a SummarizedExperiment (SE) object for easy downstream analysis.
 For further demonstration we'll use an example dataset derived from Gegner et al. 2022, featuring metabolite measurements across different extraction methods 
 and tissue types (MxP®Quant 500 kit). This dataset is included in the package.
 :::
 
 @Luis: 
 - Add citation using .bib file (e.g. above to cite se paper)
-- Adapt the syntax to showcase where the functions originate from, which is good practice (using :: syntax). This way you also do not need to load the libraries. 
 - I would not call the function MetAlyzer_dataset as we would use MetAlyzer::MetAlyzer_dataset. As I understand this will convert the MedIDQ data into a SummarizedExperiment object, so I would call it something like convert_metidq or read_metidq.
-- Before you start with loading the example data ad convert it to se file, show a screenshot of the metidq output and explain that many things are colour coded, empty cells, etc. and hence it is not machine readible. Then you can move on and show how to use the function.
+
+```{{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates MetIDQ™.", out.width="70%", fig.align="center"}}
+knitr::include_graphics("images/biocrates_output.png")
+```
+
 
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # Access the example data file path
-fpath <- example_extraction_data()
+fpath <- Metalyzer::example_extraction_data()
 
 # Load the data into a SummarizedExperiment object
-metalyzer_se <- MetAlyzer_dataset(file_path = fpath)
+metalyzer_se <- Metalyzer::MetAlyzer_dataset(file_path = fpath)
 
 # Display the object summary
 metalyzer_se
@@ -78,11 +84,18 @@ The resulting SummarizedExperiment object organizes the data:
 and a pre-joined aggregated_data tibble combining concentrations, status, and metadata for easier analysis and plotting.
 :::
 
-@Luis: - show the results here. You can print out the individual tables using this: 
 ```{r, echo=FALSE}
 # https://cran.r-project.org/web/packages/kableExtra/vignettes/awesome_table_in_html.html
 # Check how our data looks like:
-Data%>%
+SummarizedExperiment::assay(metalyzer_se) %>%
+  kableExtra::kbl(caption = "Preview of Assay containing XXXX.") %>%
+  kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
+
+SummarizedExperiment::rowData(metalyzer_se) %>%
+  kableExtra::kbl(caption = "Preview of Assay containing XXXX.") %>%
+  kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
+
+SummarizedExperiment::colData(metalyzer_se) %>%
   kableExtra::kbl(caption = "Preview of Assay containing XXXX.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 ```
