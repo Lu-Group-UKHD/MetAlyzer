@@ -29,8 +29,6 @@ knitr::opts_chunk$set(echo=TRUE, cache=FALSE, collapse=TRUE, comment='#>', warni
 
 #If you haven't done this yet, install the MetAlyzer package
 #devtools::install_github("nilsmechtel/MetAlyzer")
-
-library(MetAlyzer)
 ```
 
 
@@ -46,7 +44,7 @@ helping to find pathway-level alterations and providing a systems perspective on
 
 ## Core Workflow: Loading and Exploring Data
 ::: {style="text-align: justify"}
-MetAlyzer's primary entry point is the MetAlyzer_dataset function, which reads MetIDQ™ .xlsx output files. 
+MetAlyzer's primary entry point is the read_metidq function, which reads MetIDQ™ .xlsx output files. 
 As the output files contain layered information, inform of concentration values and color-coded quantification status (e.g., "Valid", "LOD", "LOQ"), 
 it is a tedious task to reliably process this data computationally, as the mix of numerical values and status codes hinders direct machine readability by standard analysis tools.
 To conveniently read the data in we provide the function read_metidq(), structuring the data into a SummarizedExperiment (SE) object for easy downstream analysis.
@@ -56,7 +54,6 @@ and tissue types (MxP®Quant 500 kit). This dataset is included in the package.
 
 @Luis: 
 - Add citation using .bib file (e.g. above to cite se paper)
-- I would not call the function MetAlyzer_dataset as we would use MetAlyzer::MetAlyzer_dataset. As I understand this will convert the MedIDQ data into a SummarizedExperiment object, so I would call it something like convert_metidq or read_metidq.
 
 ```{{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates MetIDQ™.", out.width="70%", fig.align="center"}}
 knitr::include_graphics("images/biocrates_output.png")
@@ -65,10 +62,10 @@ knitr::include_graphics("images/biocrates_output.png")
 
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # Access the example data file path
-fpath <- Metalyzer::example_extraction_data()
+fpath <- MetAlyzer::example_extraction_data()
 
 # Load the data into a SummarizedExperiment object
-metalyzer_se <- Metalyzer::MetAlyzer_dataset(file_path = fpath)
+metalyzer_se <- MetAlyzer::read_metidq(file_path = fpath)
 
 # Display the object summary
 metalyzer_se

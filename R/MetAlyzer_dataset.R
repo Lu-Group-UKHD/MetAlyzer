@@ -11,11 +11,12 @@
 #' @param status_list A list of HEX color codes for each quantification status.
 #' @param silent If TRUE, mute any print command.
 #' @return A Summarized Experiment object
+#' @import SummaraizedExperiment
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
-MetAlyzer_dataset <- function(
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
+read_metidq <- function(
     file_path,
     sheet = 1,
     status_list = list(
@@ -107,8 +108,6 @@ MetAlyzer_dataset <- function(
 #'
 #' @keywords internal
 metalyzer_ascii_logo <- function() {
-  # http://patorjk.com/software/taag/#p=display&f=3D-ASCII&t=MetAlyzer
-  # Also try: Rectangles
   line1 <- "\n"
   line2a <- " _____ ______   _______  _________  ________  ___           ___   "
   line2b <- " ___ ________  _______   ________"
@@ -150,6 +149,7 @@ metalyzer_ascii_logo <- function() {
 #' given sheet.
 #'
 #' @param starter_list contains the file path and the sheet index
+#' @importFrom openxlsx read.xlsx
 #'
 #' @keywords internal
 open_file <- function(starter_list) {
@@ -294,6 +294,7 @@ slice_meta_data <- function(full_sheet, data_ranges) {
 #' them in a unified format.
 #'
 #' @param hex A 3, 4, 6 or 8 digit hex code
+#' @importFrom stringr str_extract_all
 #'
 #' @keywords internal
 unify_hex <- function(hex) {
@@ -334,6 +335,7 @@ unify_hex <- function(hex) {
 #' @param metabolites metabolites
 #' @param status_list status_list
 #' @param silent silent
+#' @importFrom openxlsx loadWorkbook getSheetNames
 #'
 #' @keywords internal
 read_quant_status <- function(
@@ -396,7 +398,9 @@ read_quant_status <- function(
 #' @param conc_values conc_values of a MetAlyzer object
 #' @param quant_status quant_status of a MetAlyzer object
 #' @param status_vec A vector of quantification status
-#' @import dplyr
+#' @importFrom dplyr arrange mutate group_by
+#' @importFrom tidyr gather
+#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #'
 #' @keywords internal
@@ -444,7 +448,15 @@ aggregate_data <- function(
   aggregated_data$Status <- factor(gathered_status$Status,
     levels = status_vec
   )
-  aggregated_data <- arrange(aggregated_data, .data$Metabolite)
+  aggregated_data <- dplyr::arrange(aggregated_data, .data$Metabolite)
 
   return(droplevels(aggregated_data))
+}
+
+#' @title Open file and read data
+#'
+#' @description This function was deprecated in version v2.0.0
+#' 
+MetAlyzer_dataset(...) {
+  cat("This function was deprecated in v2.0.0, please use read_metidq()\n")
 }

@@ -34,24 +34,7 @@
 #' @export
 #' 
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_mutation_data_xl())
-#' metalyzer_se <- filterMetabolites(
-#'   metalyzer_se,
-#'   drop_metabolites = "Metabolism Indicators"
-#' )
-#' metalyzer_se <- renameMetaData(
-#'   metalyzer_se,
-#'   Mutant_Control = "Sample Description"
-#' )
-#' 
-#' metalyzer_se <- calculate_log2FC(
-#'   metalyzer_se,
-#'   categorical = "Mutant_Control",
-#'   impute_perc_of_min = 0.2,
-#'   impute_NA = FALSE
-#' )
-#' 
-#' log2fc_df <- metalyzer_se@metadata$log2FC
+#' log2fc_df <- example_log2fc_data()
 #' network <- plot_network(log2fc_df, q_value = 0.05)
 
 plot_network <- function(log2fc_df,

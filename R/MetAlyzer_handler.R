@@ -8,10 +8,10 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
 #'
-#' summarizeConcValues(metalyzer_se)
-summarizeConcValues <- function(metalyzer_se) {
+#' summarize_conc_values(metalyzer_se)
+summarize_conc_values <- function(metalyzer_se) {
   conc_values <- SummarizedExperiment::assay(
     metalyzer_se, "conc_values"
   )
@@ -37,10 +37,10 @@ summarizeConcValues <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
 #'
-#' summarizeQuantData(metalyzer_se)
-summarizeQuantData <- function(metalyzer_se) {
+#' summarize_quant_data(metalyzer_se)
+summarize_quant_data <- function(metalyzer_se) {
   # Print number of quantification status
   print_number <- function(quant_status, status, total) {
     number <- sum(quant_status == status, na.rm = TRUE)
@@ -86,15 +86,15 @@ summarizeQuantData <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
 #'
-#' metalyzer_se <- filterMetaData(metalyzer_se, !is.na(Tissue))
-#' metalyzer_se <- filterMetaData(metalyzer_se, `Sample Description` %in% 1:6)
+#' metalyzer_se <- filter_meta_data(metalyzer_se, !is.na(Tissue))
+#' metalyzer_se <- filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
 #' # or
-#' filterMetaData(metalyzer_se, !is.na(Tissue), inplace = TRUE)
-#' filterMetaData(metalyzer_se, `Sample Description` %in% 1:6, inplace = TRUE)
+#' filter_meta_data(metalyzer_se, !is.na(Tissue), inplace = TRUE)
+#' filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6, inplace = TRUE)
 
-filterMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
+filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
   # Get the name of the metalyzer_se object
@@ -154,19 +154,19 @@ filterMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
 #'
-#' metalyzer_se <- updateMetaData(
+#' metalyzer_se <- update_meta_data(
 #'   metalyzer_se,
 #'   Date = Sys.Date(), Analyzed = TRUE
 #' )
 #' # or
-#' updateMetaData(
+#' update_meta_data(
 #'   metalyzer_se,
 #'   Date = Sys.Date(), Analyzed = TRUE, inplace = TRUE
 #' )
 
-updateMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
+update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
   # Get the name of the metalyzer_se object
@@ -207,15 +207,15 @@ updateMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
 #'
-#' metalyzer_se <- renameMetaData(
+#' metalyzer_se <- rename_meta_data(
 #'   metalyzer_se,
 #'   Method = `Sample Description`
 #' )
 #' # or
-#' renameMetaData(metalyzer_se, Model_Organism = Tissue, inplace = TRUE)
-renameMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
+#' rename_meta_data(metalyzer_se, Model_Organism = Tissue, inplace = TRUE)
+rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
   # Get the name of the metalyzer_se object
@@ -271,15 +271,15 @@ renameMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
 #'
 #' drop_metabolites <- c("C0", "C2", "C3", "Metabolism Indicators",
 #'   inplace = TRUE
 #' )
-#' metalyzer_se <- filterMetabolites(metalyzer_se, drop_metabolites)
+#' metalyzer_se <- filter_metabolites(metalyzer_se, drop_metabolites)
 #' # or
-#' filterMetabolites(metalyzer_se, drop_metabolites, inplace = TRUE)
-filterMetabolites <- function(metalyzer_se,
+#' filter_metabolites(metalyzer_se, drop_metabolites, inplace = TRUE)
+filter_metabolites <- function(metalyzer_se,
                               drop_metabolites = c("Metabolism Indicators"),
                               drop_NA_concentration = FALSE,
                               drop_quant_status = NULL,
@@ -462,42 +462,11 @@ filterMetabolites <- function(metalyzer_se,
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
 #'
-#' aggregatedData(metalyzer_se)
-aggregatedData <- function(metalyzer_se) {
+#' aggregated_data(metalyzer_se)
+aggregated_data <- function(metalyzer_se) {
   return(metalyzer_se@metadata$aggregated_data)
-}
-
-# === Handle log2FC Data ===
-#' @title Get log2FC Data
-#'
-#' @description This function returns the tibble "log2FC".
-#'
-#' @param metalyzer_se SummarizedExperiment
-#' @export
-#'
-#' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_mutation_data_xl())
-#' metalyzer_se <- filterMetabolites(
-#'   metalyzer_se,
-#'   drop_metabolites = "Metabolism Indicators"
-#' )
-#' metalyzer_se <- renameMetaData(
-#'   metalyzer_se,
-#'   Mutant_Control = "Sample Description"
-#' )
-#' 
-#' metalyzer_se <- calculate_log2FC(
-#'   metalyzer_se,
-#'   categorical = "Mutant_Control",
-#'   impute_perc_of_min = 0.2,
-#'   impute_NA = TRUE
-#' )
-#'
-#' log2FC(metalyzer_se)
-log2FC <- function(metalyzer_se) {
-  return(metalyzer_se@metadata$log2FC)
 }
 
 # === Export data ===
@@ -513,17 +482,17 @@ log2FC <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
 #' 
 #' output_file <- file.path(tempdir(), "metabolomics_data.csv")
-#' exportConcValues(
+#' export_conc_values(
 #'   metalyzer_se,
 #'   `Sample Description`,
 #'   Tissue,
 #'   file_path = output_file
 #' )
 #' unlink(output_file)
-exportConcValues <- function(metalyzer_se,
+export_conc_values <- function(metalyzer_se,
                              ...,
                              file_path = "metabolomics_data.csv") {
   meta_data <- as.data.frame(SummarizedExperiment::colData(metalyzer_se))

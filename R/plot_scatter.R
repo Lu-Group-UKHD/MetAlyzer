@@ -1,29 +1,3 @@
-## ---------------------------
-##
-## Script name: Log 2 Fold Change Visualization
-##
-## Purpose of script: Data Visualisation of the log 2 Fold Changes
-##
-## Author: Luis Herfurth and Nils Mechtel
-##
-## Date Created: 2025-03-20
-##
-## Copyright (c) Luis Herfurth and Nils Mechtel
-## Email:
-##
-## ---------------------------
-##
-## Notes:
-##
-##
-## ---------------------------
-#
-
-####################################
-### ### ### Scatter Plot ### ### ###
-####################################
-
-
 #' Scatter Plot Visualization
 #'
 #' This method creates a scatter plot of the log2 fold change for each metabolite.
@@ -42,23 +16,7 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_mutation_data_xl())
-#' metalyzer_se <- filterMetabolites(
-#'   metalyzer_se,
-#'   drop_metabolites = "Metabolism Indicators"
-#' )
-#' metalyzer_se <- renameMetaData(
-#'   metalyzer_se,
-#'   Mutant_Control = "Sample Description"
-#' )
-#' metalyzer_se <- calculate_log2FC(
-#'   metalyzer_se,
-#'   categorical = "Mutant_Control",
-#'   impute_perc_of_min = 0.2,
-#'   impute_NA = TRUE
-#' )
-#' 
-#' log2fc_df <- metalyzer_se@metadata$log2FC
+#' log2fc_df <- example_log2fc_data()
 #' scatter <- plot_scatter(log2fc_df)
 plot_scatter <- function(log2fc_df,
                          signif_colors = c("#5F5F5F" = 1,
@@ -244,98 +202,4 @@ plot_scatter <- function(log2fc_df,
                     force = 10)
                     
   return(scatter)
-}
-
-####################################
-### ### ### Vulcano Plot ### ### ###
-####################################
-
-
-#' Vulcano Plot Visualization
-#'
-#' This method creates a vulcano plot of the log2 fold change for each metabolite.
-#'
-#' @param log2fc_df DF with metabolites as row names and columns including log2FC, Class, qval columns.
-#' @param x_cutoff Number of the desired log2 fold change cutoff for assessing significance.
-#' @param y_cutoff Number of the desired p value cutoff for assessing significance.
-#' @param show_labels_for Vector with Strings of Metabolite names or classes.
-#'
-#' @return ggplot object
-#'
-#' @import dplyr
-#' @import ggplot2
-#' @import ggrepel
-#' @import SummarizedExperiment
-#' @importFrom rlang .data
-#' @export
-#'
-#' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_mutation_data_xl())
-#' metalyzer_se <- filterMetabolites(
-#'   metalyzer_se,
-#'   drop_metabolites = "Metabolism Indicators"
-#' )
-#' metalyzer_se <- renameMetaData(
-#'   metalyzer_se,
-#'   Mutant_Control = "Sample Description"
-#' )
-#' metalyzer_se <- calculate_log2FC(
-#'   metalyzer_se,
-#'   categorical = "Mutant_Control",
-#'   impute_perc_of_min = 0.2,
-#'   impute_NA = TRUE
-#' )
-#' 
-#' log2fc_df <- metalyzer_se@metadata$log2FC
-#' vulcano <- plot_vulcano(log2fc_df)
-
-plot_vulcano <- function(log2fc_df,
-                         x_cutoff = 1.5,
-                         y_cutoff = 0.05,
-                         show_labels_for = NULL) {
-
-  ## Data: only color classes that are significantly differentially expressed
-
-  log2fc_df$Class[log2fc_df$qval > y_cutoff] <- NA
-  log2fc_df$Class[abs(log2fc_df$log2FC) < x_cutoff] <- NA
-
-  ## Data: Determine labels
-  log2fc_df$labels <- ""  # Initialize labels as empty strings
-
-  if (!is.null(show_labels_for)) {
-    found_metabolites <- show_labels_for[show_labels_for %in% log2fc_df$Metabolite]
-    found_classes <- show_labels_for[show_labels_for %in% log2fc_df$Class]
-    
-    not_found <- setdiff(show_labels_for, c(found_metabolites, found_classes))
-    
-    if (length(not_found) > 0) {
-      print(paste("Warning: The following values were not found in the Metabolites / Classes:", paste(not_found, collapse = ", ")))
-    }
-    
-    if (length(found_metabolites) > 0 || length(found_classes) > 0) {
-      log2fc_df$labels[log2fc_df$Metabolite %in% show_labels_for] <- log2fc_df$Metabolite
-      log2fc_df$labels[log2fc_df$Class %in% show_labels_for] <- log2fc_df$Metabolite
-      log2fc_df$labels[is.na(log2fc_df$Class)] <- ""
-    }
-  }
-
-  vulcano <- ggplot(log2fc_df,
-                   aes(x = .data$log2FC,
-                       y = -log10(.data$qval),
-                       color = .data$Class,
-                       label = labels)) +
-      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black",
-                 linetype="dashed") +
-      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
-      geom_point(size = 1) +
-      theme(plot.title = element_text(face = 'bold.italic', hjust = 0.5),
-            legend.key = element_rect(fill = 'white')) +
-      labs(x = 'log2(FC)', y = "-log10(p)") +
-      geom_label_repel(size = 2, color = 'black',
-                       box.padding = 0.6,
-                       point.padding = 0,
-                       min.segment.length = 0,
-                       max.overlaps = Inf,
-                       force = 10)
-  return(vulcano)
 }

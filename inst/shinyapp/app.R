@@ -384,9 +384,9 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
-    metabObj <- MetAlyzer_dataset(file_path = example_extraction_data(), silent = T)
+    metabObj <- read_metidq(file_path = example_extraction_data(), silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
-    metabObj <- MetAlyzer::filterMetabolites(metabObj,
+    metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                              drop_metabolites = 'Metabolism Indicators',
                                              drop_NA_concentration = F)
     reactMetabObj$metabObj <- metabObj
@@ -424,13 +424,13 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
     validUploadedFile <- try(
-      metabObj <- MetAlyzer_dataset(file_path = input$uploadedFile$datapath,
+      metabObj <- read_metidq(file_path = input$uploadedFile$datapath,
                                     sheet = 1, silent = T),
       silent = T)
     if (!is(validUploadedFile, 'try-error')) {
       # Exclude 'Metabolism Indicators' from subsequent processing and analysis
       if ('Metabolism Indicators' %in% unique(rowData(metabObj)$metabolic_classes)) {
-        metabObj <- MetAlyzer::filterMetabolites(metabObj,
+        metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                                  drop_metabolites = 'Metabolism Indicators',
                                                  drop_NA_concentration = F)
       }
@@ -554,7 +554,7 @@ server <- function(input, output, session) {
     allSmpChoices <- unlist(smpChoiceList)
     dupSmpChoices <- allSmpChoices[duplicated(allSmpChoices)]
     # Collect choice groups with duplicated choices for later choice group searches
-    # (due to design of MetAlyzer::filterMetaData)
+    # (due to design of MetAlyzer::filter_meta_data)
     dupSmpChoiceGps <- c()
     if (length(dupSmpChoices) != 0) {
       for (i in seq_along(smpChoiceList)) {
@@ -569,7 +569,7 @@ server <- function(input, output, session) {
     }
     
     # Create dictionary for later choice group searches of certain choices (due
-    # to design of MetAlyzer::filterMetaData)
+    # to design of MetAlyzer::filter_meta_data)
     choiceGpSizes <- sapply(smpChoiceList, length)
     smpChoices2Gps <- lapply(seq_along(choiceGpSizes), function(i) {
       rep(names(choiceGpSizes)[i], choiceGpSizes[i])
@@ -659,10 +659,10 @@ server <- function(input, output, session) {
       if (!selectedChoiceGp %in% smpChoicePack()$dupSmpChoiceGps) {
         if (selectedChoice %in% choices) {
           if (selectedChoice == 'NA') {
-            reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetaData(reactMetabObj$tmpMetabObj,
+            reactMetabObj$tmpMetabObj <- MetAlyzer::filter_meta_data(reactMetabObj$tmpMetabObj,
                                                                    !is.na(.data[[selectedChoiceGp]]))
           } else {
-            reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetaData(reactMetabObj$tmpMetabObj,
+            reactMetabObj$tmpMetabObj <- MetAlyzer::filter_meta_data(reactMetabObj$tmpMetabObj,
                                                                    !.data[[selectedChoiceGp]] %in% selectedChoice)
           }
         }
@@ -673,10 +673,10 @@ server <- function(input, output, session) {
         modSelectedChoice <- stringr::str_remove(selectedChoice, regexSuffix)
         if (modSelectedChoice %in% choices) {
           if (modSelectedChoice == 'NA') {
-            reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetaData(reactMetabObj$tmpMetabObj,
+            reactMetabObj$tmpMetabObj <- MetAlyzer::filter_meta_data(reactMetabObj$tmpMetabObj,
                                                                    !is.na(.data[[selectedChoiceGp]]))
           } else {
-            reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetaData(reactMetabObj$tmpMetabObj,
+            reactMetabObj$tmpMetabObj <- MetAlyzer::filter_meta_data(reactMetabObj$tmpMetabObj,
                                                                    !.data[[selectedChoiceGp]] %in% modSelectedChoice)
           }
         }
@@ -720,10 +720,10 @@ server <- function(input, output, session) {
     if (ncol(reactMetabObj$tmpMetabObj) != 0) {
       #### Filtering results depend on whether rmSelectedFeats is Null when specifying
       #### rmFeats to 'drop_metabolites'????
-      reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetabolites(reactMetabObj$tmpMetabObj,
+      reactMetabObj$tmpMetabObj <- MetAlyzer::filter_metabolites(reactMetabObj$tmpMetabObj,
                                                                 drop_metabolites = rmSelectedFeats,
                                                                 drop_NA_concentration = FALSE)
-      reactMetabObj$tmpMetabObj <- MetAlyzer::filterMetabolites(reactMetabObj$tmpMetabObj,
+      reactMetabObj$tmpMetabObj <- MetAlyzer::filter_metabolites(reactMetabObj$tmpMetabObj,
                                                                 drop_metabolites = rmMissFeats,
                                                                 drop_NA_concentration = FALSE,
                                                                 min_percent_valid = featValidCutoff,
@@ -936,9 +936,9 @@ server <- function(input, output, session) {
       selectedChoiceGp <- input$smpChoiceGpsLog2FC
       selectedChoices <- c(input$smpChoicesLog2FC_1, input$smpChoicesLog2FC_2)
       if (!'NA' %in% selectedChoices) {
-        metabObj <- MetAlyzer::filterMetaData(metabObj, .data[[selectedChoiceGp]] %in% selectedChoices)
+        metabObj <- MetAlyzer::filter_meta_data(metabObj, .data[[selectedChoiceGp]] %in% selectedChoices)
       } else {
-        metabObj <- MetAlyzer::filterMetaData(metabObj, is.na(.data[[selectedChoiceGp]]) |
+        metabObj <- MetAlyzer::filter_meta_data(metabObj, is.na(.data[[selectedChoiceGp]]) |
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
       metabObj <- calc_log2FC(metalyzer_se = metabObj,

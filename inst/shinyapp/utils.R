@@ -327,6 +327,64 @@ plotly_vulcano <- function(Log2FCTab, y_cutoff = 0.05, x_cutoff = 1.5) {
     return(p_vulcano)
   }
 }
+#' Vulcano Plot Visualization
+#'
+#' This method creates a vulcano plot of the log2 fold change for each metabolite.
+#'
+#' @param Log2FCTab DF with metabolites as row names and columns including log2FC, Class, qval columns.
+#' @param x_cutoff Number of the desired log2 fold change cutoff for assessing significance.
+#' @param y_cutoff Number of the desired p value cutoff for assessing significance.
+#' @param show_labels_for Vector with Strings of Metabolite names or classes.
+plot_vulcano <- function(Log2FCTab,
+                         x_cutoff = 1.5,
+                         y_cutoff = 0.05,
+                         show_labels_for = NULL) {
+
+  ## Data: only color classes that are significantly differentially expressed
+
+  Log2FCTab$Class[Log2FCTab$qval > y_cutoff] <- NA
+  Log2FCTab$Class[abs(Log2FCTab$log2FC) < x_cutoff] <- NA
+
+  ## Data: Determine labels
+  Log2FCTab$labels <- ""  # Initialize labels as empty strings
+
+  if (!is.null(show_labels_for)) {
+    found_metabolites <- show_labels_for[show_labels_for %in% Log2FCTab$Metabolite]
+    found_classes <- show_labels_for[show_labels_for %in% Log2FCTab$Class]
+    
+    not_found <- setdiff(show_labels_for, c(found_metabolites, found_classes))
+    
+    if (length(not_found) > 0) {
+      print(paste("Warning: The following values were not found in the Metabolites / Classes:", paste(not_found, collapse = ", ")))
+    }
+    
+    if (length(found_metabolites) > 0 || length(found_classes) > 0) {
+      Log2FCTab$labels[Log2FCTab$Metabolite %in% show_labels_for] <- Log2FCTab$Metabolite
+      Log2FCTab$labels[Log2FCTab$Class %in% show_labels_for] <- Log2FCTab$Metabolite
+      Log2FCTab$labels[is.na(Log2FCTab$Class)] <- ""
+    }
+  }
+
+  vulcano <- ggplot(Log2FCTab,
+                   aes(x = .data$log2FC,
+                       y = -log10(.data$qval),
+                       color = .data$Class,
+                       label = labels)) +
+      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black",
+                 linetype="dashed") +
+      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
+      geom_point(size = 1) +
+      theme(plot.title = element_text(face = 'bold.italic', hjust = 0.5),
+            legend.key = element_rect(fill = 'white')) +
+      labs(x = 'log2(FC)', y = "-log10(p)") +
+      geom_label_repel(size = 2, color = 'black',
+                       box.padding = 0.6,
+                       point.padding = 0,
+                       min.segment.length = 0,
+                       max.overlaps = Inf,
+                       force = 10)
+  return(vulcano)
+}
 
 #' @title Plotly Log2FC Network Plot
 #' @description This function returns a list with interactive 
