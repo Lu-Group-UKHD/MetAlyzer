@@ -5,6 +5,8 @@
 #' @description This function prints quantiles and NAs of raw data.
 #'
 #' @param metalyzer_se SummarizedExperiment
+#' @importFrom stats quantile
+#' @importFrom SummarizedExperiment rowData assay
 #' @export
 #'
 #' @examples
@@ -34,6 +36,7 @@ summarize_conc_values <- function(metalyzer_se) {
 #' its percentage.
 #'
 #' @param metalyzer_se SummarizedExperiment
+#' @importFrom SummarizedExperiment assay 
 #' @export
 #'
 #' @examples
@@ -81,8 +84,10 @@ summarize_quant_data <- function(metalyzer_se) {
 #' @param inplace If FALSE, return a copy. Otherwise, do operation inplace and
 #' return None.
 #' @return An updated SummarizedExperiment
-#' @import dplyr
-#' @importFrom rlang .data
+#' @importFrom dplyr mutate select filter
+#' @importFrom rlang .data enquos exprs
+#' @importFrom magrittr %>%
+#' @importFrom SummarizedExperiment colData
 #' @export
 #'
 #' @examples
@@ -90,10 +95,6 @@ summarize_quant_data <- function(metalyzer_se) {
 #'
 #' metalyzer_se <- filter_meta_data(metalyzer_se, !is.na(Tissue))
 #' metalyzer_se <- filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
-#' # or
-#' filter_meta_data(metalyzer_se, !is.na(Tissue), inplace = TRUE)
-#' filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6, inplace = TRUE)
-
 filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
@@ -151,6 +152,7 @@ filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @param inplace If FALSE, return a copy. Otherwise, do operation inplace
 #' and return None.
 #' @return An updated SummarizedExperiment
+#' @importFrom SummarizedExperiment colData 
 #' @export
 #'
 #' @examples
@@ -159,11 +161,6 @@ filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' metalyzer_se <- update_meta_data(
 #'   metalyzer_se,
 #'   Date = Sys.Date(), Analyzed = TRUE
-#' )
-#' # or
-#' update_meta_data(
-#'   metalyzer_se,
-#'   Date = Sys.Date(), Analyzed = TRUE, inplace = TRUE
 #' )
 
 update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
@@ -183,7 +180,6 @@ update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
       levels <- unique(new_col)
     }
     meta_data[, col_name] <- factor(new_col, levels = levels)
-  #  meta_data[, col_name][meta_data$Filter == TRUE] <- new_col  # raff nicht warum das hier ist, die Filter col ist doch weg
   }
   SummarizedExperiment::colData(metalyzer_se) <- meta_data
 
@@ -204,6 +200,9 @@ update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @param inplace If FALSE, return a copy. Otherwise, do operation inplace
 #' and return None.
 #' @return An updated SummarizedExperiment
+#' @importFrom SummarizedExperiment colData
+#' @importFrom S4Vectors DataFrame
+#' @importFrom dplyr rename
 #' @export
 #'
 #' @examples
@@ -213,8 +212,6 @@ update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #'   metalyzer_se,
 #'   Method = `Sample Description`
 #' )
-#' # or
-#' rename_meta_data(metalyzer_se, Model_Organism = Tissue, inplace = TRUE)
 rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
@@ -266,8 +263,11 @@ rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @param inplace If FALSE, return a copy. Otherwise, do operation inplace
 #' and return None.
 #' @return An updated SummarizedExperiment
-#' @import dplyr
+#' @importFrom dplyr mutate group_by_at arrange_at select group_by filter 
 #' @importFrom data.table :=
+#' @importFrom rlang .data
+#' @importFrom magrittr %>% rowData assay colData
+#' @importFrom SummarizedExperiment
 #' @export
 #'
 #' @examples
@@ -277,8 +277,6 @@ rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #'   inplace = TRUE
 #' )
 #' metalyzer_se <- filter_metabolites(metalyzer_se, drop_metabolites)
-#' # or
-#' filter_metabolites(metalyzer_se, drop_metabolites, inplace = TRUE)
 filter_metabolites <- function(metalyzer_se,
                               drop_metabolites = c("Metabolism Indicators"),
                               drop_NA_concentration = FALSE,
@@ -478,7 +476,9 @@ aggregated_data <- function(metalyzer_se) {
 #' @param metalyzer_se SummarizedExperiment
 #' @param ... Additional columns from meta_data
 #' @param file_path file path
-#'
+#' @importFrom dplyr bind_cols select
+#' @importFrom SummarizedExperiment colData assay 
+#' @importFrom utils write.csv
 #' @export
 #'
 #' @examples
@@ -500,7 +500,7 @@ export_conc_values <- function(metalyzer_se,
   conc_values <- SummarizedExperiment::assay(
     metalyzer_se, "conc_values"
   )
-  df <- bind_cols(
+  df <- dplyr::bind_cols(
     dplyr::select(meta_data, ...),
     t(conc_values)
   )
