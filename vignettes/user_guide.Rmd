@@ -62,7 +62,7 @@ knitr::include_graphics("images/biocrates_output.png")
 
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # Access the example data file path
-fpath <- MetAlyzer::example_extraction_data()
+fpath <- MetAlyzer::load_rawdata_extraction()
 
 # Load the data into a SummarizedExperiment object
 metalyzer_se <- MetAlyzer::read_metidq(file_path = fpath)
@@ -85,15 +85,15 @@ and a pre-joined aggregated_data tibble combining concentrations, status, and me
 # https://cran.r-project.org/web/packages/kableExtra/vignettes/awesome_table_in_html.html
 # Check how our data looks like:
 SummarizedExperiment::assay(metalyzer_se) %>%
-  kableExtra::kbl(caption = "Preview of Assay containing XXXX.") %>%
+  kableExtra::kbl(caption = "Preview of Assay containing assay.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 
 SummarizedExperiment::rowData(metalyzer_se) %>%
-  kableExtra::kbl(caption = "Preview of Assay containing XXXX.") %>%
+  kableExtra::kbl(caption = "Preview of Assay containing rowData.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 
 SummarizedExperiment::colData(metalyzer_se) %>%
-  kableExtra::kbl(caption = "Preview of Assay containing XXXX.") %>%
+  kableExtra::kbl(caption = "Preview of Assay containing colData.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 ```
 
@@ -101,46 +101,44 @@ SummarizedExperiment::colData(metalyzer_se) %>%
 ## Visualizing Pre-Calculated Log2 Fold Changes
 ::: {style="text-align: justify"}
 For the calculation of the Log2FC DataFrame we used the MetaProViz package. (Link to package) (citation)
-We'll use the example log2 fold change data included in the package (example_log2fc_data()). 
+We'll use the example differential results included in the package (load_diffres()). 
 The plotting functions plot_log2FC and plot_network can accept a standard data frame containing log2FC results, provided it has the necessary columns.
+This example data was generated from the raw extraction data, also provided in the pakage, it compares the concentrations between different tissue types.
 :::
 
-@Luis: 
-- Please create Differential results, meaning data that include Log2FC and stats. and call the example data something like load_diffres,... maybe above you also want to rather say load_rawdata
-showcase how we generated the diffres from the loaded metalyzer_se object, but also load the results as you did. 
-
-- As above showcase the table of the diffres, so the user knows which types of columns they need.
-- what are you comparing? explain the example data.
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
-log2fc_df <- example_log2fc_data()
-head(log2fc_df)
+# code for diffres generation
+```
+
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+diffres_df <- readRDS(MetAlyzer::load_diffres())
+diffres_df %>%
+  kableExtra::kbl(caption = "Preview of Assay containing colData.") %>%
+  kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 ```
 
 ::: {style="text-align: justify"}
 This data frame contains columns for metabolite names (Metabolite), their class (Class), calculated log2 fold change (log2FC), and adjusted p-values (adj.P.Val). 
-We can directly pass this data frame to the visualization functions. **The Column names are required to match the ones in the example!** 
-You can provide an additional colum with numerical values, that can be passed into the visualizations.
+We can directly pass this data frame to the visualization functions.
+You can provide a additional colums with numerical values, that can be passed into the visualizations and e plotted.
 :::
-
-### Volcano and Scatter Plots
-@Luis: why is it relevant for the user to display the data like this? what can they interpret from this?
 
 ::: {style="text-align: justify"}
-Visualize the log2 fold changes using plot_log2FC. Specify the column names containing the relevant information.
+### Scatter Plot
+
+::: {style="text-align: justify"}
+The `plot_scatter` function visualizes log2 fold changes, primarily to assess the behavior of different **metabolite classes**. 
+Background colors distinguish these classes, enabling users to interpret if certain groups of metabolites exhibit distinct regulatory patterns 
+(e.g., consistent up/down-regulation, specific ranges of fold changes). The plot is horizontally separated by extraction method ("LC" left, "FIA" right), 
+allowing comparison of whether these observed class-specific trends are consistent across both methods or show method-dependent variations.
 :::
 
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # Scatter plot grouped by metabolic class
-plot_vulcano(
-  log2fc_df,
-  hide_labels_for = log2fc_results$Metabolite, # Hiding all labels
-)
-```
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
-# Scatter plot grouped by metabolic class
-plot_scatter(
-  log2fc_df,
-  hide_labels_for = log2fc_results$Metabolite, # Hiding all labels
+MetAlyzer::plot_scatter(
+  diffres_df,
+  hide_labels_for = diffres_df$Metabolite, # Hiding all labels
 )
 ```
 
@@ -150,16 +148,28 @@ Also: Explain a bit about the summaries in the plot (we discussed T 14:0). Show 
 
 
 ::: {style="text-align: justify"}
-Visualize significant changes across metabolic pathways using plot_network. 
+Visualize significant changes across metabolic pathways using `plot_network`. This function maps the calculated log2 fold changes (log2FC) of metabolites onto a predefined network structure, representing known biochemical reactions and relationships.
+
+**Relevance and Interpretation:**
+
+This network visualization provides a **systems-level perspective**, going beyond individual metabolite changes. Its relevance lies in helping users understand how metabolic perturbations are interconnected within the broader context of biological pathways. By examining the network, users can:
+
+* **Identify affected pathways:** Observe clusters of connected nodes with significant changes (indicated by color) within labeled pathways (e.g., "TCA Cycle", "Fatty Acids", "Bile Acids" as seen in Figure X). This suggests potential up- or down-regulation of entire metabolic processes.
+* **Understand relationships:** Trace connections between metabolites to see how changes in one area might influence others upstream or downstream.
+* **Generate hypotheses:** Patterns observed in the network can suggest underlying mechanisms or key regulatory points affected by the experimental conditions.
+
 :::
 
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # Generate network plot from the data frame
 # Requires metabolite, class, log2fc, and p-value columns
-network <- plot_network(
-  log2fc_df,
-  metabolite_col = "Metabolite",
+network <- MetAlyzer::plot_network(
+  diffres_df,
   q_value = 0.05,
+  metabolite_col = "Metabolite",
+  plot_col_name = "log2FC",
+  qval_col_name = "qval",
+  pval_col_name = "pval",
   metabolite_text_size = 2,
   connection_width = 0.75,
   pathway_text_size = 4,
@@ -167,12 +177,51 @@ network <- plot_network(
 )
 
 network$Plot
-network$Table
 ```
 
 ::: {style="text-align: justify"}
-This concludes the core overview of MetAlyzer. The package provides a streamlined workflow for importing MetIDQ™ data, performing essential data handling and analysis, and visualizing results, including pre-calculated differential expression data. Consult the function documentation for more detailed options and parameters.
+**Node Summarization and Representation:**
+
+Each node in the network represents a metabolite or a metabolite class. The color of the node typically reflects its log2FC value (incase the viridis scale was selected, yellow represents a positiv log2 Fold Change and purlbe a negative log2 Fold Change).
+
+Some nodes, such as 'T14' which might group related species like 'T 14:0_32:2', 'T 14:0_34:0', 'T 14:0_34:1', display a **summarized value**. This value is calculated according to the following hierarchy to prioritize significant findings:
+
+1.  **Mean of Significant:** If one or more metabolites mapping to the node are statistically significant (e.g., based on FDR corrected p-values), the node's value represents the **mean log2FC of only those significant metabolites**.
+2.  **Mean of Measured:** If *none* of the associated metabolites are significant, but measurements exist for them, the node's value represents the **mean log2FC of *all* measured metabolites** mapping to that node.
+3.  **NA:** If no metabolites mapping to the node were measured or included in the dataset, the node value is NA (often represented as grey or uncolored, like some nodes in Figure X).
+
+This summarization approach provides a concise overview within the network, highlighting significant changes where present, while still providing context from measured data if significance is not reached.
+Due to the changing naming convention of Biocrates, we include old names in the excel file, which will show up as NA for later generated MetIDQ™ outputs (e.g. TG(14:0_32.2)), but this enables the analysis of older files as well.
 :::
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+nodes_list <- network$Table
+T14_node <- nodes_list[which(nodes_list$Label == "T14"), ]
+
+T14_node_expanded <- tidyr::separate_rows(T14_node,
+                                          Metabolites, log2FC, qval, pval,
+                                          sep = "\\s*;\\s*") %>%
+                     tibble::column_to_rownames("Metabolites") %>%
+                     dplyr::rename(p.adj = qval,
+                                   `p-value` = pval,
+                                   Log2FC = log2FC) %>%
+                    dplyr::mutate(Log2FC = as.numeric(Log2FC),
+                                  p.adj = as.numeric(p.adj),
+                                  `p-value` = as.numeric(`p-value`))
+  
+T14_node_expanded %>%
+  kableExtra::kbl(caption = "T14 Node detailed Information") %>%
+  kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
+```
+
+:::
+For easy Visualisation of the summarized nodes, you can use the MetaProViz Vulcano Plot (package) (bib).
+:::
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+MetaProViz::VizVolcano(InputData = T14_node_expanded, yCutoff = 0.05)
+```
+
 
 # Session information
 ```{r session_info, echo=FALSE}

@@ -3,13 +3,15 @@
 #' @description This function plots the log2 fold change for each metabolite and visualizes it, in a pathway network.
 #'
 #' @param log2fc_df A dataframe with log2FC, pval, qval, additional columns
-#' @param metabolite_col Columnname that holds the Metabolites
 #' @param q_value The q-value threshold for significance
+#' @param plot_col_name Column name in the Log2FC dataframe to plot; 
+#' @param metabolite_col_name Columnname that holds the Metabolites
+#' @param pval_col_name Columnname that holds the p values
+#' @param qval_col_name Columnname that holds the adjusted p values
 #' @param metabolite_text_size The text size of metabolite labels
 #' @param connection_width The line width of connections between metabolites
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
-#' @param plot_column_name Column name in the Log2FC dataframe to plot; 
 #' @param exlude_pathways Pathway names that are exluded from plotting
 #' @param color_scale A string specifying the color scale to use. Options include `"viridis"`, `"plasma"`, `"magma"`, `"inferno"`, `"cividis"`, `"rocket"`, `"mako"`, and `"turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.
 #' @param gradient_colors A vector of length 2 or 3 specifying the colors for a custom gradient. If two colors are provided (`c(low, high)`), `scale_fill_gradient()` is used. If three colors are provided (`c(low, mid, high)`), `scale_fill_gradient2()` is used. If `NULL` or incorrectly specified, the viridis color scale is applied.
@@ -34,17 +36,19 @@
 #' @export
 #' 
 #' @examples
-#' log2fc_df <- example_log2fc_data()
+#' log2fc_df <- readRDS(load_diffres())
 #' network <- plot_network(log2fc_df, q_value = 0.05)
 
 plot_network <- function(log2fc_df,
-                         metabolite_col = "Metabolite",
                          q_value = 0.05,
+                         metabolite_col_name = "Metabolite",
+                         plot_col_name = "log2FC",
+                         qval_col_name = "qval",
+                         pval_col_name = "pval",
                          metabolite_text_size = 3,
                          connection_width = 0.75,
                          pathway_text_size = 6,
                          pathway_width = 3,
-                         plot_column_name = "log2FC",
                          exclude_pathways = NULL,
                          color_scale = "viridis",
                          gradient_colors = NULL,
@@ -58,118 +62,54 @@ plot_network <- function(log2fc_df,
                          units = "cm",
                          overwrite = FALSE) {
   
-  pathway_file <- MetAlyzer::pathway()
+  network_file <- MetAlyzer::pathway()
 
-  ## Read network nodes, edges and annotations
-  pathways <- read_named_region(pathway_file, "Pathways_Header")
-  invalid_annotations <- which(
-    is.na(pathways$Label) |
-    duplicated(pathways$Label) |
-    is.na(pathways$x) |
-    is.na(pathways$y) |
-    is.na(pathways$Color)
-  )
-  if (length(invalid_annotations) > 0) {
-    # print warning and remove
-    cat("Warning: Removing", length(invalid_annotations), "invalid pathways.\n")
-    pathways <- pathways[-invalid_annotations, ]
-  }
-  rownames(pathways) <- pathways$Label
-
-  nodes <- read_named_region(pathway_file, "Metabolites_Header")
-  nodes$Pathway[is.na(nodes$Pathway)] <- ""
-  invalid_nodes <- which(
-    is.na(nodes$Label) |
-    duplicated(nodes$Label) |
-    is.na(nodes$x) |
-    is.na(nodes$y) |
-    !nodes$Pathway %in% c(rownames(pathways), "")
-  )
-  if (length(invalid_nodes) > 0) {
-    # print warning and remove
-    cat("Warning: Removing", length(invalid_nodes), "invalid nodes.\n")
-    nodes <- nodes[-invalid_nodes, ]
-  }
-  rownames(nodes) <- nodes$Label
-  # Remove #1 at the end
-  nodes$Label <- gsub("#[0-9]+", "", nodes$Label)
-
-  edges <- read_named_region(pathway_file, "Connections_Header")
-  invalid_edges <- which(
-    !edges$Node1 %in% rownames(nodes) |
-    !edges$Node2 %in% rownames(nodes) |
-    edges$Node1 == edges$Node2
-  )
-  if (length(invalid_edges) > 0) {
-    # print warning and remove
-    cat("Warning: Removing", length(invalid_edges), "invalid connections.\n")
-    edges <- edges[-invalid_edges, ]
-  }
-
-  edges$x_start <- nodes[edges$Node1, "x"]
-  edges$y_start <- nodes[edges$Node1, "y"]
-  edges$x_end <- nodes[edges$Node2, "x"]
-  edges$y_end <- nodes[edges$Node2, "y"]
-  edges$Color <- sapply(rownames(edges), function(rowname) {
-    from <- edges[rowname, "Node1"]
-    to <- edges[rowname, "Node2"]
-    from_pathway <- nodes[from, "Pathway"]
-    to_pathway <- nodes[to, "Pathway"]
-    color <- NA
-    if (from_pathway == to_pathway & from_pathway != "") {
-      color <- pathways[from_pathway, "Color"]
-    }
-    return(color)
-  })
-  pathways <- filter(pathways, !Label %in% exclude_pathways)
-  excluded_labels <- nodes$Label[nodes$Pathway %in% exclude_pathways]
-  edges <- edges %>%
-    filter(!(Node1 %in% excluded_labels | Node2 %in% excluded_labels))
+  ### Read in Excel file
+  pathways <- MetAlyzer:::read_pathways(network_file)
+  nodes <- MetAlyzer:::read_nodes(network_file, pathways)
+  edges <- MetAlyzer:::read_edges(network_file, nodes, pathways)
   
   nodes <- filter(nodes, !Pathway %in% exclude_pathways)
   
   nodes_separated <- tidyr::separate_rows(nodes, Metabolites, sep = "\\s*;\\s*")
   
-  nodes_joined <- left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col))
+  nodes_joined <- dplyr::left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col_name))
 
-  updated_nodes_list <- calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, plot_column_name)
+  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, plot_col_name, pval_col_name, qval_col_name)
 
   # --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
 
   nodes_separated_shortend <- nodes_separated_processed %>%
-    filter(!is.na(log2FC)) %>%  
+    filter(!is.na(plot_col_name)) %>%  
     select(-c(Class, x, y, Shape))  
   
-  nodes_collapsed <- nodes_separated_shortend %>%
+  summary_log2fc <- nodes_separated_shortend %>%
     group_by(Label) %>%
-    filter(n() > 1) %>%
+    summarise(
+      log2FC_collapsed = paste(log2FC, collapse = "; "),
+      pval_collapsed = paste(pval, collapse = "; "),
+      qval_collapsed = paste(qval, collapse = "; "),
+      .groups = 'drop'
+    )
+
+  cols_to_summarise_unique <- setdiff(names(nodes_separated_shortend), c("Label", "log2FC", "pval", "qval"))
+
+  summary_others <- nodes_separated_shortend %>%
+    group_by(Label) %>%
     summarise(
       collapsed_count = n(),
-      
       across(
-        .cols = everything(),
-        .fns = ~paste(unique(.), collapse = "; ")
+        .cols = all_of(cols_to_summarise_unique), # Use the identified columns
+        .fns = ~ paste(unique(.), collapse = "; ")
       ),
       .groups = 'drop'
-    ) %>%
+    )
+
+  nodes_collapsed <- left_join(summary_others, summary_log2fc, by = "Label") %>%
+    rename(log2FC = log2FC_collapsed, pval = pval_collapsed, qval = qval_collapsed ) %>%
     mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
-  
-  #nodes_list <- nodes_separated_processed %>%
-  #  group_by(Label) %>%
-  #  mutate(
-  #    any_significant_in_group = any(!is.na(qval) & qval <= q_value, na.rm = TRUE),
-  #    
-  #    used = if_else(
-  #      any_significant_in_group,
-  #      !is.na(qval) & qval <= q_value,
-  #      !is.na(log2FC) | !is.na(pval) | !is.na(qval)
-  #    ),
-  #    used = coalesce(used, FALSE)
-  #  ) %>%
-  #  select(-any_significant_in_group) %>%
-  #  ungroup()
-                  
+    
   # --- The dataframe for plotting ---
   nodes_original_processed <- updated_nodes_list$nodes
 
@@ -227,16 +167,16 @@ plot_network <- function(log2fc_df,
     switch(color_scale,
            "gradient" = if (!is.null(gradient_colors) && length(gradient_colors) %in% c(2, 3)) {
              if (length(gradient_colors) == 2) {
-               scale_fill_gradient(low = gradient_colors[1], high = gradient_colors[2], name = plot_column_name)
+               scale_fill_gradient(low = gradient_colors[1], high = gradient_colors[2], name = plot_col_name)
              } else {
                scale_fill_gradient2(low = gradient_colors[1], mid = gradient_colors[2], high = gradient_colors[3], 
-                                    midpoint = 0, name = plot_column_name)
+                                    midpoint = 0, name = plot_col_name)
              }
            } else {
              message("gradient_colors is NULL or incorrectly specified. Falling back to viridis scale.")
-             scale_fill_viridis(option = "D", name = plot_column_name)  # default fallback
+             scale_fill_viridis(option = "D", name = plot_col_name)  # default fallback
            },
-           scale_fill_viridis(option = get_color_option(color_scale), name = plot_column_name)  # default to viridis
+           scale_fill_viridis(option = get_color_option(color_scale), name = plot_col_name)  # default to viridis
     ) +
 
     # Add annotations
@@ -325,6 +265,144 @@ read_named_region <- function(file_path, named_region) {
   }
   rownames(df) <- NULL
   return(df)
+}
+
+# --- Sub-Functions ---
+
+#' Read and Validate Pathway Annotations
+#'
+#' Reads pathway data from a specified named region in the pathway file,
+#' validates entries, removes invalid ones, and sets row names.
+#'
+#' @param network_file Path to the input file containing pathway data.
+#' @param region_name The named region or sheet containing pathway header info.
+#' @return A data frame of validated pathway annotations with labels as row names.
+read_pathways <- function(network_file, region_name = "Pathways_Header") {
+  # Assuming MetAlyzer::pathway() provides the file path
+  # and read_named_region is available in the environment
+  pathways <- read_named_region(network_file, region_name)
+  
+  invalid_annotations <- which(
+    is.na(pathways$Label) |
+    duplicated(pathways$Label) |
+    is.na(pathways$x) |
+    is.na(pathways$y) |
+    is.na(pathways$Color)
+  )
+  if (length(invalid_annotations) > 0) {
+    cat("Warning: Removing", length(invalid_annotations), "invalid pathways.\n")
+    pathways <- pathways[-invalid_annotations, ]
+  }
+  if (nrow(pathways) > 0) {
+     rownames(pathways) <- pathways$Label
+  } else {
+     cat("Warning: No valid pathways found.\n")
+     # Return an empty data frame with expected columns if needed downstream
+     # return(data.frame(Label=character(), x=numeric(), y=numeric(), Color=character(), stringsAsFactors=FALSE))
+  }
+  return(pathways)
+}
+
+#' Read and Validate Network Nodes (Metabolites)
+#'
+#' Reads node data from a specified named region, validates entries against
+#' pathway information, cleans labels, removes invalid nodes, and sets row names.
+#'
+#' @param network_file Path to the input file containing node data.
+#' @param pathways A data frame of validated pathways (output of read_pathways).
+#' @param region_name The named region or sheet containing metabolite header info.
+#' @return A data frame of validated nodes with labels as row names.
+read_nodes <- function(network_file, pathways, region_name = "Metabolites_Header") {
+  nodes <- read_named_region(network_file, region_name)
+  nodes$Pathway[is.na(nodes$Pathway)] <- ""
+
+  valid_pathway_names <- character(0) # Initialize empty vector
+  if (nrow(pathways) > 0) {
+      valid_pathway_names <- c(rownames(pathways), "")
+  } else {
+      valid_pathway_names <- "" # Only allow unassigned pathway if no pathways exist
+  }
+
+  invalid_nodes <- which(
+    is.na(nodes$Label) |
+    duplicated(nodes$Label) |
+    is.na(nodes$x) |
+    is.na(nodes$y) |
+    !nodes$Pathway %in% valid_pathway_names
+  )
+
+  if (length(invalid_nodes) > 0) {
+    cat("Warning: Removing", length(invalid_nodes), "invalid nodes.\n")
+    nodes <- nodes[-invalid_nodes, ]
+  }
+
+  if (nrow(nodes) > 0) {
+    # Use the original label for rownames before cleaning
+    rownames(nodes) <- nodes$Label
+    # Remove #suffix from labels after setting rownames
+    nodes$Label <- gsub("#[0-9]+$", "", nodes$Label)
+  } else {
+     cat("Warning: No valid nodes found.\n")
+     # Return an empty data frame with expected columns if needed downstream
+     # return(data.frame(Label=character(), x=numeric(), y=numeric(), Pathway=character(), stringsAsFactors=FALSE))
+  }
+  return(nodes)
+}
+
+#' Read and Validate Network Edges (Connections)
+#'
+#' Reads edge data from a specified named region, validates that connected
+#' nodes exist and are not self-loops, and removes invalid edges.
+#'
+#' @param network_file Path to the input file containing edge data.
+#' @param nodes A data frame of validated nodes (output of read_nodes).
+#' @param pathways A data frame of validated pathways (output of read_pathways).
+#' @param region_name The named region or sheet containing connections header info.
+#' @return A data frame of validated edges.
+read_edges <- function(network_file, nodes, pathways, region_name = "Connections_Header") {
+  edges <- read_named_region(network_file, region_name)
+  
+  valid_node_names <- character(0) # Initialize empty vector
+   if (nrow(nodes) > 0) {
+       valid_node_names <- rownames(nodes)
+   } else {
+       # If there are no valid nodes, all edges are invalid
+       cat("Warning: No valid nodes exist, removing all connections.\n")
+       return(edges[0, ]) # Return empty dataframe with same columns
+   }
+
+  invalid_edges <- which(
+    is.na(edges$Node1) | # Check for NA node names first
+    is.na(edges$Node2) |
+    !edges$Node1 %in% valid_node_names |
+    !edges$Node2 %in% valid_node_names |
+    edges$Node1 == edges$Node2
+  )
+
+  if (length(invalid_edges) > 0) {
+    cat("Warning: Removing", length(invalid_edges), "invalid connections.\n")
+    edges <- edges[-invalid_edges, ]
+  }
+   if (nrow(edges) == 0) {
+     cat("Info: No valid edges found after validation.\n")
+  }
+
+  edges$x_start <- nodes[edges$Node1, "x"]
+  edges$y_start <- nodes[edges$Node1, "y"]
+  edges$x_end <- nodes[edges$Node2, "x"]
+  edges$y_end <- nodes[edges$Node2, "y"]
+  edges$Color <- sapply(rownames(edges), function(rowname) {
+    from <- edges[rowname, "Node1"]
+    to <- edges[rowname, "Node2"]
+    from_pathway <- nodes[from, "Pathway"]
+    to_pathway <- nodes[to, "Pathway"]
+    color <- NA
+    if (from_pathway == to_pathway & from_pathway != "") {
+      color <- pathways[from_pathway, "Color"]
+    }
+    return(color)
+  })
+  return(edges)
 }
 
 #' Get the color option based on the color scale
@@ -491,7 +569,9 @@ save_plot <- function(plot,
 #' @param nodes_orig_df Original dataframe with potentially semi-colon separated metabolites.
 #'   Must contain Label.
 #' @param q_value Significance threshold for q-values (e.g., 0.05).
-#' @param plot_column_name plotted column
+#' @param plot_col_name plotted column
+#' @param qval_col_name p value column name
+#' @param pval_col_name q value column name
 #'
 #' @return A list containing two dataframes:
 #'   $nodes_separated: Input nodes_sep_df with 5 new columns:
@@ -499,7 +579,12 @@ save_plot <- function(plot,
 #'   $nodes: Input nodes_orig_df with 4 new columns:
 #'     node_log_value, node_p_value, node_q_value, node_add_col.
 #'
-calculate_node_aggregates_conditional <- function(nodes_sep_df, nodes_orig_df, q_value, plot_column_name) {
+calculate_node_aggregates_conditional <- function(nodes_sep_df, 
+                                                  nodes_orig_df, 
+                                                  q_value, 
+                                                  plot_col_name, 
+                                                  pval_col_name, 
+                                                  qval_col_name) {
 
   # --- Input Validation ---
   if (!"Label" %in% names(nodes_sep_df) || !"Label" %in% names(nodes_orig_df)) {
@@ -520,13 +605,10 @@ calculate_node_aggregates_conditional <- function(nodes_sep_df, nodes_orig_df, q
     group_by(Label) %>%
     summarise(
       # Use the helper function for conditional mean calculation
-      node_log_value = calculate_conditional_mean(log2FC, qval, q_value),
-      node_p_value   = calculate_conditional_mean(pval,   qval, q_value),
+      node_log_value = calculate_conditional_mean(.data[[plot_col_name]], .data[[qval_col_name]], q_value),
+      node_p_value   = calculate_conditional_mean(.data[[pval_col_name]],   .data[[qval_col_name]], q_value),
       # Apply the same logic to qval itself: average significant qvals if present, else average measured qvals.
-      node_q_value   = calculate_conditional_mean(qval,   qval, q_value),
-
-      # Create node_add_col - still no calculation specified, setting to NA
-      node_add_col = calculate_conditional_mean(.data[[plot_column_name]],   qval, q_value),
+      node_q_value   = calculate_conditional_mean(.data[[qval_col_name]],   .data[[qval_col_name]], q_value),
 
       .groups = "drop" # Drop grouping after summarise
     )

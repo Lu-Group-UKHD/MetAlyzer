@@ -11,11 +11,11 @@
 #' @param status_list A list of HEX color codes for each quantification status.
 #' @param silent If TRUE, mute any print command.
 #' @return A Summarized Experiment object
-#' @import SummaraizedExperiment
+#' @import SummarizedExperiment
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = example_extraction_data())
+#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
 read_metidq <- function(
     file_path,
     sheet = 1,
@@ -457,6 +457,6 @@ aggregate_data <- function(
 #'
 #' @description This function was deprecated in version v2.0.0
 #' 
-MetAlyzer_dataset(...) {
+MetAlyzer_dataset <- function(...) {
   cat("This function was deprecated in v2.0.0, please use read_metidq()\n")
 }

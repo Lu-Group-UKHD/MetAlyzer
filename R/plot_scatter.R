@@ -16,7 +16,7 @@
 #' @export
 #'
 #' @examples
-#' log2fc_df <- example_log2fc_data()
+#' log2fc_df <- load_diffres()
 #' scatter <- plot_scatter(log2fc_df)
 plot_scatter <- function(log2fc_df,
                          signif_colors = c("#5F5F5F" = 1,
