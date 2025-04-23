@@ -8,9 +8,8 @@ plot_network(
   log2fc_df,
   q_value = 0.05,
   metabolite_col_name = "Metabolite",
-  plot_col_name = "log2FC",
-  qval_col_name = "qval",
-  pval_col_name = "pval",
+  values_col_name = "log2FC",
+  stat_col_name = "qval",
   metabolite_text_size = 3,
   connection_width = 0.75,
   pathway_text_size = 6,
@@ -36,11 +35,9 @@ plot_network(
 
 \item{metabolite_col_name}{Columnname that holds the Metabolites}
 
-\item{plot_col_name}{Column name in the Log2FC dataframe to plot;}
+\item{values_col_name}{Column name of a column that holds numeric values, to be plotted \strong{Default = "log2FC"}}
 
-\item{qval_col_name}{Columnname that holds the adjusted p values}
-
-\item{pval_col_name}{Columnname that holds the p values}
+\item{stat_col_name}{Columnname that holds numeric stat values that are used for significance \strong{Default = "qval"}}
 
 \item{metabolite_text_size}{The text size of metabolite labels}
 
@@ -80,6 +77,6 @@ ggplot object
 This function plots the log2 fold change for each metabolite and visualizes it, in a pathway network.
 }
 \examples{
-log2fc_df <- load_diffres()
+log2fc_df <- readRDS(load_diffres())
 network <- plot_network(log2fc_df, q_value = 0.05)
 }

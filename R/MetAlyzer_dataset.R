@@ -95,8 +95,8 @@ read_metidq <- function(
 
   # Print summary of conc_values and quant_status
   if (silent == FALSE) {
-    summarizeConcValues(se)
-    summarizeQuantData(se)
+    summarize_conc_values(se)
+    summarize_quant_data(se)
   }
 
   return(se)

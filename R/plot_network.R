@@ -4,10 +4,9 @@
 #'
 #' @param log2fc_df A dataframe with log2FC, pval, qval, additional columns
 #' @param q_value The q-value threshold for significance
-#' @param plot_col_name Column name in the Log2FC dataframe to plot; 
+#' @param values_col_name Column name of a column that holds numeric values, to be plotted \strong{Default = "log2FC"}
+#' @param stat_col_name Columnname that holds numeric stat values that are used for significance \strong{Default = "qval"}
 #' @param metabolite_col_name Columnname that holds the Metabolites
-#' @param pval_col_name Columnname that holds the p values
-#' @param qval_col_name Columnname that holds the adjusted p values
 #' @param metabolite_text_size The text size of metabolite labels
 #' @param connection_width The line width of connections between metabolites
 #' @param pathway_text_size The text size of pathway annotations
@@ -29,10 +28,9 @@
 #' @import dplyr
 #' @import ggplot2
 #' @import ggrepel
-#' @import SummarizedExperiment
 #' @import viridis
 #' @import viridisLite
-#' @importFrom rlang .data
+#' @importFrom rlang .data !!
 #' @export
 #' 
 #' @examples
@@ -42,9 +40,8 @@
 plot_network <- function(log2fc_df,
                          q_value = 0.05,
                          metabolite_col_name = "Metabolite",
-                         plot_col_name = "log2FC",
-                         qval_col_name = "qval",
-                         pval_col_name = "pval",
+                         values_col_name = "log2FC",
+                         stat_col_name = "qval",
                          metabolite_text_size = 3,
                          connection_width = 0.75,
                          pathway_text_size = 6,
@@ -69,37 +66,36 @@ plot_network <- function(log2fc_df,
   nodes <- MetAlyzer:::read_nodes(network_file, pathways)
   edges <- MetAlyzer:::read_edges(network_file, nodes, pathways)
   
-  nodes <- filter(nodes, !Pathway %in% exclude_pathways)
+  nodes <- dplyr::filter(nodes, !Pathway %in% exclude_pathways)
   
   nodes_separated <- tidyr::separate_rows(nodes, Metabolites, sep = "\\s*;\\s*")
   
   nodes_joined <- dplyr::left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col_name))
 
-  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, plot_col_name, pval_col_name, qval_col_name)
+  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, values_col_name, stat_col_name)
 
   # --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
 
   nodes_separated_shortend <- nodes_separated_processed %>%
-    filter(!is.na(plot_col_name)) %>%  
-    select(-c(Class, x, y, Shape))  
+    dplyr::filter(!is.na(values_col_name)) %>%  
+    dplyr::select(-c(Class, x, y, Shape))  
   
   summary_log2fc <- nodes_separated_shortend %>%
-    group_by(Label) %>%
-    summarise(
-      log2FC_collapsed = paste(log2FC, collapse = "; "),
-      pval_collapsed = paste(pval, collapse = "; "),
-      qval_collapsed = paste(qval, collapse = "; "),
+    dplyr::group_by(Label) %>%
+    dplyr::summarise(
+      values_collapsed = paste(values_col_name, collapse = "; "),
+      stat_collapsed = paste(stat_col_name, collapse = "; "),
       .groups = 'drop'
     )
 
-  cols_to_summarise_unique <- setdiff(names(nodes_separated_shortend), c("Label", "log2FC", "pval", "qval"))
+  cols_to_summarise_unique <- setdiff(names(nodes_separated_shortend), c("Label", values_col_name, stat_col_name))
 
   summary_others <- nodes_separated_shortend %>%
-    group_by(Label) %>%
-    summarise(
-      collapsed_count = n(),
-      across(
+    dplyr::group_by(Label) %>%
+    dplyr::summarise(
+      collapsed_count = dplyr::n(),
+      dplyr::across(
         .cols = all_of(cols_to_summarise_unique), # Use the identified columns
         .fns = ~ paste(unique(.), collapse = "; ")
       ),
@@ -107,7 +103,7 @@ plot_network <- function(log2fc_df,
     )
 
   nodes_collapsed <- left_join(summary_others, summary_log2fc, by = "Label") %>%
-    rename(log2FC = log2FC_collapsed, pval = pval_collapsed, qval = qval_collapsed ) %>%
+    rename(values = values_collapsed, stat = stat_collapsed,) %>%
     mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
     
   # --- The dataframe for plotting ---
@@ -159,7 +155,7 @@ plot_network <- function(log2fc_df,
         x = .data$x,
         y = .data$y,
         label = .data$Label,
-        fill = .data$node_add_col
+        fill = .data[[values_col_name]]
       ),
       size = metabolite_text_size,
       color = "white"
@@ -167,16 +163,16 @@ plot_network <- function(log2fc_df,
     switch(color_scale,
            "gradient" = if (!is.null(gradient_colors) && length(gradient_colors) %in% c(2, 3)) {
              if (length(gradient_colors) == 2) {
-               scale_fill_gradient(low = gradient_colors[1], high = gradient_colors[2], name = plot_col_name)
+               scale_fill_gradient(low = gradient_colors[1], high = gradient_colors[2], name = values_col_name)
              } else {
                scale_fill_gradient2(low = gradient_colors[1], mid = gradient_colors[2], high = gradient_colors[3], 
-                                    midpoint = 0, name = plot_col_name)
+                                    midpoint = 0, name = values_col_name)
              }
            } else {
              message("gradient_colors is NULL or incorrectly specified. Falling back to viridis scale.")
-             scale_fill_viridis(option = "D", name = plot_col_name)  # default fallback
+             scale_fill_viridis(option = "D", name = values_col_name)  # default fallback
            },
-           scale_fill_viridis(option = get_color_option(color_scale), name = plot_col_name)  # default to viridis
+           scale_fill_viridis(option = get_color_option(color_scale), name = values_col_name)  # default to viridis
     ) +
 
     # Add annotations
@@ -210,7 +206,7 @@ plot_network <- function(log2fc_df,
               format = save_as,
               overwrite = overwrite)
   
-  return(list("Network" = network, "Table" = nodes_collapsed))
+  return(list("Plot" = network, "Table" = nodes_collapsed))
 
 }
 
@@ -569,28 +565,26 @@ save_plot <- function(plot,
 #' @param nodes_orig_df Original dataframe with potentially semi-colon separated metabolites.
 #'   Must contain Label.
 #' @param q_value Significance threshold for q-values (e.g., 0.05).
-#' @param plot_col_name plotted column
-#' @param qval_col_name p value column name
-#' @param pval_col_name q value column name
+#' @param values_col_name plotted column
+#' @param stat_col_name p value column name
 #'
 #' @return A list containing two dataframes:
-#'   $nodes_separated: Input nodes_sep_df with 5 new columns:
-#'     node_log_value, node_p_value, node_q_value, node_add_col, used.
-#'   $nodes: Input nodes_orig_df with 4 new columns:
-#'     node_log_value, node_p_value, node_q_value, node_add_col.
+#'   $nodes_separated: Input nodes_sep_df with 2 new columns:
+#'     node_values, node_stat
+#'   $nodes: Input nodes_orig_df with 2 new columns:
+#'     node_values, node_stat
 #'
 calculate_node_aggregates_conditional <- function(nodes_sep_df, 
                                                   nodes_orig_df, 
                                                   q_value, 
-                                                  plot_col_name, 
-                                                  pval_col_name, 
-                                                  qval_col_name) {
+                                                  values_col_name, 
+                                                  stat_col_name) {
 
   # --- Input Validation ---
   if (!"Label" %in% names(nodes_sep_df) || !"Label" %in% names(nodes_orig_df)) {
     stop("Both dataframes must contain a 'Label' column for grouping.")
   }
-  required_cols <- c("log2FC", "pval", "qval")
+  required_cols <- c(values_col_name, stat_col_name)
   if (!all(required_cols %in% names(nodes_sep_df))) {
     stop("nodes_sep_df must contain columns: ", paste(required_cols, collapse=", "))
   }
@@ -605,10 +599,9 @@ calculate_node_aggregates_conditional <- function(nodes_sep_df,
     group_by(Label) %>%
     summarise(
       # Use the helper function for conditional mean calculation
-      node_log_value = calculate_conditional_mean(.data[[plot_col_name]], .data[[qval_col_name]], q_value),
-      node_p_value   = calculate_conditional_mean(.data[[pval_col_name]],   .data[[qval_col_name]], q_value),
+      node_values = calculate_conditional_mean(.data[[values_col_name]], .data[[stat_col_name]], q_value),
       # Apply the same logic to qval itself: average significant qvals if present, else average measured qvals.
-      node_q_value   = calculate_conditional_mean(.data[[qval_col_name]],   .data[[qval_col_name]], q_value),
+      node_stat   = calculate_conditional_mean(.data[[stat_col_name]],   .data[[stat_col_name]], q_value),
 
       .groups = "drop" # Drop grouping after summarise
     )
@@ -622,8 +615,9 @@ calculate_node_aggregates_conditional <- function(nodes_sep_df,
   # --- 3. Update Original Nodes Dataframe ---
 
   nodes_orig_updated <- nodes_orig_df %>%
-      select(-any_of(c("node_log_value", "node_p_value", "node_q_value", "node_add_col"))) %>%
-      left_join(node_summary, by = "Label")
+      dplyr::select(-any_of(c("node_values", "node_stat"))) %>%
+      dplyr::left_join(node_summary, by = "Label") %>%
+      dplyr::rename(!!values_col_name := node_values, !!stat_col_name := node_stat)
 
   # --- 4. Return Updated Dataframes ---
   return(list(nodes_separated = nodes_sep_updated, nodes = nodes_orig_updated))

@@ -8,9 +8,8 @@ calculate_node_aggregates_conditional(
   nodes_sep_df,
   nodes_orig_df,
   q_value,
-  plot_col_name,
-  pval_col_name,
-  qval_col_name
+  values_col_name,
+  stat_col_name
 )
 }
 \arguments{
@@ -22,18 +21,16 @@ Must contain Label.}
 
 \item{q_value}{Significance threshold for q-values (e.g., 0.05).}
 
-\item{plot_col_name}{plotted column}
+\item{values_col_name}{plotted column}
 
-\item{pval_col_name}{q value column name}
-
-\item{qval_col_name}{p value column name}
+\item{stat_col_name}{p value column name}
 }
 \value{
 A list containing two dataframes:
-  $nodes_separated: Input nodes_sep_df with 5 new columns:
-    node_log_value, node_p_value, node_q_value, node_add_col, used.
-  $nodes: Input nodes_orig_df with 4 new columns:
-    node_log_value, node_p_value, node_q_value, node_add_col.
+  $nodes_separated: Input nodes_sep_df with 2 new columns:
+    node_values, node_stat
+  $nodes: Input nodes_orig_df with 2 new columns:
+    node_values, node_stat
 }
 \description{
 Calculates mean log2FC, p-value, and q-value for each node (Label),

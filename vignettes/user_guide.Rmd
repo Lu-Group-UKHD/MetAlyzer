@@ -1,8 +1,4 @@
 ---
-output: html_document
-editor_options: 
-  chunk_output_type: console
----
 title: "User Guide"
 author:
   - name: Luis Herfurth
@@ -24,11 +20,12 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+```{r setup, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo=TRUE, cache=FALSE, collapse=TRUE, comment='#>', warning=FALSE, message=FALSE)
 
 #If you haven't done this yet, install the MetAlyzer package
 #devtools::install_github("nilsmechtel/MetAlyzer")
+library(dplyr)
 ```
 
 
@@ -42,25 +39,23 @@ These network visualizations are crucial for understanding the complex interconn
 helping to find pathway-level alterations and providing a systems perspective on the metabolic response under investigation.
 :::
 
-## Core Workflow: Loading and Exploring Data
+# Loading and Exploring Data
 ::: {style="text-align: justify"}
 MetAlyzer's primary entry point is the read_metidq function, which reads MetIDQ™ .xlsx output files. 
 As the output files contain layered information, inform of concentration values and color-coded quantification status (e.g., "Valid", "LOD", "LOQ"), 
 it is a tedious task to reliably process this data computationally, as the mix of numerical values and status codes hinders direct machine readability by standard analysis tools.
 To conveniently read the data in we provide the function read_metidq(), structuring the data into a SummarizedExperiment (SE) object for easy downstream analysis.
-For further demonstration we'll use an example dataset derived from Gegner et al. 2022, featuring metabolite measurements across different extraction methods 
+For further demonstration we'll use an example dataset derived from [@Gegner2022], featuring metabolite measurements across different extraction methods 
 and tissue types (MxP®Quant 500 kit). This dataset is included in the package.
 :::
 
-@Luis: 
-- Add citation using .bib file (e.g. above to cite se paper)
 
-```{{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates MetIDQ™.", out.width="70%", fig.align="center"}}
+```{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates MetIDQ™.", out.width="70%", fig.align="center"}
 knitr::include_graphics("images/biocrates_output.png")
 ```
 
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+```{r initialise, message=FALSE, warning=FALSE}
 # Access the example data file path
 fpath <- MetAlyzer::load_rawdata_extraction()
 
@@ -74,31 +69,30 @@ metalyzer_se
 ::: {style="text-align: justify"}
 The resulting SummarizedExperiment object organizes the data:
 
-**Assay**: Contains matrices for conc_values (metabolite concentrations) and quant_status (quantification status).
-**rowData**: Stores metabolite information, including names and assigned classes. Note the distinction between quantified metabolites and calculated 'Metabolism Indicators'.
-**colData**: Holds sample-specific metadata provided in the input file or added later.
+**Assay**: Contains matrices for conc_values (metabolite concentrations) and quant_status (quantification status). <br>
+**rowData**: Stores metabolite information, including names and assigned classes. Note the distinction between quantified metabolites and calculated 'Metabolism Indicators'. <br>
+**colData**: Holds sample-specific metadata provided in the input file or added later. <br>
 **metadata**: Contains supplementary information like the original file path, sheet index, status color mappings, 
 and a pre-joined aggregated_data tibble combining concentrations, status, and metadata for easier analysis and plotting.
 :::
 
-```{r, echo=FALSE}
-# https://cran.r-project.org/web/packages/kableExtra/vignettes/awesome_table_in_html.html
-# Check how our data looks like:
-SummarizedExperiment::assay(metalyzer_se) %>%
-  kableExtra::kbl(caption = "Preview of Assay containing assay.") %>%
+```{r showcase, echo=FALSE, warning=FALSE, message=FALSE}
+head(SummarizedExperiment::assay(metalyzer_se)) %>%
+  kableExtra::kbl(caption = "Preview of Assay containing concentration values.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 
-SummarizedExperiment::rowData(metalyzer_se) %>%
+head(SummarizedExperiment::rowData(metalyzer_se)) %>%
   kableExtra::kbl(caption = "Preview of Assay containing rowData.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 
-SummarizedExperiment::colData(metalyzer_se) %>%
+head(SummarizedExperiment::colData(metalyzer_se)) %>%
   kableExtra::kbl(caption = "Preview of Assay containing colData.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 ```
 
 
-## Visualizing Pre-Calculated Log2 Fold Changes
+
+# Visualizing Log2 Fold Changes
 ::: {style="text-align: justify"}
 For the calculation of the Log2FC DataFrame we used the MetaProViz package. (Link to package) (citation)
 We'll use the example differential results included in the package (load_diffres()). 
@@ -106,14 +100,15 @@ The plotting functions plot_log2FC and plot_network can accept a standard data f
 This example data was generated from the raw extraction data, also provided in the pakage, it compares the concentrations between different tissue types.
 :::
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+```{r diffres, echo=FALSE, message=FALSE, warning=FALSE}
 # code for diffres generation
 ```
 
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+```{r import, message=FALSE, warning=FALSE}
 diffres_df <- readRDS(MetAlyzer::load_diffres())
-diffres_df %>%
+
+head(diffres_df) %>%
   kableExtra::kbl(caption = "Preview of Assay containing colData.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 ```
@@ -125,7 +120,7 @@ You can provide a additional colums with numerical values, that can be passed in
 :::
 
 ::: {style="text-align: justify"}
-### Scatter Plot
+## Scatter Plot
 
 ::: {style="text-align: justify"}
 The `plot_scatter` function visualizes log2 fold changes, primarily to assess the behavior of different **metabolite classes**. 
@@ -134,23 +129,17 @@ Background colors distinguish these classes, enabling users to interpret if cert
 allowing comparison of whether these observed class-specific trends are consistent across both methods or show method-dependent variations.
 :::
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+```{r scatter, message=FALSE, warning=FALSE, out.width="100%"}
 # Scatter plot grouped by metabolic class
-MetAlyzer::plot_scatter(
-  diffres_df,
-  hide_labels_for = diffres_df$Metabolite, # Hiding all labels
-)
+MetAlyzer::plot_scatter(diffres_df)
 ```
 
-### Pathway Network Visualization
-@Luis: why is it relevant for the user to display the data like this? what can they interpret from this?
-Also: Explain a bit about the summaries in the plot (we discussed T 14:0). Show the table and discuss it here. Inform the user how to interpret the results. 
-
+## Pathway Network Visualization
 
 ::: {style="text-align: justify"}
 Visualize significant changes across metabolic pathways using `plot_network`. This function maps the calculated log2 fold changes (log2FC) of metabolites onto a predefined network structure, representing known biochemical reactions and relationships.
 
-**Relevance and Interpretation:**
+### Relevance and Interpretation:
 
 This network visualization provides a **systems-level perspective**, going beyond individual metabolite changes. Its relevance lies in helping users understand how metabolic perturbations are interconnected within the broader context of biological pathways. By examining the network, users can:
 
@@ -160,16 +149,15 @@ This network visualization provides a **systems-level perspective**, going beyon
 
 :::
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+```{r network, message=FALSE, warning=FALSE}
 # Generate network plot from the data frame
 # Requires metabolite, class, log2fc, and p-value columns
 network <- MetAlyzer::plot_network(
   diffres_df,
   q_value = 0.05,
   metabolite_col = "Metabolite",
-  plot_col_name = "log2FC",
-  qval_col_name = "qval",
-  pval_col_name = "pval",
+  values_col_name = "log2FC",
+  stat_col_name = "qval",
   metabolite_text_size = 2,
   connection_width = 0.75,
   pathway_text_size = 4,
@@ -180,7 +168,7 @@ network$Plot
 ```
 
 ::: {style="text-align: justify"}
-**Node Summarization and Representation:**
+### Node Summarization and Representation:
 
 Each node in the network represents a metabolite or a metabolite class. The color of the node typically reflects its log2FC value (incase the viridis scale was selected, yellow represents a positiv log2 Fold Change and purlbe a negative log2 Fold Change).
 
@@ -194,7 +182,7 @@ This summarization approach provides a concise overview within the network, high
 Due to the changing naming convention of Biocrates, we include old names in the excel file, which will show up as NA for later generated MetIDQ™ outputs (e.g. TG(14:0_32.2)), but this enables the analysis of older files as well.
 :::
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+```{r networkTable, echo=FALSE, message=FALSE, warning=FALSE}
 nodes_list <- network$Table
 T14_node <- nodes_list[which(nodes_list$Label == "T14"), ]
 
@@ -218,7 +206,7 @@ T14_node_expanded %>%
 For easy Visualisation of the summarized nodes, you can use the MetaProViz Vulcano Plot (package) (bib).
 :::
 
-```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+```{r vulcano, echo=FALSE, message=FALSE, warning=FALSE}
 MetaProViz::VizVolcano(InputData = T14_node_expanded, yCutoff = 0.05)
 ```
 

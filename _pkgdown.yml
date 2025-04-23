@@ -36,7 +36,7 @@ navbar:
 
 home:
   sidebar:
-    structure: [links, citation, developers, license, funding, toc] #other options: dev, links, community
+    structure: [links, citation, authors, license, funding, toc] #other options: dev, links, community
     components:
       links:
         title: Links
