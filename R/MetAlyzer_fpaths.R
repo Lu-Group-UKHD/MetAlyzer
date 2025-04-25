@@ -12,6 +12,20 @@ load_rawdata_extraction <- function() {
 }
 
 
+#' @title Get demodata from biocrates
+#'
+#' @description This function returns the Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx file path.
+#'
+#' @return Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx file path
+#' @export
+#'
+#' @examples
+#' fpath <- load_rawdata_extraction()
+load_demodata_biocrates <- function() {
+  system.file("extdata", "Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx", package = "MetAlyzer")
+}
+
+
 #' @title Get example mutation data
 #'
 #' @description This function returns the mutation_data_MxP_Quant_500_XL.xlsx file path.
