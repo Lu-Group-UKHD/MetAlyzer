@@ -3,7 +3,7 @@
 #' This function launches the Shiny application.
 #'
 #' @export
-run_app <- function() {
+start_app <- function() {
   app_dir <- system.file("shinyapp", package = "MetAlyzer")
   if (app_dir == "") {
     stop("Could not find app directory. Try re-installing the package.", call. = FALSE)

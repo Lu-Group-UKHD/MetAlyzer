@@ -1,13 +1,3 @@
-library(limma)
-library(vsn)
-library(MetAlyzer)
-library(plotly)
-library(gridExtra)
-library(viridis)
-library(viridisLite)
-library(SummarizedExperiment)
-library(tidyverse)
-
 #' @title Calculate log2 fold change
 #' @description This function calculates log2(FC), p-values, and adjusted p-values
 #' of the data using limma. Note that the data has to be filtered and log2 transformed
