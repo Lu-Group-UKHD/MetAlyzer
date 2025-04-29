@@ -34,7 +34,7 @@
 #' @export
 #' 
 #' @examples
-#' log2fc_df <- readRDS(load_diffres())
+#' log2fc_df <- readRDS(toy_diffres())
 #' network <- plot_network(log2fc_df, q_value = 0.05)
 
 plot_network <- function(log2fc_df,

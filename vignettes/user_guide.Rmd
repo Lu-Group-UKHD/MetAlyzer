@@ -57,7 +57,7 @@ knitr::include_graphics("images/biocrates_output.png")
 
 ```{r initialise, message=FALSE, warning=FALSE}
 # Access the example data file path
-fpath <- MetAlyzer::load_rawdata_extraction()
+fpath <- MetAlyzer::load_demodata_biocrates()
 
 # Load the data into a SummarizedExperiment object
 metalyzer_se <- MetAlyzer::read_metidq(file_path = fpath)
@@ -95,7 +95,7 @@ head(SummarizedExperiment::colData(metalyzer_se)) %>%
 # Visualizing Log2 Fold Changes
 ::: {style="text-align: justify"}
 For the calculation of the Log2FC DataFrame we used the MetaProViz package. (Link to package) (citation)
-We'll use the example differential results included in the package (load_diffres()). 
+We'll use the example differential results included in the package (toy_diffres()). 
 The plotting functions plot_log2FC and plot_network can accept a standard data frame containing log2FC results, provided it has the necessary columns.
 This example data was generated from the raw extraction data, also provided in the pakage, it compares the concentrations between different tissue types.
 :::
@@ -106,7 +106,7 @@ This example data was generated from the raw extraction data, also provided in t
 
 
 ```{r import, message=FALSE, warning=FALSE}
-diffres_df <- readRDS(MetAlyzer::load_diffres())
+diffres_df <- readRDS(MetAlyzer::toy_diffres())
 
 head(diffres_df) %>%
   kableExtra::kbl(caption = "Preview of Assay containing colData.") %>%

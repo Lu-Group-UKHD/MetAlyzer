@@ -25,6 +25,6 @@ ggplot object
 This method creates a scatter plot of the log2 fold change for each metabolite.
 }
 \examples{
-log2fc_df <- load_diffres()
+log2fc_df <- toy_diffres()
 scatter <- plot_scatter(log2fc_df)
 }

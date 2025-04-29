@@ -521,7 +521,7 @@ export_conc_values <- function(metalyzer_se,
 #' @param metalyzer_se SummarizedExperiment
 #'
 #' @examples
-#' metalyzer_se@metadata$log2FC <- readRDS(load_diffres())
+#' metalyzer_se@metadata$log2FC <- readRDS(toy_diffres())
 #' log2FC(metalyzer_se)
 log2FC <- function(metalyzer_se) {
   return(metalyzer_se@metadata$log2FC)

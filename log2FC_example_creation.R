@@ -1,4 +1,4 @@
-metalyzer_ext_SE <- MetAlyzer_dataset(example_mutation_data_xl())
+metalyzer_ext_SE <- read_metidq(load_demodata_biocrates())
 
 #Load the data:
 data_df <- SummarizedExperiment::assay(metalyzer_ext_SE)
@@ -16,8 +16,8 @@ col_metadata_df$RowNames <- col@rownames
 Intra_M <- as.data.frame(t(data_df))#We require that the rownames match the rownames of the SampleInfo
 
 SampleInfo <-col_metadata_df%>%
-  column_to_rownames("RowNames")%>%#We require that the rownames match the rownames of the Intra_M
-  rename("Conditions"="Sample.Description")#The column Biological_Replicates can also be used during pre-processing (Here I just assumed that these might be the replicates)
+  tibble::column_to_rownames("RowNames")%>%#We require that the rownames match the rownames of the Intra_M
+  dplyr::rename("Conditions"="Sample.description")#The column Biological_Replicates can also be used during pre-processing (Here I just assumed that these might be the replicates)
 
 MappingInfo <- row_metadata_df
 
