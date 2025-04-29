@@ -159,8 +159,16 @@ ui <- fluidPage(
                                                            choices = character(0), multiple = F))
                            ),
                            fluidRow(
-                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%'))
+                             style = "display: flex; align-items: center;",
+                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%')),
+                             conditionalPanel(
+                              condition = "input.computeLog2FC > 0", # Check if the compute button has been clicked
+                              fluidRow(
+                                column(width = 5, downloadButton('downloadLog2FC', 'Download log2FC Table', width = '100%'))
+                              ),
+                             ),
                            ),
+                           
                            tags$br(),
                            tags$h4('Vulcano Plot', style = 'color:steelblue;font-weight:bold'), #Log₂(FC) Visualization
                            #### Highlighting in scatter plot is to be fixed 
@@ -384,7 +392,7 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
-    metabObj <- read_metidq(file_path = example_extraction_data(), silent = T)
+    metabObj <- read_metidq(file_path = load_rawdata_extraction(), silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
     metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                              drop_metabolites = 'Metabolism Indicators',
@@ -943,7 +951,7 @@ server <- function(input, output, session) {
       }
       metabObj <- calc_log2FC(metalyzer_se = metabObj,
                               categorical = selectedChoiceGp)
-      reactLog2FCTbl(log2FC(metabObj))
+      reactLog2FCTbl(MetAlyzer:::log2FC(metabObj))
       
       # Update the slider input, for custom inputs
       updateSliderInput(session, "plotVolcanoLog2FCCutoff",
@@ -1212,6 +1220,25 @@ server <- function(input, output, session) {
     }
   )
   
+  output$downloadLog2FC <- downloadHandler(
+    filename = function() {
+      paste0("Log2FC_values_", Sys.Date(), ".xlsx") 
+    },
+    
+    content = function(file) {
+      data_to_export <- reactLog2FCTbl()
+      
+      if (is.null(data_to_export) || nrow(data_to_export) == 0) {
+        shiny::showNotification("Please compute the log2FC values first.", type = "warning")
+
+        if(is.null(data_to_export)) data_to_export <- data.frame()
+      }
+      
+      writexl::write_xlsx(data_to_export, path = file)
+    }
+  )
+
+
   
   # Visualize log2(FC)
   # Give sign before log2(FC) calculation

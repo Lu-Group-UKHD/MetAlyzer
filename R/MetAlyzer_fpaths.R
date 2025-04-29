@@ -20,7 +20,7 @@ load_rawdata_extraction <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- load_rawdata_extraction()
+#' fpath <- load_demodata_biocrates()
 load_demodata_biocrates <- function() {
   system.file("extdata", "Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx", package = "MetAlyzer")
 }

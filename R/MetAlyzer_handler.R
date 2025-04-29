@@ -512,3 +512,17 @@ export_conc_values <- function(metalyzer_se,
     row.names = FALSE
   )
 }
+
+# === Handle log2FC Data ===
+#' @title Get log2FC Data
+#'
+#' @description This function returns the tibble "log2FC".
+#'
+#' @param metalyzer_se SummarizedExperiment
+#'
+#' @examples
+#' metalyzer_se@metadata$log2FC <- readRDS(load_diffres())
+#' log2FC(metalyzer_se)
+log2FC <- function(metalyzer_se) {
+  return(metalyzer_se@metadata$log2FC)
+}
