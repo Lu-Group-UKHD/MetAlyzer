@@ -23,7 +23,7 @@
 #' @param height Height of the saved plot in specified units. \strong{Default = 21.0}
 #' @param units Units for width and height (e.g., "in", "cm", "mm"). \strong{Default = "cm"}
 #' @param overwrite Logical: If `TRUE`, overwrite existing files without asking. If `FALSE`, prompt user before overwriting. \strong{Default = FALSE}
-#' @return ggplot object
+#' @return list with ggplot object and table of node summaries
 #' 
 #' @import dplyr
 #' @import ggplot2
@@ -36,6 +36,8 @@
 #' @examples
 #' log2fc_df <- readRDS(toy_diffres())
 #' network <- plot_network(log2fc_df, q_value = 0.05)
+#' network$Plot
+#' network$Table
 
 plot_network <- function(log2fc_df,
                          q_value = 0.05,

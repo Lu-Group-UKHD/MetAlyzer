@@ -10,7 +10,7 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 #'
 #' summarize_conc_values(metalyzer_se)
 summarize_conc_values <- function(metalyzer_se) {
@@ -40,7 +40,7 @@ summarize_conc_values <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 #'
 #' summarize_quant_data(metalyzer_se)
 summarize_quant_data <- function(metalyzer_se) {
@@ -91,7 +91,7 @@ summarize_quant_data <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 #'
 #' metalyzer_se <- filter_meta_data(metalyzer_se, !is.na(Tissue))
 #' metalyzer_se <- filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
@@ -156,7 +156,7 @@ filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 #'
 #' metalyzer_se <- update_meta_data(
 #'   metalyzer_se,
@@ -206,7 +206,7 @@ update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 #'
 #' metalyzer_se <- rename_meta_data(
 #'   metalyzer_se,
@@ -271,7 +271,7 @@ rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 #'
 #' drop_metabolites <- c("C0", "C2", "C3", "Metabolism Indicators",
 #'   inplace = TRUE
@@ -460,7 +460,7 @@ filter_metabolites <- function(metalyzer_se,
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 #'
 #' aggregated_data(metalyzer_se)
 aggregated_data <- function(metalyzer_se) {
@@ -482,7 +482,7 @@ aggregated_data <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 #' 
 #' output_file <- file.path(tempdir(), "metabolomics_data.csv")
 #' export_conc_values(

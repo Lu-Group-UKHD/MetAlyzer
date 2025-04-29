@@ -29,10 +29,8 @@ install_github("nilsmechtel/MetAlyzer")
 
 The package takes metabolomic measurements and the quantification status (e.g. "Valid", "LOQ", "LOD") as ".xlsx" files generated from the MetIDQ&trade; software. Additionally, meta data for each sample can be provided for further analysis.
 
-![MetAlyzer](vignettes/MetAlyzer_workflow.png)
-
 This is an extract from one of the provided example data sets.
-![Example_Data](vignettes/screenshot_xlsx.png)
+![Example_Data](vignettes/images/biocrates_output.png)
 
 #### Create MetAlyzer object:
 ```{r}
@@ -101,7 +99,9 @@ network <- MetAlyzer::plot_network(
 
 network$Plot
 ```
+
 ![Network](vignettes/images/network_demodata.png)
+
 ## Detailed instructions
 **For a comprehensive tutorial, please check out the [MetAlyzer Vignette](https://CRAN.R-project.org/package=MetAlyzer
 ).**

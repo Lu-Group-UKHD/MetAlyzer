@@ -15,7 +15,7 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_rawdata_extraction())
+#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
 read_metidq <- function(
     file_path,
     sheet = 1,

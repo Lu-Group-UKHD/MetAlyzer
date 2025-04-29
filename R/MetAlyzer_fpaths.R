@@ -16,7 +16,7 @@ load_rawdata_extraction <- function() {
 #'
 #' @description This function returns the Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx file path.
 #'
-#' @return Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx file path
+#' @return Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04 file path
 #' @export
 #'
 #' @examples
@@ -41,7 +41,7 @@ example_mutation_data_xl <- function() {
 
 #' @title Get example log2fc data
 #'
-#' @description This function returns the log2fc dataframe of the mutation_data_MxP_Quant_500_XL.xlsx file, created with the MetaVizPro package.
+#' @description This function returns the log2fc dataframe of the Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04 file, created with the MetaVizPro package.
 #'
 #' @return toy_diffres.rds file path
 #' @export
@@ -49,21 +49,7 @@ example_mutation_data_xl <- function() {
 #' @examples
 #' fpath <- toy_diffres()
 toy_diffres <- function() {
-  system.file("extdata", "diffres_data.rds", package = "MetAlyzer")
-}
-
-
-#' @title Get example meta data
-#'
-#' @description This function returns the data frame loaded from example_meta_data.RDS.
-#'
-#' @return data frame loaded from example_meta_data.RDS
-#' @export
-#'
-#' @examples
-#' fpath <- example_meta_data()
-example_meta_data <- function() {
-  readRDS(system.file("extdata", "example_meta_data.RDS", package = "MetAlyzer"))
+  system.file("extdata", "toy_diffres_biocrates.rds", package = "MetAlyzer")
 }
 
 #' @title Get MetAlyzer colors

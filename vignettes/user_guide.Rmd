@@ -45,8 +45,7 @@ MetAlyzer's primary entry point is the read_metidq function, which reads MetIDQ�
 As the output files contain layered information, inform of concentration values and color-coded quantification status (e.g., "Valid", "LOD", "LOQ"), 
 it is a tedious task to reliably process this data computationally, as the mix of numerical values and status codes hinders direct machine readability by standard analysis tools.
 To conveniently read the data in we provide the function read_metidq(), structuring the data into a SummarizedExperiment (SE) object for easy downstream analysis.
-For further demonstration we'll use an example dataset derived from [@Gegner2022], featuring metabolite measurements across different extraction methods 
-and tissue types (MxP®Quant 500 kit). This dataset is included in the package.
+For further demonstration we'll use a demo dataset from Biocrates, featuring metabolite measurements across two groups (MxP®Quant 500 kit). This dataset is included in the package.
 :::
 
 
@@ -101,7 +100,60 @@ This example data was generated from the raw extraction data, also provided in t
 :::
 
 ```{r diffres, echo=FALSE, message=FALSE, warning=FALSE}
-# code for diffres generation
+## -------------------------------------------------------------------------- ##
+##  Skip this part if you already know how to generate a Log2 Fold Change df  ##
+## -------------------------------------------------------------------------- ##
+
+## Sample Info
+col <- SummarizedExperiment::colData(metalyzer_se)
+col_metadata_df <- data.frame(col@listData)
+col_metadata_df$RowNames <- col@rownames
+
+sample_info <- col_metadata_df %>%
+  tibble::column_to_rownames("RowNames") %>%
+  dplyr::rename("Conditions" = "Sample.description")
+
+## Input Concentration values
+intra_m <- as.data.frame(t(SummarizedExperiment::assay(metalyzer_se))) # rownames must match the rownames of the SampleInfo
+
+# Preprocessing
+preprocessing_results <- MetaProViz::PreProcessing(InputData = intra_m,
+                                                  SettingsFile_Sample = sample_info,
+                                                  SettingsInfo = c(Conditions = "Conditions"),
+                                                  FeatureFilt = "Modified",
+                                                  FeatureFilt_Value = 0.8,
+                                                  TIC = TRUE,
+                                                  MVI = TRUE,
+                                                  HotellinsConfidence = 0.99,
+                                                  CoRe = FALSE,
+                                                  SaveAs_Plot = NULL,
+                                                  SaveAs_Table = NULL)
+
+intra_preprocessed <- preprocessing_results[["DF"]][["Preprocessing_output"]]
+
+## Mapping Info
+row_metadata_df <- data.frame(SummarizedExperiment::rowData(metalyzer_se))
+
+mapping_info <- row_metadata_df
+
+# Differential Metabolite Analysis
+dma <- MetaProViz::DMA(InputData = intra_preprocessed[, -c(1:14)], #filter non-numeric columns
+                       SettingsFile_Sample = sample_info,
+                       SettingsInfo = c(Conditions="Conditions", Numerator="Group 1" , Denominator = "Group 2"),
+                       SettingsFile_Metab = mapping_info,
+                       StatPval = "lmFit",
+                       StatPadj = "fdr")
+
+dma_group1_vs_group2 <- dma[["DMA"]][["Group 1_vs_Group 2"]]
+
+diffres_df <- dma_group1_vs_group2 %>%
+  select(
+    Metabolite = Metabolite,
+    Class = metabolic_classes,
+    log2FC = Log2FC,
+    pval = p.val,
+    qval = p.adj
+  )
 ```
 
 
