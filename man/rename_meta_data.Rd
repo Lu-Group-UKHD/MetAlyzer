@@ -21,9 +21,9 @@ An updated SummarizedExperiment
 This function renames a column of meta_data.
 }
 \examples{
-metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 
-metalyzer_se <- rename_meta_data(
+metalyzer_se <- MetAlyzer::rename_meta_data(
   metalyzer_se,
   Method = `Sample Description`
 )

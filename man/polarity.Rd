@@ -13,5 +13,5 @@ polarity.csv file path
 This function returns the polarity.csv file path.
 }
 \examples{
-fpath <- polarity()
+fpath <- MetAlyzer::polarity()
 }

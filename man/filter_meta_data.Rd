@@ -22,8 +22,8 @@ This function updates the "Filter" column in meta_data to
 filter out samples.
 }
 \examples{
-metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 
-metalyzer_se <- filter_meta_data(metalyzer_se, !is.na(Tissue))
-metalyzer_se <- filter_meta_data(metalyzer_se, `Sample Description` \%in\% 1:6)
+metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, !is.na(Tissue))
+metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, `Sample Description` \%in\% 1:6)
 }

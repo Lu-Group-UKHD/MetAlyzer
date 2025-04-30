@@ -17,14 +17,13 @@ export_conc_values(metalyzer_se, ..., file_path = "metabolomics_data.csv")
 This function exports the filtered raw data in the CSV format.
 }
 \examples{
-metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 
 output_file <- file.path(tempdir(), "metabolomics_data.csv")
-export_conc_values(
-  metalyzer_se,
-  `Sample Description`,
-  Tissue,
-  file_path = output_file
-)
+MetAlyzer::export_conc_values(metalyzer_se,
+                              `Sample Description`,
+                              Tissue,
+                              file_path = output_file
+                              )
 unlink(output_file)
 }

@@ -13,6 +13,6 @@ log2FC(metalyzer_se)
 This function returns the tibble "log2FC".
 }
 \examples{
-metalyzer_se@metadata$log2FC <- readRDS(toy_diffres())
+metalyzer_se@metadata$log2FC <- readRDS(MetAlyzer::toy_diffres())
 log2FC(metalyzer_se)
 }

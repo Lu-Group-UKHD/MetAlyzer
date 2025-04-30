@@ -29,7 +29,7 @@ plot_network(
 )
 }
 \arguments{
-\item{log2fc_df}{A dataframe with log2FC, pval, qval, additional columns}
+\item{log2fc_df}{A dataframe with log2FC, qval, additional columns}
 
 \item{q_value}{The q-value threshold for significance}
 
@@ -77,8 +77,8 @@ list with ggplot object and table of node summaries
 This function plots the log2 fold change for each metabolite and visualizes it, in a pathway network.
 }
 \examples{
-log2fc_df <- readRDS(toy_diffres())
-network <- plot_network(log2fc_df, q_value = 0.05)
+log2fc_df <- readRDS(MetAlyzer::toy_diffres())
+network <- MetAlyzer::plot_network(log2fc_df, q_value = 0.05)
 network$Plot
 network$Table
 }

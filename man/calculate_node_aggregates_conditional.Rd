@@ -14,7 +14,7 @@ calculate_node_aggregates_conditional(
 }
 \arguments{
 \item{nodes_sep_df}{Dataframe with metabolites separated (e.g., 'nodes_final').
-Must contain Label, log2FC, pval, qval.}
+Must contain Label, log2FC, qval.}
 
 \item{nodes_orig_df}{Original dataframe with potentially semi-colon separated metabolites.
 Must contain Label.}

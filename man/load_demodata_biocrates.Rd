@@ -13,5 +13,5 @@ Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04 file path
 This function returns the Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx file path.
 }
 \examples{
-fpath <- load_demodata_biocrates()
+fpath <- MetAlyzer::load_demodata_biocrates()
 }

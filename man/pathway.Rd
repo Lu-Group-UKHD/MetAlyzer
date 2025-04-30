@@ -13,5 +13,5 @@ pathway.xlsx file path
 This function returns the latest pathway.xlsx file path.
 }
 \examples{
-fpath <- pathway()
+fpath <- MetAlyzer::pathway()
 }

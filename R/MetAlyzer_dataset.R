@@ -15,7 +15,7 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 read_metidq <- function(
     file_path,
     sheet = 1,
@@ -30,7 +30,7 @@ read_metidq <- function(
     silent = FALSE) {
   # Print MetAlyzer logo
   if (silent == FALSE) {
-    metalyzer_ascii_logo()
+    MetAlyzer:::metalyzer_ascii_logo()
   }
 
   # Open MetIDQ Excel sheet
@@ -38,16 +38,16 @@ read_metidq <- function(
     "file_path" = as.character(file_path),
     "sheet" = as.numeric(sheet)
   )
-  full_sheet <- open_file(starter_list)
-  data_ranges <- get_data_range(full_sheet)
+  full_sheet <- MetAlyzer:::open_file(starter_list)
+  data_ranges <- MetAlyzer:::get_data_range(full_sheet)
 
   # Extract metabolites, meta data and concentration values
-  metabolites <- slice_metabolites(full_sheet, data_ranges)
-  meta_data <- slice_meta_data(full_sheet, data_ranges)
-  conc_values <- slice_conc_values(full_sheet, data_ranges, metabolites)
+  metabolites <- MetAlyzer:::slice_metabolites(full_sheet, data_ranges)
+  meta_data <- MetAlyzer:::slice_meta_data(full_sheet, data_ranges)
+  conc_values <- MetAlyzer:::slice_conc_values(full_sheet, data_ranges, metabolites)
 
   # Read quantification status
-  quant_status <- read_quant_status(
+  quant_status <- MetAlyzer:::read_quant_status(
     starter_list = starter_list,
     sheet_dim = c(nrow(full_sheet), ncol(full_sheet)),
     data_ranges = data_ranges,
@@ -57,7 +57,7 @@ read_metidq <- function(
   )
 
   # Aggregate data and add it to the metadata of SE object
-  aggregated_data <- aggregate_data(
+  aggregated_data <- MetAlyzer:::aggregate_data(
     metabolites = metabolites,
     meta_data = meta_data,
     conc_values = conc_values,
@@ -95,8 +95,8 @@ read_metidq <- function(
 
   # Print summary of conc_values and quant_status
   if (silent == FALSE) {
-    summarize_conc_values(se)
-    summarize_quant_data(se)
+    MetAlyzer:::summarize_conc_values(se)
+    MetAlyzer:::summarize_quant_data(se)
   }
 
   return(se)

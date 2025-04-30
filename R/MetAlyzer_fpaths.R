@@ -6,7 +6,7 @@
 #' @export
 #'
 #' @examples
-#' fpath <- load_rawdata_extraction()
+#' fpath <- MetAlyzer::load_rawdata_extraction()
 load_rawdata_extraction <- function() {
   system.file("extdata", "extraction_data_MxP_Quant_500.xlsx", package = "MetAlyzer")
 }
@@ -20,7 +20,7 @@ load_rawdata_extraction <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- load_demodata_biocrates()
+#' fpath <- MetAlyzer::load_demodata_biocrates()
 load_demodata_biocrates <- function() {
   system.file("extdata", "Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx", package = "MetAlyzer")
 }
@@ -34,7 +34,7 @@ load_demodata_biocrates <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- example_mutation_data_xl()
+#' fpath <- MetAlyzer::example_mutation_data_xl()
 example_mutation_data_xl <- function() {
   system.file("extdata", "mutation_data_MxP_Quant_500_XL.xlsx", package = "MetAlyzer")
 }
@@ -47,7 +47,7 @@ example_mutation_data_xl <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- toy_diffres()
+#' fpath <- MetAlyzer::toy_diffres()
 toy_diffres <- function() {
   system.file("extdata", "toy_diffres_biocrates.rds", package = "MetAlyzer")
 }
@@ -60,7 +60,7 @@ toy_diffres <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- metalyzer_colors()
+#' fpath <- MetAlyzer::metalyzer_colors()
 metalyzer_colors <- function() {
   readRDS(system.file("extdata", "metalyzer_colors.RDS", package = "MetAlyzer"))
 }
@@ -73,7 +73,7 @@ metalyzer_colors <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- polarity()
+#' fpath <- MetAlyzer::polarity()
 polarity <- function() {
   system.file("extdata", "polarity.csv", package = "MetAlyzer")
 }
@@ -87,7 +87,7 @@ polarity <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- pathway()
+#' fpath <- MetAlyzer::pathway()
 pathway <- function() {
   system.file("extdata", "Pathway_120325.xlsx", package = "MetAlyzer")
 }

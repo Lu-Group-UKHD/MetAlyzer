@@ -13,5 +13,5 @@ extraction_data_MxP_Quant_500.xlsx file path
 This function returns the extraction_data_MxP_Quant_500.xlsx file path.
 }
 \examples{
-fpath <- load_rawdata_extraction()
+fpath <- MetAlyzer::load_rawdata_extraction()
 }

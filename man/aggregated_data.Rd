@@ -13,7 +13,7 @@ aggregated_data(metalyzer_se)
 This function returns the tibble "aggregated_data".
 }
 \examples{
-metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 
-aggregated_data(metalyzer_se)
+MetAlyzer::aggregated_data(metalyzer_se)
 }

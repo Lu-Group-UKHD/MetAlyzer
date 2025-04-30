@@ -10,9 +10,9 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' summarize_conc_values(metalyzer_se)
+#' MetAlyzer::summarize_conc_values(metalyzer_se)
 summarize_conc_values <- function(metalyzer_se) {
   conc_values <- SummarizedExperiment::assay(
     metalyzer_se, "conc_values"
@@ -40,9 +40,9 @@ summarize_conc_values <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' summarize_quant_data(metalyzer_se)
+#' MetAlyzer::summarize_quant_data(metalyzer_se)
 summarize_quant_data <- function(metalyzer_se) {
   # Print number of quantification status
   print_number <- function(quant_status, status, total) {
@@ -91,10 +91,10 @@ summarize_quant_data <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' metalyzer_se <- filter_meta_data(metalyzer_se, !is.na(Tissue))
-#' metalyzer_se <- filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
+#' metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, !is.na(Tissue))
+#' metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
 filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
@@ -156,9 +156,9 @@ filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' metalyzer_se <- update_meta_data(
+#' metalyzer_se <- MetAlyzer::update_meta_data(
 #'   metalyzer_se,
 #'   Date = Sys.Date(), Analyzed = TRUE
 #' )
@@ -206,9 +206,9 @@ update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' metalyzer_se <- rename_meta_data(
+#' metalyzer_se <- MetAlyzer::rename_meta_data(
 #'   metalyzer_se,
 #'   Method = `Sample Description`
 #' )
@@ -271,12 +271,12 @@ rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' drop_metabolites <- c("C0", "C2", "C3", "Metabolism Indicators",
 #'   inplace = TRUE
 #' )
-#' metalyzer_se <- filter_metabolites(metalyzer_se, drop_metabolites)
+#' metalyzer_se <- MetAlyzer::filter_metabolites(metalyzer_se, drop_metabolites)
 filter_metabolites <- function(metalyzer_se,
                               drop_metabolites = c("Metabolism Indicators"),
                               drop_NA_concentration = FALSE,
@@ -460,9 +460,9 @@ filter_metabolites <- function(metalyzer_se,
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' aggregated_data(metalyzer_se)
+#' MetAlyzer::aggregated_data(metalyzer_se)
 aggregated_data <- function(metalyzer_se) {
   return(metalyzer_se@metadata$aggregated_data)
 }
@@ -482,15 +482,14 @@ aggregated_data <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #' 
 #' output_file <- file.path(tempdir(), "metabolomics_data.csv")
-#' export_conc_values(
-#'   metalyzer_se,
-#'   `Sample Description`,
-#'   Tissue,
-#'   file_path = output_file
-#' )
+#' MetAlyzer::export_conc_values(metalyzer_se,
+#'                               `Sample Description`,
+#'                               Tissue,
+#'                               file_path = output_file
+#'                               )
 #' unlink(output_file)
 export_conc_values <- function(metalyzer_se,
                              ...,
@@ -521,7 +520,7 @@ export_conc_values <- function(metalyzer_se,
 #' @param metalyzer_se SummarizedExperiment
 #'
 #' @examples
-#' metalyzer_se@metadata$log2FC <- readRDS(toy_diffres())
+#' metalyzer_se@metadata$log2FC <- readRDS(MetAlyzer::toy_diffres())
 #' log2FC(metalyzer_se)
 log2FC <- function(metalyzer_se) {
   return(metalyzer_se@metadata$log2FC)

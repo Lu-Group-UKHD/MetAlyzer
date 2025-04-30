@@ -16,8 +16,8 @@
 #' @export
 #'
 #' @examples
-#' log2fc_df <- toy_diffres()
-#' scatter <- plot_scatter(log2fc_df)
+#' log2fc_df <- MetAlyzer::toy_diffres()
+#' scatter <- MetAlyzer::plot_scatter(log2fc_df)
 plot_scatter <- function(log2fc_df,
                          signif_colors = c("#5F5F5F" = 1,
                                            "#FEBF6E" = 0.1,

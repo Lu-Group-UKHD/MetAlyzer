@@ -13,5 +13,5 @@ toy_diffres.rds file path
 This function returns the log2fc dataframe of the Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04 file, created with the MetaVizPro package.
 }
 \examples{
-fpath <- toy_diffres()
+fpath <- MetAlyzer::toy_diffres()
 }

@@ -52,10 +52,10 @@ of the metabolites vector. If aggregated_data is not empty,
 metabolites and class will also be filtered here.
 }
 \examples{
-metalyzer_se <- read_metidq(file_path = load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 
 drop_metabolites <- c("C0", "C2", "C3", "Metabolism Indicators",
   inplace = TRUE
 )
-metalyzer_se <- filter_metabolites(metalyzer_se, drop_metabolites)
+metalyzer_se <- MetAlyzer::filter_metabolites(metalyzer_se, drop_metabolites)
 }
