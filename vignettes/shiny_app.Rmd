@@ -19,27 +19,27 @@ editor_options:
   chunk_output_type: console
 ---
 
-:::
+
 1. Install the "devtools" package (if not already installed):
-:::
+
 
 ```{r}
-install.packages("devtools")
+#install.packages("devtools")
 ```
 
-:::
+
 2. Install the "dgeAnalysis" package:
-:::
+
 
 ```{r}
-library("devtools")
-devtools::install_github("nilsmechtel/MetAlyzer")
+#library("devtools")
+#devtools::install_github("nilsmechtel/MetAlyzer")
 ```
 
-:::
+
 3. Launch the application:
-:::
+
 
 ```{r}
-MetAlyzer::start_app()
+#MetAlyzer::start_app()
 ```

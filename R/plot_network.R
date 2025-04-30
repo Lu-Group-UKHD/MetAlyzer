@@ -2,7 +2,7 @@
 #'
 #' @description This function plots the log2 fold change for each metabolite and visualizes it, in a pathway network.
 #'
-#' @param log2fc_df A dataframe with log2FC, pval, qval, additional columns
+#' @param log2fc_df A dataframe with log2FC, qval, additional columns
 #' @param q_value The q-value threshold for significance
 #' @param values_col_name Column name of a column that holds numeric values, to be plotted \strong{Default = "log2FC"}
 #' @param stat_col_name Columnname that holds numeric stat values that are used for significance \strong{Default = "qval"}
@@ -34,8 +34,8 @@
 #' @export
 #' 
 #' @examples
-#' log2fc_df <- readRDS(toy_diffres())
-#' network <- plot_network(log2fc_df, q_value = 0.05)
+#' log2fc_df <- readRDS(MetAlyzer::toy_diffres())
+#' network <- MetAlyzer::plot_network(log2fc_df, q_value = 0.05)
 #' network$Plot
 #' network$Table
 
@@ -81,13 +81,13 @@ plot_network <- function(log2fc_df,
 
   nodes_separated_shortend <- nodes_separated_processed %>%
     dplyr::filter(!is.na(values_col_name)) %>%  
-    dplyr::select(-c(Class, x, y, Shape))  
+    dplyr::select(c("Metabolites", "Pathway", "Label", "node_values", "node_stat", all_of(values_col_name), all_of(stat_col_name)))  
   
   summary_log2fc <- nodes_separated_shortend %>%
     dplyr::group_by(Label) %>%
     dplyr::summarise(
-      values_collapsed = paste(values_col_name, collapse = "; "),
-      stat_collapsed = paste(stat_col_name, collapse = "; "),
+      values_collapsed = paste(.data[[values_col_name]], collapse = "; "),
+      stat_collapsed = paste(.data[[stat_col_name]], collapse = "; "),
       .groups = 'drop'
     )
 
@@ -563,7 +563,7 @@ save_plot <- function(plot,
 #' uses all measured metabolites for the node. Adds results to both dataframes.
 #'
 #' @param nodes_sep_df Dataframe with metabolites separated (e.g., 'nodes_final').
-#'   Must contain Label, log2FC, pval, qval.
+#'   Must contain Label, log2FC, qval.
 #' @param nodes_orig_df Original dataframe with potentially semi-colon separated metabolites.
 #'   Must contain Label.
 #' @param q_value Significance threshold for q-values (e.g., 0.05).

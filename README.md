@@ -33,7 +33,7 @@ This is an extract from one of the provided example data sets.
 ![Example_Data](vignettes/images/biocrates_output.png)
 
 #### Create MetAlyzer object:
-```{r}
+```r
 > metalyzer_se <- MetAlyzer_dataset(file_path = load_demodata_biocrates())
 
 
@@ -78,13 +78,11 @@ NAs: 0 (0%)
 ### Visualizations:
 The plotting functions plot_log2FC and plot_network can accept a standard data frame containing log2FC results, and a stat column.
 
-```{r import, message=FALSE, warning=FALSE}
+```r
 diffres_df <- readRDS(MetAlyzer::toy_diffres())
-
-
 ```
 
-```{r, message=FALSE, warning=FALSE}
+```r
 network <- MetAlyzer::plot_network(
   diffres_df,
   q_value = 0.05,

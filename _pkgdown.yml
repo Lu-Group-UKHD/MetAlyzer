@@ -17,16 +17,16 @@ navbar:
     #Customize articles:
     articles:
       text: Tutorials
-      icon: fa-book-open # icons can be found here: https://fontawesome.com/icons?d=gallery
+      icon: fa-code-simple # icons can be found here: https://fontawesome.com/icons?d=gallery
       menu:
-      - text: MetAlyzer R Package User Guide
+      - text: User Guide
         href: articles/user_guide.html
-      - text: MetAlzyer Shiny App User Guide
+      - text: Shiny App Guide
         href: articles/shiny_app.html
     #customize intro:
     reference:
       text: Reference
-      icon: "fa-solid fa-rocket"
+      icon: "fa-solid fa-file"
       href: reference/index.html
     #Customize github:
     github:
@@ -46,5 +46,5 @@ home:
         text: We are grateful for [***SmartCare***](https://smart-care.mscoresys.de/research/computational-data-analysis)
 
 
-#include:
-#  after_body: css/custom_styles.css # This line specifies the custom CSS file
+include:
+  after_body: pkgdown/extra.css

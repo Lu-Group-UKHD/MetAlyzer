@@ -20,7 +20,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, message=FALSE, warning=FALSE}
+```{r setup, message=FALSE, warning=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo=TRUE, cache=FALSE, collapse=TRUE, comment='#>', warning=FALSE, message=FALSE)
 
 #If you haven't done this yet, install the MetAlyzer package
@@ -59,7 +59,7 @@ knitr::include_graphics("images/biocrates_output.png")
 fpath <- MetAlyzer::load_demodata_biocrates()
 
 # Load the data into a SummarizedExperiment object
-metalyzer_se <- MetAlyzer::read_metidq(file_path = fpath)
+metalyzer_se <- MetAlyzer::read_metidq(file_path = fpath, silent = TRUE)
 
 # Display the object summary
 metalyzer_se
@@ -99,7 +99,7 @@ The plotting functions plot_log2FC and plot_network can accept a standard data f
 This example data was generated from the raw extraction data, also provided in the pakage, it compares the concentrations between different tissue types.
 :::
 
-```{r diffres, echo=FALSE, message=FALSE, warning=FALSE}
+```{r diffres, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 ## -------------------------------------------------------------------------- ##
 ##  Skip this part if you already know how to generate a Log2 Fold Change df  ##
 ## -------------------------------------------------------------------------- ##
@@ -239,19 +239,17 @@ nodes_list <- network$Table
 T14_node <- nodes_list[which(nodes_list$Label == "T14"), ]
 
 T14_node_expanded <- tidyr::separate_rows(T14_node,
-                                          Metabolites, log2FC, qval, pval,
+                                          Metabolites, values, stat,
                                           sep = "\\s*;\\s*") %>%
                      tibble::column_to_rownames("Metabolites") %>%
-                     dplyr::rename(p.adj = qval,
-                                   `p-value` = pval,
-                                   Log2FC = log2FC) %>%
-                    dplyr::mutate(Log2FC = as.numeric(Log2FC),
-                                  p.adj = as.numeric(p.adj),
-                                  `p-value` = as.numeric(`p-value`))
-  
+                     dplyr::rename(p.adj = stat,
+                                   Log2FC = values) %>%
+                     dplyr::mutate(Log2FC = as.numeric(Log2FC),
+                                   p.adj = as.numeric(p.adj))
+
 T14_node_expanded %>%
   kableExtra::kbl(caption = "T14 Node detailed Information") %>%
-  kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
+  kableExtra::kable_classic(full_width = F, html_font = "helvetica", font_size = 12)
 ```
 
 :::
@@ -259,14 +257,7 @@ For easy Visualisation of the summarized nodes, you can use the MetaProViz Vulca
 :::
 
 ```{r vulcano, echo=FALSE, message=FALSE, warning=FALSE}
-MetaProViz::VizVolcano(InputData = T14_node_expanded, yCutoff = 0.05)
-```
-
-
-# Session information
-```{r session_info, echo=FALSE}
-options(width = 120)
-sessionInfo()
+MetaProViz::VizVolcano(InputData = T14_node_expanded, yCutoff = 0.05, PlotName = "Vulcano Plot Group 1 vs Group 2")
 ```
 
 # Bibliography

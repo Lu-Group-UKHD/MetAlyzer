@@ -71,7 +71,7 @@ If not provided, results will be saved in `MetAlyzer_results` within the working
 \item{exlude_pathways}{Pathway names that are exluded from plotting}
 }
 \value{
-ggplot object
+list with ggplot object and table of node summaries
 }
 \description{
 This function plots the log2 fold change for each metabolite and visualizes it, in a pathway network.
@@ -79,4 +79,6 @@ This function plots the log2 fold change for each metabolite and visualizes it, 
 \examples{
 log2fc_df <- readRDS(toy_diffres())
 network <- plot_network(log2fc_df, q_value = 0.05)
+network$Plot
+network$Table
 }
