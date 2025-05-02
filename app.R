@@ -191,7 +191,10 @@ ui <- fluidPage(
                              withSpinner(color="#56070C"),
                            #### Provide option of downloading static plot?
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
-                                    column(width = 2, downloadButton("downloadVulcanoPlot", "Download vulcano plot"))),
+                                    column(width = 2, 
+                                            selectInput("formatVulcano", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
+                                    column(width = 2, downloadButton("downloadVulcanoPlot", "Download vulcano plot"))
+                           ),
                            tags$br(),
                            tags$h4(strong('Scatter plot'), style = "margin-top:1rem;"),
                            fluidRow(
@@ -202,7 +205,10 @@ ui <- fluidPage(
                            ),
                            #### Downloaded scatter plot is to be fixed
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem; margin-bottom:1rem;",
-                                    column(width = 2, downloadButton("downloadScatterPlot", "Download scatter plot")))
+                                    column(width = 2, 
+                                            selectInput("formatScatter", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
+                                    column(width = 2, downloadButton("downloadScatterPlot", "Download scatter plot"))
+                           )
           )
         )
       )
@@ -213,9 +219,9 @@ ui <- fluidPage(
       # Lower network plot a bit
       tags$br(),
       conditionalPanel(condition = "input.computeLog2FC",
-        bsCollapse(open = "",
-          bsCollapsePanel("Advanced Styles",
-                          div(style = "display: flex; 
+                       bsCollapse(open = "",
+                                  bsCollapsePanel("Advanced Styles",
+                                                  div(style = "display: flex; 
                                        flex-wrap: wrap; 
                                        justify-content: center; 
                                        align-items: center; 
@@ -223,46 +229,46 @@ ui <- fluidPage(
                                        width: 80%; 
                                        margin-left: auto;
                                        margin-right: auto",
-                              # Plot Height Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkPlotHeight", 
-                                              "Plot Height [100px]", 
-                                              min = 4, max = 20, 
-                                              value = 10, step = 1)
-                              ),
-                              # Metabolite Node Size Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkMetaboliteNodeSize", 
-                                              "Metabolite Node Size", 
-                                              min = 5, max = 50, 
-                                              value = 11, step = 1)
-                              ),
-                              # Connection Width Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkConnectionWidth", 
-                                              "Connection Width", 
-                                              min = 0.5, max = 5, 
-                                              value = 1.25, step = 0.25)
-                              ),
-                              # Pathway Text Size Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkPathwayTextSize", 
-                                              "Pathway Text Size", 
-                                              min = 10, max = 50, 
-                                              value = 20, step = 1)
-                              ),
-                              # Pathway Width Slider
-                              div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                  sliderInput("networkPathwayWidth", 
-                                              "Pathway Width", 
-                                              min = 5, max = 30, 
-                                              value = 10, step = 1)
-                              ),
-                              actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
-                              bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
-                          )
-          )
-        )
+                                                      # Plot Height Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkPlotHeight", 
+                                                                      "Plot Height [100px]", 
+                                                                      min = 4, max = 20, 
+                                                                      value = 10, step = 1)
+                                                      ),
+                                                      # Metabolite Node Size Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkMetaboliteNodeSize", 
+                                                                      "Metabolite Node Size", 
+                                                                      min = 5, max = 50, 
+                                                                      value = 11, step = 1)
+                                                      ),
+                                                      # Connection Width Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkConnectionWidth", 
+                                                                      "Connection Width", 
+                                                                      min = 0.5, max = 5, 
+                                                                      value = 1.25, step = 0.25)
+                                                      ),
+                                                      # Pathway Text Size Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkPathwayTextSize", 
+                                                                      "Pathway Text Size", 
+                                                                      min = 10, max = 50, 
+                                                                      value = 20, step = 1)
+                                                      ),
+                                                      # Pathway Width Slider
+                                                      div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                          sliderInput("networkPathwayWidth", 
+                                                                      "Pathway Width", 
+                                                                      min = 5, max = 30, 
+                                                                      value = 10, step = 1)
+                                                      ),
+                                                      actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
+                                                      bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
+                                                  )
+                                  )
+                       )
       ),
       
       conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
@@ -272,8 +278,11 @@ ui <- fluidPage(
                            # Use the height value from the slider to control the plot's height
                            plotlyOutput('plotNetwork', height = "auto") %>%
                              withSpinner(color="#56070C"),
-                           div(style = "width: 100%; margin-top: 50px; display: flex; justify-content: center;",
-                               downloadButton("downloadNetworkPlot", "Download network Plot")))
+                           fluidRow(style="display:flex; justify-content:center; margin-top:50px; margin-bottom:1rem;",
+                                    column(width = 2, 
+                                            selectInput("formatNetwork", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
+                                    column(width = 2, downloadButton("downloadNetworkPlot", "Download Network plot"))
+                           ))
       )
     ),
     tabPanel(
@@ -580,7 +589,7 @@ server <- function(input, output, session) {
       #   updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
       #                     selected = 'Metabolism Indicators')
       # } else {
-        updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
       # }
     }
   })
@@ -834,7 +843,7 @@ server <- function(input, output, session) {
     #   updateSelectInput(session, 'featChoicesFiltering', choices = featChoices(),
     #                     selected = 'Metabolism Indicators')
     # } else {
-      updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
+    updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
     # }
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
     updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
@@ -1237,12 +1246,12 @@ server <- function(input, output, session) {
     req(reactLog2FCTbl())
     if (!input$highlightVulcano) {
       plotly_vulcano(reactLog2FCTbl(),
-                     cutoff_x = input$plotVolcanoLog2FCCutoff,
-                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
+                     x_cutoff = input$plotVolcanoLog2FCCutoff,
+                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
     } else {
       plotly_vulcano(reactVulcanoHighlight(),
-                     cutoff_x = input$plotVolcanoLog2FCCutoff,
-                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
+                     x_cutoff = input$plotVolcanoLog2FCCutoff,
+                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
     }
   })
   
@@ -1300,69 +1309,71 @@ server <- function(input, output, session) {
   # Download the log2(FC) visuals as html
   output$downloadVulcanoPlot <- downloadHandler(
     filename = function() {
-      "vulcano_plot.html"
+      paste0("vulcano_plot.", input$formatVulcano)
     },
     content = function(file) {
-      # Define a variable to store the final plot
-      if (input$highlightVulcano) {
-        req(reactVulcanoHighlight())
-        final_plot <- plotly_vulcano(reactVulcanoHighlight(), 
-                                     cutoff_x = input$plotVolcanoLog2FCCutoff,
-                                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
+      if (input$formatVulcano == "html") {
+        if (input$highlightVulcano) {
+          req(reactVulcanoHighlight())
+          final_plot <- plotly_vulcano(reactVulcanoHighlight(), 
+                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+        } else {
+          final_plot <- plotly_vulcano(reactLog2FCTbl(), 
+                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+        }
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
-        final_plot <- plotly_vulcano(reactLog2FCTbl(), 
-                                     cutoff_x = input$plotVolcanoLog2FCCutoff,
-                                     cutoff_y = as.numeric(input$plotVolcanoPValCutoff))
+        if (input$highlightVulcano) {
+          req(reactVulcanoHighlight())
+          final_plot <- MetAlyzer::plot_vulcano(reactVulcanoHighlight(), 
+                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff),
+                                       show_labels_for = input$metabChoicesVulcano)
+        } else {
+          final_plot <- MetAlyzer::plot_vulcano(reactLog2FCTbl(), 
+                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+        }
+        ggsave(filename = file, plot = final_plot, device = input$formatVulcano, dpi = 300)
       }
-      
-      # Save the Plotly plot as an HTML file
-      htmlwidgets::saveWidget(
-        widget = final_plot,
-        file = file,
-        selfcontained = TRUE
-      )
     }
   )
   output$downloadScatterPlot <- downloadHandler(
     filename = function() {
-      "scatter_plot.html"
+      paste0("scatter_plot.", input$formatScatter)
     },
     content = function(file) {
-      # Define a variable to store the final plot
-      # if (input$highlightVulcano) {
-      #   req(reactVulcanoHighlight())
-      #   final_plot <- plotly_scatter(reactVulcanoHighlight())$Plot
-      # } else {
-      #   final_plot <- plotly_scatter(reactLog2FCTbl())$Plot
-      # }
-      final_plot <- plotly_scatter(reactLog2FCTbl())$Plot
       
-      # Save the Plotly plot as an HTML file
-      htmlwidgets::saveWidget(
-        widget = final_plot,
-        file = file,
-        selfcontained = TRUE
-      )
+      if (input$formatScatter == "html") {
+        htmlwidgets::saveWidget(plotly_scatter(reactLog2FCTbl())$Plot, file, selfcontained = TRUE)
+      } else {
+        ggsave(filename = file, plot = MetAlyzer::plot_scatter(reactLog2FCTbl()), device = input$formatScatter, dpi = 300, units = "cm", width = 32.0, height = 21.0)
+      }
     }
   )
   output$downloadNetworkPlot <- downloadHandler(
     filename = function() {
-      "network_plot.html"
+      paste0("network_plot.", input$formatNetwork)
     },
     content = function(file) {
-      # Save the Plotly plot as an HTML file
-      htmlwidgets::saveWidget(
-        widget = plotly_network(
+      if (input$formatNetwork == "html") {
+        final_plot <- plotly_network(
           reactLog2FCTbl(), 
           metabolite_node_size = input$networkMetaboliteNodeSize,
           connection_width = input$networkConnectionWidth,
           pathway_text_size = input$networkPathwayTextSize,
           pathway_width = input$networkPathwayWidth,
-          plot_height = input$networkPlotHeight*100
-        ),
-        file = file,
-        selfcontained = TRUE
-      )
+          plot_height = input$networkPlotHeight * 100
+        )
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
+      } else {
+        final_plot <- MetAlyzer::plot_network(
+          reactLog2FCTbl()
+        )
+        ggsave(filename = file, plot = final_plot, device = input$formatNetwork, dpi = 300, units = "cm", width = 32.0, height = 21.0)
+      }
     }
   )
 }

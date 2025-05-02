@@ -1,0 +1,13 @@
+name: rshiny_biocrates_da
+title: RShiny_Biocrates_DA
+username: metalyzerbeta
+account: metalyzerbeta
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12979616
+bundleId: 9746502
+url: https://metalyzerbeta.shinyapps.io/rshiny_biocrates_da/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: README.md

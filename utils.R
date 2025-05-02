@@ -248,9 +248,9 @@ plotly_scatter <- function(Log2FCTab) {
 #' vulcanoplot based on log2 fold change data.
 #' 
 #' @param Log2FCTab A data frame containing log2 fold change data
-#' @param cutoff_y A numeric value specifying the cutoff for q-value
-#' @param cutoff_x A numeric value specifying the cutoff for log2 fold change
-plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
+#' @param y_cutoff A numeric value specifying the cutoff for q-value
+#' @param x_cutoff A numeric value specifying the cutoff for log2 fold change
+plotly_vulcano <- function(Log2FCTab, y_cutoff = 0.05, x_cutoff = 1.5) {
   # Make Colors unique for each class
   polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
   polarity_df <- utils::read.csv(polarity_file) %>%
@@ -280,8 +280,8 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
                                                "\nLog2(FC): ", round(log2FC, digits=2), 
                                                "\nAdj. p-value: ", round(qval, digits=4),
                                                "\nP-value: ", round(pval, digits=4)))) +
-      geom_vline(xintercept=c(-cutoff_x, cutoff_x), col="black", linetype="dashed") +
-      geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
+      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
+      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
       scale_color_manual('',
                          breaks = c("Other metabolites", "Highlighted metabolite(s)"),
                          values = c("#d3d3d3","#56070C")) +
@@ -294,9 +294,10 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
     return(p_vulcano_highlighted)
   } else {
     # Data Vulcano: Prepare Dataframe for vulcano plot
-    Log2FCTab$Class <- as.character(Log2FCTab$Class)
-    Log2FCTab$Class[Log2FCTab$qval > cutoff_y] <- "Not Significant"
-    Log2FCTab$Class[abs(Log2FCTab$log2FC) < cutoff_x] <- "Not Significant"
+    Log2FCTab$Class <- Log2FCTab$Class
+    Log2FCTab$ClassColor <- Log2FCTab$Class
+    Log2FCTab$ClassColor[Log2FCTab$qval > y_cutoff] <- "Not Significant"
+    Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < x_cutoff] <- "Not Significant"
 
     breaks <- unique(Log2FCTab$Class)
     values <- class_colors[names(class_colors) %in% Log2FCTab$Class]
@@ -305,9 +306,9 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
     p_fc_vulcano <- ggplot(Log2FCTab,
                            aes(x = .data$log2FC,
                                y = -log10(.data$qval),
-                               color = .data$Class)) +
-      geom_vline(xintercept=c(-cutoff_x, cutoff_x), col="black", linetype="dashed") +
-      geom_hline(yintercept=-log10(cutoff_y), col="black", linetype="dashed") +
+                               color = .data$ClassColor)) +
+      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
+      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
       geom_point(size = 1.5, aes(text = paste0(Metabolite, 
                                                "\nClass: ", Class, 
                                                "\nLog2(FC): ", round(log2FC, digits=2), 
@@ -338,14 +339,17 @@ plotly_vulcano <- function(Log2FCTab, cutoff_y = 0.05, cutoff_x = 1.5) {
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
 #' @param plot_height The height of the Plot in pixel [px]
+#' @param plot_column_name Column name in the Log2FC dataframe to plot; 
+#' for multiple metabolites per node, the mean is used.
 plotly_network <- function(Log2FCTab,
                            q_value=0.05,
                            metabolite_node_size=11,
                            connection_width=1.25,
                            pathway_text_size=20,
                            pathway_width=10,
-                           plot_height=800) {
-  pathway_file <- get_data_file_path("Pathway_120924.xlsx")
+                           plot_height=800,
+                           plot_column_name="log2FC") {
+  pathway_file <- get_data_file_path("Pathway_120325.xlsx")
   ## Read network nodes, edges and annotations
   pathways <- read_named_region(pathway_file, "Pathways_Header")
   invalid_annotations <- which(
@@ -412,16 +416,18 @@ plotly_network <- function(Log2FCTab,
   signif_df <- filter(Log2FCTab,
                       !is.na(.data$log2FC),
                       !is.na(.data$qval),
+                      !is.na(.data$pval),
                       .data$qval <= q_value)
+
   
-  nodes$FC_thresh <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+  nodes$log2FC <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
     tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
-    } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
       # Not significantly changed but measured
-      l2fc <- 0
+      l2fc <- sum(Log2FCTab$log2FC[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
       # Not measured
       l2fc <- NA
@@ -430,12 +436,12 @@ plotly_network <- function(Log2FCTab,
   })
   
   ## Add p-value to nodes_df
-  nodes$q_value <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+  nodes$qval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
     tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
     if (nrow(tmp_df) > 0) {
       # Alteast 1 significantly changed
       qval <- sum(tmp_df$qval) / nrow(tmp_df)
-    } else if (any(m_vec %in% Log2FCTab$Metabolite)) {
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
       # Not significantly changed but measured
       qval <- sum(Log2FCTab$qval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
     } else {
@@ -444,18 +450,55 @@ plotly_network <- function(Log2FCTab,
     }
     return(qval)
   })
-  
+
+  ## Add p-value to nodes_df
+  nodes$pval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 significantly changed
+      pval <- sum(tmp_df$pval) / nrow(tmp_df)
+    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
+      # Not significantly changed but measured
+      pval <- sum(Log2FCTab$pval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
+    } else {
+      # Not measured
+      pval <- NA
+    }
+    return(pval)
+  })
+
+  nodes$add_col <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
+    tmp_df <- filter(Log2FCTab, .data$Metabolite %in% m_vec)
+    if (nrow(tmp_df) > 0) {
+      # Alteast 1 value per Node
+      value <- sum(tmp_df[plot_column_name]) / nrow(tmp_df)
+    } else {
+      # Not measured
+      value <- NA
+    }
+    return(value)
+  })
+
+  # In case the plotted column is log2FC or qval, as they are calculated differently
+  if (plot_column_name == "log2FC") {
+    nodes$add_col = nodes$log2FC
+  } else if (plot_column_name == "qval") {
+    nodes$add_col = nodes$qval
+  } else if (plot_column_name == "pval") {
+    nodes$add_col = nodes$pval
+  }
+
   ## Draw network
   # Create a plot of the network using ggplotly
   
   # Preparing Hexcodes for Annotation Colors
-  nodes$color <- sapply(nodes$FC_thresh, function(value) {
+  nodes$color <- sapply(nodes$add_col, function(value) {
     if (is.na(value)) {
       return("grey")
     } else {
       # Using the viridis color scale, adjust 'option' based on your preference
       color_scale <- viridis(10, option = "D")
-      nodes_range <- na.omit(nodes$FC_thresh)
+      nodes_range <- na.omit(nodes$add_col)
       
       color_index <- findInterval(value, seq(min(nodes_range), max(nodes_range)+0.1, length.out = length(color_scale) + 1))
       return(color_scale[color_index])
@@ -508,7 +551,7 @@ plotly_network <- function(Log2FCTab,
                      y = nodes$y,
                      type = "scatter",
                      mode = "markers",
-                     marker = list(color = nodes$FC_thresh, 
+                     marker = list(color = nodes$add_col, 
                                    colorbar = list(title = ""),
                                    colorscale='Viridis',
                                    showscale = TRUE),
@@ -535,25 +578,10 @@ plotly_network <- function(Log2FCTab,
       ay = 0,
       bgcolor = nodes$color[i],
       opacity = 1,
-      hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
+      hovertext = paste0("log2 Fold Change: ", round(nodes$log2FC[i], 5),
                          "\nPathway: ", nodes$Pathway[i],
-                         "\nadj. p-value: ", round(nodes$q_value[i], 5))
-    )
-  }
-  for (i in 1:nrow(nodes)) {
-    p_network <- p_network %>% add_annotations(
-      text = nodes$Label[i],
-      x = nodes$x[i],
-      y = nodes$y[i],
-      arrowhead = 0,
-      font = list(size = metabolite_node_size, color = "white"),
-      ax = 0,
-      ay = 0,
-      bgcolor = nodes$color[i],
-      opacity = 1,
-      hovertext = paste0("log2 Fold Change: ", round(nodes$FC_thresh[i], 5),
-                         "\nPathway: ", nodes$Pathway[i],
-                         "\nadj. p-value: ", round(nodes$q_value[i], 5))
+                         "\nadj. p-value: ", round(nodes$qval[i], 5),
+                         "\np-value: ", round(nodes$pval[i], 5))
     )
   }
   
@@ -741,8 +769,8 @@ data_normalization <- function(metalyzer_se, norm_method) {
 #' located regardless of where the app is running.
 #' 
 #' @examples
-#' # Get path to the file "Pathway_120924.xlsx" in the data folder
-#' file_path <- get_data_file_path("Pathway_120924.xlsx")
+#' # Get path to the file "Pathway_120325.xlsx" in the data folder
+#' file_path <- get_data_file_path("Pathway_120325.xlsx")
 #' 
 #' # Read the CSV file
 #' data <- read.csv(file_path)
