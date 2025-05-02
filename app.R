@@ -67,9 +67,10 @@ ui <- fluidPage(
                                               value = T, status = 'primary', right = T),
                                #### Needs further discussion on median normalization
                                selectInput('normalization', 'Select normalization method to use:',
-                                           choices = c('None', 'Median normalization',
+                                           choices = c('None', 'Log2 transformation',
+                                                       'Median normalization',
                                                        'Total ion count (TIC) normalization'),
-                                           selected = 'Median normalization', multiple = F)
+                                           selected = 'Log2 transformation', multiple = F)
                                # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
                                #                               observed values in each metabolite.')),
                                # bsTooltip('normalization', '')
@@ -192,7 +193,7 @@ ui <- fluidPage(
                            #### Provide option of downloading static plot?
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
                                     column(width = 2, 
-                                            selectInput("formatVulcano", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
+                                           selectInput("formatVulcano", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
                                     column(width = 2, downloadButton("downloadVulcanoPlot", "Download vulcano plot"))
                            ),
                            tags$br(),
@@ -206,7 +207,7 @@ ui <- fluidPage(
                            #### Downloaded scatter plot is to be fixed
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem; margin-bottom:1rem;",
                                     column(width = 2, 
-                                            selectInput("formatScatter", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
+                                           selectInput("formatScatter", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
                                     column(width = 2, downloadButton("downloadScatterPlot", "Download scatter plot"))
                            )
           )
@@ -280,7 +281,7 @@ ui <- fluidPage(
                              withSpinner(color="#56070C"),
                            fluidRow(style="display:flex; justify-content:center; margin-top:50px; margin-bottom:1rem;",
                                     column(width = 2, 
-                                            selectInput("formatNetwork", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
+                                           selectInput("formatNetwork", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
                                     column(width = 2, downloadButton("downloadNetworkPlot", "Download Network plot"))
                            ))
       )
@@ -405,7 +406,7 @@ server <- function(input, output, session) {
     updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
     updateMaterialSwitch(session, 'imputation', value = T)
-    updateSelectInput(session, 'normalization', selected = 'Median normalization')
+    updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
     
     updateSelectInput(session, 'featIdChoicesExport', selected = character(0))
     
@@ -450,7 +451,7 @@ server <- function(input, output, session) {
       updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
       updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
       updateMaterialSwitch(session, 'imputation', value = T)
-      updateSelectInput(session, 'normalization', selected = 'Median normalization')
+      updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
       
       updateCheckboxInput(session, 'ifUploadedFilePrior2023', value = F)
       updateSelectInput(session, 'featIdChoicesExport', selected = character(0))
@@ -756,6 +757,9 @@ server <- function(input, output, session) {
         } else if (input$normalization == 'Median normalization') {
           reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'median')
           doneNormalization(1)
+        } else if (input$normalization == 'Log2 transformation') {
+          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'log2')
+          doneNormalization(1)
         }
       }
       # Update main MetAlyzer object for further analysis
@@ -856,7 +860,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'smpChoicesFiltering', choices = smpChoiceList)
     # Set parameters for imputation and normalization back to default
     updateMaterialSwitch(session, 'imputation', value = T)
-    updateSelectInput(session, 'normalization', selected = 'Median normalization')
+    updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
     
     # Empty parameter log
     reactParamList$smpFiltering <- c()

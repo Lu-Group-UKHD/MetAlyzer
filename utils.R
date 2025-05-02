@@ -692,12 +692,12 @@ glog2 <- function(x) {
 #' @title Normalize aggregated data in SE MetAlyzer object
 #' @description This function normalizes concentration values among samples using
 #' total ion count (TIC) normalization, variance stabilizing normalization (VSN),
-#' or median normalization. The normalized values are stored in column 'Concentration'
-#' of aggregated data.
+#' median normalization, or log2 transformation. The normalized values are stored
+#' in column 'Concentration' of aggregated data.
 #'
 #' @param metalyzer_se A MetAlyzer object
 #' @param norm_method A character specifying the normalization method to use, which
-#' should be one of 'TIC', 'VSN', or 'median'
+#' should be one of 'TIC', 'VSN', 'median', or 'log2'
 #' @import dplyr, limma
 data_normalization <- function(metalyzer_se, norm_method) {
   aggregated_data <- metalyzer_se@metadata$aggregated_data
@@ -741,6 +741,9 @@ data_normalization <- function(metalyzer_se, norm_method) {
     #' In log(apply(x, 2, median, na.rm = TRUE)) : NaNs produced
     # norm_data <- glog2(data_mat) %>%
     #   limma::normalizeBetweenArrays(method = 'scale')
+  } else if (norm_method %in% 'log2') {
+    # Do log2 transformation
+    norm_data <- glog2(data_mat)
   }
   # Convert matrix to aggregated long data
   aggregated_data <- tibble::as_tibble(norm_data, rownames = 'Metabolite') %>%
