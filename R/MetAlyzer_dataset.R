@@ -28,6 +28,31 @@ read_metidq <- function(
       "Incomplete" = c("#CBD2D7", "#FFCCCC")
     ),
     silent = FALSE) {
+  # Input checks
+  if (!is.character(file_path) || length(file_path) != 1) {
+    stop("`file_path` must be a single character string.", call. = FALSE)
+  }
+  if (!file.exists(file_path)) {
+    stop("`file_path` does not exist: ", file_path, call. = FALSE)
+  }
+  if (!((is.numeric(sheet) && length(sheet) == 1 && sheet > 0 && floor(sheet) == sheet) ||
+        (is.character(sheet) && length(sheet) == 1))) {
+    stop("`sheet` must be a single positive integer or a single sheet name (character string).", call. = FALSE)
+  }
+  if (!is.list(status_list)) {
+    stop("`status_list` must be a list.", call. = FALSE)
+  }
+  if (length(status_list) > 0 && !all(sapply(status_list, function(x) is.character(x) && !any(is.na(x))))) {
+    stop("All elements in `status_list` must be character vectors of hex color codes.", call. = FALSE)
+  }
+  if (!is.logical(silent) || length(silent) != 1) {
+    stop("`silent` must be a single logical value (TRUE or FALSE).", call. = FALSE)
+  }
+
+  # Rest of the function code would go here...
+  if (!silent) {
+    message("Input checks passed. Proceeding with reading MetIDQ file.")
+  }
   # Print MetAlyzer logo
   if (silent == FALSE) {
     MetAlyzer:::metalyzer_ascii_logo()
