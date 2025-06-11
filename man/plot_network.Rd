@@ -47,6 +47,8 @@ plot_network(
 
 \item{pathway_width}{The line width of pathway-specific connection coloring}
 
+\item{exclude_pathways}{Pathway names that are exluded from plotting}
+
 \item{color_scale}{A string specifying the color scale to use. Options include `"viridis"`, `"plasma"`, `"magma"`, `"inferno"`, `"cividis"`, `"rocket"`, `"mako"`, and `"turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.}
 
 \item{gradient_colors}{A vector of length 2 or 3 specifying the colors for a custom gradient. If two colors are provided (`c(low, high)`), `scale_fill_gradient()` is used. If three colors are provided (`c(low, mid, high)`), `scale_fill_gradient2()` is used. If `NULL` or incorrectly specified, the viridis color scale is applied.}
@@ -60,6 +62,8 @@ If not provided, results will be saved in `MetAlyzer_results` within the working
 
 \item{file_name}{Name of the output file (without extension). \strong{Default = "network"}}
 
+\item{format}{File format for saving the plot (e.g., "png", "pdf", "svg"). \strong{Default = "pdf"}}
+
 \item{width}{Width of the saved plot in specified units. \strong{Default = 29.7}}
 
 \item{height}{Height of the saved plot in specified units. \strong{Default = 21.0}}
@@ -67,8 +71,6 @@ If not provided, results will be saved in `MetAlyzer_results` within the working
 \item{units}{Units for width and height (e.g., "in", "cm", "mm"). \strong{Default = "cm"}}
 
 \item{overwrite}{Logical: If `TRUE`, overwrite existing files without asking. If `FALSE`, prompt user before overwriting. \strong{Default = FALSE}}
-
-\item{exlude_pathways}{Pathway names that are exluded from plotting}
 }
 \value{
 list with ggplot object and table of node summaries

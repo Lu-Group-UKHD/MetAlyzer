@@ -24,6 +24,5 @@ filter out samples.
 \examples{
 metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 
-metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, !is.na(Tissue))
 metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, `Sample Description` \%in\% 1:6)
 }

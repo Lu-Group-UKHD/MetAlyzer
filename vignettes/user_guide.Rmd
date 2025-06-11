@@ -111,7 +111,7 @@ col_metadata_df$RowNames <- col@rownames
 
 sample_info <- col_metadata_df %>%
   tibble::column_to_rownames("RowNames") %>%
-  dplyr::rename("Conditions" = "Sample.description")
+  dplyr::rename("Conditions" = "Sample.Description")
 
 ## Input Concentration values
 intra_m <- as.data.frame(t(SummarizedExperiment::assay(metalyzer_se))) # rownames must match the rownames of the SampleInfo

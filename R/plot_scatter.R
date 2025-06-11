@@ -13,10 +13,11 @@
 #' @import ggrepel
 #' @import SummarizedExperiment
 #' @importFrom rlang .data
+#' @importFrom magrittr %>%
 #' @export
 #'
 #' @examples
-#' log2fc_df <- MetAlyzer::toy_diffres()
+#' log2fc_df <- readRDS(MetAlyzer::toy_diffres())
 #' scatter <- MetAlyzer::plot_scatter(log2fc_df)
 plot_scatter <- function(log2fc_df,
                          signif_colors = c("#5F5F5F" = 1,

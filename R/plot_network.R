@@ -11,7 +11,7 @@
 #' @param connection_width The line width of connections between metabolites
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
-#' @param exlude_pathways Pathway names that are exluded from plotting
+#' @param exclude_pathways Pathway names that are exluded from plotting
 #' @param color_scale A string specifying the color scale to use. Options include `"viridis"`, `"plasma"`, `"magma"`, `"inferno"`, `"cividis"`, `"rocket"`, `"mako"`, and `"turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.
 #' @param gradient_colors A vector of length 2 or 3 specifying the colors for a custom gradient. If two colors are provided (`c(low, high)`), `scale_fill_gradient()` is used. If three colors are provided (`c(low, mid, high)`), `scale_fill_gradient2()` is used. If `NULL` or incorrectly specified, the viridis color scale is applied.
 #' @param save_as \emph{Optional: } Select the file type of output plots. Options are svg, pdf, png or NULL. \strong{Default = "NULL"}
@@ -19,6 +19,7 @@
 #' @param folder_path \emph{Optional: } User-defined path where the folder should be created. 
 #' If not provided, results will be saved in `MetAlyzer_results` within the working directory. \strong{Default = NULL}
 #' @param file_name Name of the output file (without extension). \strong{Default = "network"}
+#' @param format File format for saving the plot (e.g., "png", "pdf", "svg"). \strong{Default = "pdf"}
 #' @param width Width of the saved plot in specified units. \strong{Default = 29.7}
 #' @param height Height of the saved plot in specified units. \strong{Default = 21.0}
 #' @param units Units for width and height (e.g., "in", "cm", "mm"). \strong{Default = "cm"}
@@ -31,6 +32,7 @@
 #' @import viridis
 #' @import viridisLite
 #' @importFrom rlang .data !!
+#' @importFrom magrittr %>%
 #' @export
 #' 
 #' @examples
@@ -64,9 +66,9 @@ plot_network <- function(log2fc_df,
   network_file <- MetAlyzer::pathway()
 
   ### Read in Excel file
-  pathways <- MetAlyzer:::read_pathways(network_file)
-  nodes <- MetAlyzer:::read_nodes(network_file, pathways)
-  edges <- MetAlyzer:::read_edges(network_file, nodes, pathways)
+  pathways <- read_pathways(network_file)
+  nodes <- read_nodes(network_file, pathways)
+  edges <- read_edges(network_file, nodes, pathways)
   
   nodes <- dplyr::filter(nodes, !Pathway %in% exclude_pathways)
   
@@ -74,7 +76,7 @@ plot_network <- function(log2fc_df,
   
   nodes_joined <- dplyr::left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col_name))
 
-  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, values_col_name, stat_col_name)
+  updated_nodes_list <- calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, values_col_name, stat_col_name)
 
   # --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
@@ -570,6 +572,10 @@ save_plot <- function(plot,
 #' @param values_col_name plotted column
 #' @param stat_col_name p value column name
 #'
+#' @import dplyr
+#' @importFrom rlang .data 
+#' @importFrom magrittr %>%
+#' 
 #' @return A list containing two dataframes:
 #'   $nodes_separated: Input nodes_sep_df with 2 new columns:
 #'     node_values, node_stat
@@ -598,8 +604,8 @@ calculate_node_aggregates_conditional <- function(nodes_sep_df,
 
   # Group by Label and apply the conditional mean logic for each metric
   node_summary <- nodes_sep_df %>%
-    group_by(Label) %>%
-    summarise(
+    dplyr::group_by(.data$Label) %>%
+    dplyr::summarise(
       # Use the helper function for conditional mean calculation
       node_values = calculate_conditional_mean(.data[[values_col_name]], .data[[stat_col_name]], q_value),
       # Apply the same logic to qval itself: average significant qvals if present, else average measured qvals.
@@ -612,14 +618,14 @@ calculate_node_aggregates_conditional <- function(nodes_sep_df,
 
   nodes_sep_updated <- nodes_sep_df %>%
     # Join the calculated node-level aggregates back
-    left_join(node_summary, by = "Label")
+    dplyr::left_join(node_summary, by = "Label")
 
   # --- 3. Update Original Nodes Dataframe ---
 
   nodes_orig_updated <- nodes_orig_df %>%
       dplyr::select(-any_of(c("node_values", "node_stat"))) %>%
       dplyr::left_join(node_summary, by = "Label") %>%
-      dplyr::rename(!!values_col_name := node_values, !!stat_col_name := node_stat)
+      dplyr::rename(!!values_col_name := .data$node_values, !!stat_col_name := .data$node_stat)
 
   # --- 4. Return Updated Dataframes ---
   return(list(nodes_separated = nodes_sep_updated, nodes = nodes_orig_updated))

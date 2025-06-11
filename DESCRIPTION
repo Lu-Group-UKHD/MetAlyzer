@@ -33,27 +33,15 @@ Imports:
     stringr,
     dplyr,
     tidyr,
-    tibble,
-    agricolae,
     ggplot2,
     ggrepel,
     utils,
     rlang,
     data.table,
     S4Vectors,
+    magrittr,
     viridis,
     viridisLite,
-    limma,
-    plotly,
-    vsn,
-    writexl,
-    svglite,
-    htmlwidgets,
-    bslib,
-    shiny,
-    shinyBS,
-    shinyWidgets,
-    gridExtra
 Description: The 'MetAlyzer' S4 object provides methods to read and reformat metabolomics data for convenient data handling, statistics and downstream analysis. The resulting format corresponds to input data of the Shiny app 'MetaboExtract' (<https://www.metaboextract.shiny.dkfz.de/MetaboExtract/>).
 License: GPL-3
 Encoding: UTF-8
@@ -61,7 +49,20 @@ Language: en-US
 RoxygenNote: 7.3.2
 Suggests:
     rmarkdown,
-    knitr
+    knitr,
+    MetaProViz,
+    kableExtra,
+    gridExtra,
+    plotly,
+    shiny,
+    shinyBS,
+    shinyWidgets,
+    svglite,
+    htmlwidgets,
+    bslib,
+    vsn,
+    writexl,
+    tibble
 VignetteBuilder: knitr
 URL: https://github.com/nilsmechtel/MetAlyzer
 BugReports: https://github.com/nilsmechtel/MetAlyzer/issues

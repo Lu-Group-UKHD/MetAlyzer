@@ -6,6 +6,9 @@
 \usage{
 MetAlyzer_dataset(...)
 }
+\arguments{
+\item{...}{Declare this function as out of date}
+}
 \description{
 This function was deprecated in version v2.0.0
 }

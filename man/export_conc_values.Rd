@@ -22,7 +22,6 @@ metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_bioc
 output_file <- file.path(tempdir(), "metabolomics_data.csv")
 MetAlyzer::export_conc_values(metalyzer_se,
                               `Sample Description`,
-                              Tissue,
                               file_path = output_file
                               )
 unlink(output_file)

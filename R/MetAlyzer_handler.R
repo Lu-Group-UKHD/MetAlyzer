@@ -93,7 +93,6 @@ summarize_quant_data <- function(metalyzer_se) {
 #' @examples
 #' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, !is.na(Tissue))
 #' metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
 filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
@@ -487,7 +486,6 @@ aggregated_data <- function(metalyzer_se) {
 #' output_file <- file.path(tempdir(), "metabolomics_data.csv")
 #' MetAlyzer::export_conc_values(metalyzer_se,
 #'                               `Sample Description`,
-#'                               Tissue,
 #'                               file_path = output_file
 #'                               )
 #' unlink(output_file)
@@ -518,10 +516,12 @@ export_conc_values <- function(metalyzer_se,
 #' @description This function returns the tibble "log2FC".
 #'
 #' @param metalyzer_se SummarizedExperiment
-#'
+#' @export
+#' 
 #' @examples
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #' metalyzer_se@metadata$log2FC <- readRDS(MetAlyzer::toy_diffres())
-#' log2FC(metalyzer_se)
+#' MetAlyzer::log2FC(metalyzer_se)
 log2FC <- function(metalyzer_se) {
   return(metalyzer_se@metadata$log2FC)
 }
