@@ -63,7 +63,8 @@ Suggests:
     vsn,
     writexl,
     tibble,
-    remotes
+    remotes,
+    MetaProViz
 Remotes: 
     MetaProViz=url::github.com/saezlab/MetaProViz@main
 VignetteBuilder: knitr
