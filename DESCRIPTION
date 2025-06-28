@@ -63,8 +63,7 @@ Suggests:
     writexl,
     tibble,
     remotes
-Remotes:
-    MetaProViz=github::https://github.com/saezlab/MetaProViz@main
+Remotes: MetaProViz=github::https://github.com/saezlab/MetaProViz@main
 VignetteBuilder: knitr
 URL: https://github.com/nilsmechtel/MetAlyzer
 BugReports: https://github.com/nilsmechtel/MetAlyzer/issues
