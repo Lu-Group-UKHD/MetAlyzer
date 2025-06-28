@@ -66,7 +66,7 @@ Suggests:
     remotes,
     MetaProViz
 Remotes: 
-    MetaProViz=url::github.com/saezlab/MetaProViz
+    saezlab/MetaProViz
 VignetteBuilder: knitr
 URL: https://github.com/nilsmechtel/MetAlyzer
 BugReports: https://github.com/nilsmechtel/MetAlyzer/issues
