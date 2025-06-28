@@ -64,7 +64,7 @@ Suggests:
     tibble,
     remotes
 Remotes:
-    github::https://github.com/saezlab/MetaProViz@main
+    MetaProViz=github::https://github.com/saezlab/MetaProViz@main
 VignetteBuilder: knitr
 URL: https://github.com/nilsmechtel/MetAlyzer
 BugReports: https://github.com/nilsmechtel/MetAlyzer/issues
