@@ -6,20 +6,56 @@
 \usage{
 plot_scatter(
   log2fc_df,
+  show_labels_for = NULL,
+  values_col_name = "log2FC",
+  stat_col_name = "qval",
+  show_p_value = TRUE,
   signif_colors = c(`#5F5F5F` = 1, `#FEBF6E` = 0.1, `#EE5C42` = 0.05, `#8B1A1A` = 0.01),
-  show_labels_for = NULL
+  save_as = NULL,
+  folder_name = format(Sys.Date(), "\%Y-\%m-\%d"),
+  folder_path = NULL,
+  file_name = "network",
+  format = "pdf",
+  width = 29.7,
+  height = 21,
+  units = "cm",
+  overwrite = FALSE
 )
 }
 \arguments{
 \item{log2fc_df}{DF with metabolites as row names and columns including log2FC, Class, qval columns.}
 
+\item{show_labels_for}{Vector with Strings of Metabolite names or classes.}
+
+\item{values_col_name}{Column name of a column that holds numeric values, to be plotted \strong{Default = "log2FC"}}
+
+\item{stat_col_name}{Columnname that holds numeric stat values that are used for significance \strong{Default = "qval"}}
+
+\item{show_p_value}{Boolean Value, to color p-values according to their significance level and add a Legend \strong{Default = TRUE}}
+
 \item{signif_colors}{Vector assigning significance values different colors}
 
-\item{show_labels_for}{Vector with Strings of Metabolite names or classes.}
+\item{save_as}{\emph{Optional: } Select the file type of output plots. Options are svg, pdf, png or NULL. \strong{Default = "NULL"}}
+
+\item{folder_name}{Name of the folder where the plot will be saved. Special characters will be removed automatically. \strong{Default = date}}
+
+\item{folder_path}{\emph{Optional: } User-defined path where the folder should be created. 
+If not provided, results will be saved in `MetAlyzer_results` within the working directory. \strong{Default = NULL}}
+
+\item{file_name}{Name of the output file (without extension). \strong{Default = "network"}}
+
+\item{format}{File format for saving the plot (e.g., "png", "pdf", "svg"). \strong{Default = "pdf"}}
+
+\item{width}{Width of the saved plot in specified units. \strong{Default = 29.7}}
+
+\item{height}{Height of the saved plot in specified units. \strong{Default = 21.0}}
+
+\item{units}{Units for width and height (e.g., "in", "cm", "mm"). \strong{Default = "cm"}}
+
+\item{overwrite}{Logical: If `TRUE`, overwrite existing files without asking. If `FALSE`, prompt user before overwriting. \strong{Default = FALSE}}
 }
 \value{
 ggplot object
-]
 }
 \description{
 This method creates a scatter plot of the log2 fold change for each metabolite.

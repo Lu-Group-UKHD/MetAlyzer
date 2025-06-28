@@ -50,7 +50,6 @@ RoxygenNote: 7.3.2
 Suggests:
     rmarkdown,
     knitr,
-    MetaProViz,
     kableExtra,
     gridExtra,
     plotly,
@@ -62,7 +61,10 @@ Suggests:
     bslib,
     vsn,
     writexl,
-    tibble
+    tibble,
+    remotes
+Remotes:
+    github::https://github.com/saezlab/MetaProViz@main
 VignetteBuilder: knitr
 URL: https://github.com/nilsmechtel/MetAlyzer
 BugReports: https://github.com/nilsmechtel/MetAlyzer/issues

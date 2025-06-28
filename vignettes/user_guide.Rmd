@@ -160,11 +160,11 @@ processedDF <- processing_res[["DF"]][["Preprocessing_output"]]%>%
 ##------ Differential Analysis 
 # For function details visit MetaProViz: https://saezlab.github.io/MetaProViz/reference/dma.html
 dma_res <- MetaProViz::dma(data=processedDF , #we need to remove columns that do not include metabolite measurements
-                           metadata_sample=sample_info,#only maintain the information about condition and replicates
+                           metadata_sample=sample_info, #only maintain the information about condition and replicates
                            metadata_info = c(Conditions="Conditions", 
                                              Numerator="Group 1", 
                                              Denominator = "Group 2"),
-                           metadata_feature = data.frame(SummarizedExperiment::rowData(metalyzer_se)),# Adds metadata for the metabolites such as metabolite classes
+                           metadata_feature = data.frame(SummarizedExperiment::rowData(metalyzer_se)), # Adds metadata for the metabolites such as metabolite classes
                            pval ="lmFit",
                            padj="fdr")
 
