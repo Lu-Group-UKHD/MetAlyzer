@@ -1,0 +1,79 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage{hyperref}
+\usepackage{graphicx}
+	\graphicspath{{images/}}
+\usepackage[bottom]{footmisc}
+\usepackage{setspace}
+\usepackage{graphicx,caption}
+\usepackage[super,comma]{natbib}
+\renewcommand{\thefootnote}{\alph{footnote}}
+
+\title{
+    \vspace{-25mm}
+    \large \bfseries MetAlyzer: A dual-mode R package for streamlined and interactive analysis of biocrates metabolomics data
+    \vspace{-4mm}
+    }
+\author{
+    \vspace{-2mm}
+    \hspace{-5mm} \small Qian-Wu Liao
+    }
+\date{}
+
+\setstretch{1.5}
+
+\begin{document}
+\maketitle
+\vspace{-8mm}
+
+\section*{\large Abstract}
+Mass spectrometry (MS)-based metabolomics has emerged as a powerful tool to answer multifaceted biological questions and biocrates, a biotechnology company, has designed standardized, ready-to-use kits for reliable metabolic profiling. Kit raw MS data is typically quantified and preprocessed by biocrates' MetIDQ software, which outputs a structured and insightful Excel spreadsheet containing metabolite concentrations, color-coded quantification statuses, and sample and metabolite metadata. Even so, the output spreadsheet is complex and requires proper parsing for further processing and analysis. To this end, we developed MetAlyzer, an R package, specifically for coping with biocrates-exported data, including conversion of a complex spreadsheet into a flexible SummarizedExperiment object, data preprocessing, statistical analysis, and visualization of differential metabolites. Considering coding can be intimidating for users with limited programming experience, we also developed an interactive Shiny app that interfaces with MetAlyzer's core functionality, enabling users to implement the full analysis workflow without writing code, which potentially facilitates metabolomics research in the life sciences.
+
+\section*{\large Introduction}
+Metabolomics aided by hyphenated mass spectrometry (MS) approaches has emerged as a powerful tool for investigating intricate biochemical networks within living organisms and can be used in various areas such as biomedical, nutritional, and agricultural sciences\cite{Gowda2008,Gomez-Casati2013,Gonzalez-Covarrubias2022}. While global metabolic profiling has garnered significant interest over the past decades due to its comprehensive coverage and discovery potential, targeted metabolomics offers distinct advantages in terms of specificity, sensitivity, and reproducibility by focusing on the precise measurement and quantification of predefined sets of metabolites\cite{Begou2017}. To achieve reliable MS-based metabolomics analysis, biocrates, a biotechnology company, has designed ready-to-use kits that provide quantitative, standardized, and reproducible assays covering more than 1000 metabolites from more than 40 metabolite classes (biocrates, Austria). Kit raw MS data is typically quantified and preprocessed by biocrates' MetIDQ software, which transforms MS raw intensities into precise metabolite concentrations and outputs a structured, insightful, but complex Excel spreadsheet. In addition to concentrations, the output spreadsheet includes color-coded quantification statuses as well as sample and metabolite metadata, where the complexity of its layout presents challenges for further downstream use. MeTaQuaC\cite{Kuhring2020}, a published R package, was developed to perform automated quality control of targeted metabolomics data, particularly from the biocrates platform, which outputs a well-documented HTML report. Even so, MeTaQuaC and its static report lack flexibility and interactivity needed for custom data processing and analysis. To overcome these limitations, we developed MetAlyzer, an R package that offers a flexible analysis workflow for biocrates-exported datasets.
+
+MetAlyzer offers a streamlined workflow for processing, analysis, and visualization of targeted metabolomics datasets acquired through the biocrates platform. A core initial function of MetAlyzer is converting a complex Excel spreadsheet exported from biocrates' MetIDQ software into a flexible, widely-used SummarizedExperiment object\cite{Morgan2022} that keeps the original information. This conversion enhances data accessibility and interoperability, enabling users to use tools provided by both MetAlyzer and external resources such as the Bioconductor ecosystem\cite{Huber2015}. As a one-stop solution for data processing and analysis, MetAlyzer supports sample and metabolite filtering, data imputation and transformation, quality control, statistical analysis, and visualization of differential metabolites. One standout feature of MetAlyzer is its contextual visualization of metabolite-level statistics mapped onto canonical metabolic pathways, which facilitates the identification of biologically relevant metabolites and their interconnections. Moreover, recognizing that coding can be intimidating for users with limited programming experience, we also developed an interactive Shiny app that interfaces with MetAlyzer's core functionality and provides point-and-click access to the full analysis workflow without requiring any coding. Several web-based platforms for metabolomics data processing and analysis exist, such as MetaboAnalyst\cite{Pang2024}, Galaxy\cite{Galaxy2024}, and Metabolomics Workbench\cite{MWB}. However, none of these tools can be directly applied to spreadsheets exported from the MetIDQ software. For instance, if users wish to perform statistical analysis using MetaboAnalyst, they must first convert the output spreadsheet into a concentration matrix. Although MetaboAnalyst provides a comprehensive set of preprocessing options throughout its analysis workflow, users may find it difficult to select appropriate operations without an initial overview of the dataset. In contrast, Shiny-based MetAlyzer can directly handle biocrates-exported datasets and provides immediate visual feedback for each operation. Collectively, the aforementioned features establish MetAlyzer as an efficient, flexible, and reproducible solution that bridges the gap between raw biocrates output and custom downstream analysis.
+
+In conclusion, we present MetAlyzer's strengths in simplifying data processing, enabling flexible analysis, and improving accessibility for biocrates-exported targeted metabolomics datasets. Its dual-mode design, which combines the code-based R and interactive Shiny interfaces within a single package, accommodates users with varying levels of programming expertise. In conjunction with the biocrates platform, we envision MetAlyzer as a complementary and powerful tool for advancing accessible and reproducible metabolomics research in the life sciences. We demonstrate the usability and functionality of MetAlyzer using \textbf{a demo dataset generated with the MxP® Quant 500 XL kit, provided by our collaborators at biocrates} in the Results section.
+
+% Maybe ask for more information about the demo dataset, like what are the samples and what differences are between Group 1&2?
+
+\section*{\large Results}
+\subsection*{\normalsize Overall features}
+MetAlyzer provides a workflow for processing, quality control, statistical analysis, and visualization of targeted metabolomics datasets generated using the biocrates platform. The workflow begins by converting an Excel spreadsheet (.xlsx format) exported from the MetIDQ software into a SummarizedExperiment object, which serves as the central data structure for subsequent preprocessing and downstream analysis. MetAlyzer supports sample and metabolite filtering, half-minimum imputation, $\log_2$ transformation, and various analyses including descriptive statistics, fold changes (FCs), and ANOVA. Visual summaries of differential metabolites are generated as volcano plots, scatter plots, and metabolic network diagrams (Fig.~\ref{}). In addition to the R-based interface, MetAlyzer includes a Shiny-based graphical interface\cite{Chang2024} that offers point-and-click access to its core functionality. The app delivers real-time visual feedback for each preprocessing operation, including boxplots of metabolite concentration distributions across samples and barplots of metabolite missing values and quantification statuses. All preprocessing parameters and their corresponding outputs are logged in a history table, enabling traceability and comparisons of different configurations. Volcano plots allow users to adjust $\log_2$ FC and p-value cutoffs and highlight specific metabolites or metabolic classes. Scatter plots show associations between $\log_2$ FCs and metabolic classes, while network diagrams contextualize metabolite-level statistics onto the predefined metabolic pathways (Fig.\ref{}). These visualizations are interactive and can be exported in HTML, PDF, SVG, or PNG formats.
+% Additionally, users can retrieve alternative metabolite identifiers (e.g., HMDB IDs) corresponding to biocrates-named compounds for downstream applications outside MetAlyzer.
+
+\subsection*{\normalsize Usage scenario}
+We demonstrate the utility of MetAlyzer through its Shiny app using \textbf{a demo dataset generated with the MxP® Quant 500 XL kit, provided by our collaborators at biocrates}. The raw dataset, exported directly from the MetIDQ software, was uploaded onto the app and initially assessed in terms of its data distribution, missingness patterns, and quantification status composition to guide the selection of appropriate preprocessing steps (Fig.\ref{}). Given that the overall quantification appeared stable and no systematic distributional drift was evident, we applied metabolite filtering based on the 80\% rule\cite{Wei2018} to enhance statistical robustness, followed by $\log_2$ transformation to stabilize variance across the dataset. We then performed statistical comparisons between the samples from Group 1 and Group 2, identifying differentially abundant metabolites, particularly within the triacylglycerol and glycerophospholipid classes (Fig.\ref{}). The volcano and scatter plots indicated increased levels of triacylglycerols in Group 1 and decreased levels of glycerophospholipids in Group 2. Finally, the metabolic network diagram highlighted potential perturbations in polyamine, indole/tryptophan, and lysine metabolism pathways (Fig.\ref{}).
+
+% highlighting changes predominantly in triacylglycerols and glycerophospholipids
+
+% \section*{\large Implementation}
+% After kit raw MS data is processed by biocrates' MetIDQ software, one can upload the output Excel spreadsheet onto MetAlyzer's shiny app, of which the standard implementation is described as follows:
+% \newline
+% \indent (1) Data upload. Note that uploaded data should be an Excel spreadsheet (.xlsx format) exported from biocrates' MetIDQ software, where the column "Sample Type" and the row "Class" must be present and fixed as the original, since these two cells are used as anchors to convert a spreadsheet into a SummarizedExperiment object.
+% \newline
+% \indent (2) Data overview and preprocessing. The uploaded data can be first viewed from different angles to determine whether further preprocessing is needed. Our app provides a boxplot displaying the distributions of metabolite concentrations across samples, a barplot illustrating the proportions of missing values and quantification statuses of metabolites in samples, and a table showing sample metadata. For preprocessing, options for sample and metabolite filtering, imputation, and normalization are available. Filtering can be performed on individual or grouped samples and metabolites, or by setting cutoffs for metabolite missingness and invalid quantification status levels. Imputation is done using the half-minimum approach, while normalization can be achieved through either median normalization or total ion count normalization. The plots update once the data is processed, providing an immediate overview of the effect of each operation. Additionally, all processing parameters and resulting plots from each operation are stored in the history table, allowing for comparisons between different trials and ensuring traceability.
+% \newline
+% \indent (3) Data analysis. Statistical analysis can then be performed to identify differential metabolites between two sample groups, from which log2 fold changes and p-values are calculated. To visualize differential analysis results, a volcano plot, scatter plot, and network plot are provided. Specifically, the scatter plot illustrates the relationships between log2 fold changes and metabolic classes, helping to reveal whether any class is differentially abundant. The network plot displays the predefined canonical metabolic pathways, with nodes annotated by calculated statistics to highlight key metabolites and their interconnections. All plots can be downloaded to a local computer.
+
+% Last, our app allows users to download alternative metabolite identifiers, such as HMDB IDs, corresponding to metabolites named by biocrates using their nomenclature \textit{(biocrates-named compounds)}. These identifiers can then be used for further analysis, for instance, pathway analysis through MetaboAnalyst\cite{Pang2024}.
+
+\section*{\large Discussion}
+MetAlyzer is an R package designed for the efficient processing and analysis of targeted metabolomics datasets exported from the biocrates platform. Its strengths lie in a streamlined, dual-mode workflow that integrates both a code-based interface and an interactive Shiny app. The workflow begins by converting a complex biocrates-exported Excel spreadsheet into a flexible SummarizedExperiment object\cite{Morgan2022}, which serves as the central data structure within MetAlyzer and can also be widely used in external environments (e.g., Bioconductor\cite{Huber2015}), enhancing interoperability and customizability. The workflow is minimal yet functionally complete, encompassing sample and metabolite filtering, data imputation and transformation, statistical analysis, and result visualization, which supports rapid quality control and downstream analysis. Although biocrates' MetIDQ software has its own data cleaning (modified 80\% rule\cite{Wei2018}) and imputation (k-nearest neighbors) methods, MetAlyzer provides complementary options, such as filtering by metabolite quantification statuses and imputation using the half-minimum approach. To improve accessibility and efficiency, the Shiny-based interface enables full workflow execution without requiring users to code, particularly valuable for wet-lab researchers with limited programming experience. Unlike existing web-based tools\cite{Pang2024,Galaxy2024,MWB}, MetAlyzer directly accepts raw biocrates-exported spreadsheets and includes only essential steps, which reduces complexity while supporting flexible data exploration and hypothesis generation. Recognizing that users may require more advanced analyses, we plan to extend MetAlyzer's functionality by exporting compatible data formats (e.g., concentration matrices) for use in other tools (e.g., MetaboAnalyst for enrichment analysis\cite{Xia2010}). Altogether, MetAlyzer offers an accessible and efficient solution for the reproducible analysis of targeted metabolomics data generated with the biocrates platform, which balances usability and flexibility through a dual interface that supports both routine tasks and exploratory research across varying levels of user expertise.
+
+% (Fig.\ref{fig:mDevSigFeats})
+
+% \begin{figure}[h!]
+%     \centering
+%     \includegraphics[scale=1.5]{mDev_sigFeats.png}
+%     \caption{\footnotesize{\textbf{Barplot showing percentages of NSCLC recurrence-related significant features identified in method development datasets} | Sample filtering can be performed on individual or grouped...}}
+%     \label{fig:mDevSigFeats}
+% \end{figure}
+
+\setstretch{1}
+\bibliographystyle{unsrt}
+% \nocite{*}
+\footnotesize
+\bibliography{references.bib}
+
+\end{document}
