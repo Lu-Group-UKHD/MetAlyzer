@@ -43,7 +43,9 @@ jobs:
         run: brew install --cask xquartz
 
       - name: Install OmnipathR first
-        run: Rscript -e "remotes::install_github('saezlab/OmnipathR@devel')"
+        run: |
+          Rscript -e "install.packages('remotes')"
+          Rscript -e "remotes::install_github('saezlab/OmnipathR@devel')"
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
