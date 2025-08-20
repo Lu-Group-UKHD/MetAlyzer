@@ -1,3 +1,22 @@
+library(magrittr)
+library(SummarizedExperiment)
+library(shiny)
+library(shinyBS)
+library(shinyWidgets)
+library(plotly)
+library(DT)
+library(shinycssloaders)
+library(MetAlyzer)
+library(limma)
+library(tidyverse)
+library(htmlwidgets)
+library(svglite)
+library(writexl)
+library(bslib)
+source("utils.R")
+library(viridis)
+library(viridisLite)
+library(gridExtra)
 ui <- fluidPage(
   titlePanel('Biocrates Metabolomics Analysis'),
   tabsetPanel(
@@ -12,16 +31,16 @@ ui <- fluidPage(
           checkboxInput('exampleFile',
                         HTML('Explore app with <b>example dataset</b>: <a href = "https://doi.org/10.3389/fmolb.2022.961448">[Gegner et al. 2022]</a>'), 
                         value = FALSE),
-          bsTooltip('exampleFile', 'Discover the full range of functions with this diverse tissue dataset.'),
+          shinyBS::bsTooltip('exampleFile', 'Discover the full range of functions with this diverse tissue dataset.'),
           # Show data processing options only after file is uploaded
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
-                           bsCollapse(
+                           shinyBS::bsCollapse(
                              open = c('Sample filtering', 'Filtering Log'), multiple = T,
-                             bsCollapsePanel('Sample filtering', style = 'info',
+                             shinyBS::bsCollapsePanel('Sample filtering', style = 'info',
                                              selectInput('smpChoicesFiltering', 'Select sample(s) to remove:',
                                                          choices = character(0), multiple = T)),
-                             bsCollapsePanel(
+                             shinyBS::bsCollapsePanel(
                                'Metabolite filtering', style = 'info',
                                selectInput('featChoicesFiltering', 'Select metabolite(s) to remove:',
                                            choices = character(0), multiple = T),
@@ -38,32 +57,32 @@ ui <- fluidPage(
                                         checkboxGroupInput('featValidStatusFiltering', 'Validity',
                                                            choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
                                                            selected = c('Valid', 'LOQ'))),
-                                 bsTooltip('featCompleteCutoffFiltering',
+                                 shinyBS::bsTooltip('featCompleteCutoffFiltering',
                                            'Metabolites with observed values below this cutoff are removed.'),
-                                 bsTooltip('featValidCutoffFiltering',
+                                 shinyBS::bsTooltip('featValidCutoffFiltering',
                                            'Metabolites with valid values below this cutoff are removed.'),
-                                 bsTooltip('featValidStatusFiltering',
+                                 shinyBS::bsTooltip('featValidStatusFiltering',
                                            'The selected is considered valid for filtering.')
                                )
                              ),
-                             bsCollapsePanel(
+                             shinyBS::bsCollapsePanel(
                                'Imputation and Normalization', style = 'info',
-                               materialSwitch('imputation', 'Half-minimum (HM) imputation',
+                               shinyWidgets::materialSwitch('imputation', 'Half-minimum (HM) imputation',
                                               value = T, status = 'primary', right = T),
                                #### Needs further discussion on median normalization
                                selectInput('normalization', 'Select normalization method to use:',
                                            choices = c('None', 'Median normalization',
                                                        'Total ion count (TIC) normalization'),
                                            selected = 'Median normalization', multiple = F)
-                               # bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
+                               # shinyBS::bsTooltip('imputation', paste('Missing values are replaced with half of the minimum of,
                                #                               observed values in each metabolite.')),
-                               # bsTooltip('normalization', '')
+                               # shinyBS::bsTooltip('normalization', '')
                              )
                            ),
                            fluidRow(
                              column(width = 6, actionButton('updateProcessing', 'Process', width = '100%')),
                              column(width = 6, actionButton('revertProcessing', 'Revert/Default', width = '100%')),
-                             bsTooltip('revertProcessing', 'The processed data and specified parameters revert to the origins.')
+                             shinyBS::bsTooltip('revertProcessing', 'The processed data and specified parameters revert to the origins.')
                            ),
                            #### Hide following functionalities until work is done
                            # tags$br(),
@@ -74,7 +93,7 @@ ui <- fluidPage(
                            #                                 choices = character(0), multiple = T)),
                            #   column(width = 5, downloadButton('downloadRawAbunExport', 'Download',
                            #                                    style = 'width:100%; margin-bottom: 15px')),
-                           #   bsTooltip('downloadRawAbunExport', 'This output can directly be used for MetaboAnalyst.')
+                           #   shinyBS::bsTooltip('downloadRawAbunExport', 'This output can directly be used for MetaboAnalyst.')
                            # ),
                            tags$br(),
                            tags$br(),
@@ -85,7 +104,7 @@ ui <- fluidPage(
                              column(width = 7, uiOutput('loadFeatIdChoicesExport')),
                              column(width = 5, downloadButton('downloadFeatIdsExport', 'Download',
                                                               style = 'width:100%; margin-bottom: 15px'))
-                             # bsTooltip('featIdChoicesExport', 'The identifiers were generated by MetaboAnalyst using HMDB IDs.',
+                             # shinyBS::bsTooltip('featIdChoicesExport', 'The identifiers were generated by MetaboAnalyst using HMDB IDs.',
                              #           placement = 'top')
                            )
           )
@@ -103,26 +122,26 @@ ui <- fluidPage(
                                 <p>Additional information is available by hovering over all action elements.</p>')
           ),
           conditionalPanel(condition = "output.ifValidUploadedFile",
-                           bsCollapse(
+                           shinyBS::bsCollapse(
                              open = c('Data distribution', 'Data completeness'), multiple = T,
-                             bsCollapsePanel('Sample metadata', style = 'primary',
+                             shinyBS::bsCollapsePanel('Sample metadata', style = 'primary',
                                              DT::dataTableOutput('tblSmpMetadat') %>%
-                                               withSpinner(color="#56070C")),
-                             bsCollapsePanel('Data distribution', style = 'primary',
+                                               shinycssloaders::withSpinner(color="#56070C")),
+                             shinyBS::bsCollapsePanel('Data distribution', style = 'primary',
                                              uiOutput('updateGpColsDatDist'),
-                                             plotlyOutput('plotDatDist') %>%
-                                               withSpinner(color="#56070C")),
-                             bsCollapsePanel('Data completeness', style = 'primary',
-                                             bsCollapsePanel('Hint', style = 'success',
+                                             plotly::plotlyOutput('plotDatDist') %>%
+                                               shinycssloaders::withSpinner(color="#56070C")),
+                             shinyBS::bsCollapsePanel('Data completeness', style = 'primary',
+                                             shinyBS::bsCollapsePanel('Hint', style = 'success',
                                                              textOutput('summDatComplete', container = strong)),
-                                             plotlyOutput('plotDatComplete') %>%
-                                               withSpinner(color="#56070C")),
-                             bsCollapsePanel('Quantification status', style = 'primary',
+                                             plotly::plotlyOutput('plotDatComplete') %>%
+                                               shinycssloaders::withSpinner(color="#56070C")),
+                             shinyBS::bsCollapsePanel('Quantification status', style = 'primary',
                                              #### Adjust tab size
-                                             bsCollapsePanel('Hint', style = 'success',
+                                             shinyBS::bsCollapsePanel('Hint', style = 'success',
                                                              textOutput('summQuanStatus', container = strong)),
-                                             plotlyOutput('plotQuanStatus') %>%
-                                               withSpinner(color="#56070C"))
+                                             plotly::plotlyOutput('plotQuanStatus') %>%
+                                               shinycssloaders::withSpinner(color="#56070C"))
                            )
           )
         )
@@ -162,7 +181,7 @@ ui <- fluidPage(
                              column(width = 6, selectInput('metabChoicesVulcano',
                                                            'Select metabolite(s) to highlight:',
                                                            choices = character(0), multiple = T)),
-                             column(width = 6, materialSwitch('highlightVulcano', 'Highlight',
+                             column(width = 6, shinyWidgets::materialSwitch('highlightVulcano', 'Highlight',
                                                               value = F, status = 'primary'))
                            ),
                            tags$h4('Select cutoffs:', style = 'font-weight:bold;font-size:14px'),
@@ -180,8 +199,8 @@ ui <- fluidPage(
                            div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
           conditionalPanel(condition = "input.computeLog2FC",
                            tags$h4(strong('Vulcano plot'), style = "margin-top:1rem;"),
-                           plotlyOutput('plotVolcano') %>%
-                             withSpinner(color="#56070C"),
+                           plotly::plotlyOutput('plotVolcano') %>%
+                             shinycssloaders::withSpinner(color="#56070C"),
                            #### Provide option of downloading static plot?
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
                                     column(width = 2, 
@@ -191,7 +210,7 @@ ui <- fluidPage(
                            tags$br(),
                            tags$h4(strong('Scatter plot'), style = "margin-top:1rem;"),
                            fluidRow(
-                             column(width = 9, style = "z-index:2;", plotlyOutput('plotScatter') %>%
+                             column(width = 9, style = "z-index:2;", plotly::plotlyOutput('plotScatter') %>%
                                       shinycssloaders::withSpinner(color="#56070C")),
                              column(width = 3, style = "margin-left: -175px; z-index:1;",
                                     imageOutput('plotScatterLegend'))
@@ -212,8 +231,8 @@ ui <- fluidPage(
       # Lower network plot a bit
       tags$br(),
       conditionalPanel(condition = "input.computeLog2FC",
-                       bsCollapse(open = "",
-                                  bsCollapsePanel("Advanced Styles",
+                       shinyBS::bsCollapse(open = "",
+                                  shinyBS::bsCollapsePanel("Advanced Styles",
                                                   div(style = "display: flex; 
                                        flex-wrap: wrap; 
                                        justify-content: center; 
@@ -258,7 +277,7 @@ ui <- fluidPage(
                                                                       value = 10, step = 1)
                                                       ),
                                                       actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
-                                                      bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
+                                                      shinyBS::bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
                                                   )
                                   )
                        )
@@ -269,8 +288,8 @@ ui <- fluidPage(
       conditionalPanel(condition = "input.computeLog2FC",
                        div(style = "width: 100%;",
                            # Use the height value from the slider to control the plot's height
-                           plotlyOutput('plotNetwork', height = "auto") %>%
-                             withSpinner(color="#56070C"),
+                           plotly::plotlyOutput('plotNetwork', height = "auto") %>%
+                             shinycssloaders::withSpinner(color="#56070C"),
                            fluidRow(style="display:flex; justify-content:center; margin-top:50px; margin-bottom:1rem;",
                                     column(width = 2, 
                                             selectInput("formatNetwork", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
@@ -291,7 +310,7 @@ ui <- fluidPage(
                                                 <br>')),
                          column(width = 2, div(style = "width: 60%; margin-top: 30%;",
                                                actionButton('clearParamLog', 'Clear', width = '100%'))),
-                         bsTooltip('clearParamLog', 'The parameter log table will be cleared.')
+                         shinyBS::bsTooltip('clearParamLog', 'The parameter log table will be cleared.')
                        ),
                        fluidRow(
                          column(width = 7, DT::dataTableOutput("tblParamLog")),
@@ -301,20 +320,20 @@ ui <- fluidPage(
                                                       <h4 style="color: IndianRed; text-align: left;">Please select a row.</h4>')
                                 ),
                                 conditionalPanel(condition = "typeof input.tblParamLog_rows_selected !== 'undefined' && input.tblParamLog_rows_selected.length > 0",
-                                                 bsCollapse(
+                                                 shinyBS::bsCollapse(
                                                    multiple = T,
-                                                   bsCollapsePanel('Features Removed', style = 'info',
+                                                   shinyBS::bsCollapsePanel('Features Removed', style = 'info',
                                                                    textOutput('textRmFeatsLog') %>%
-                                                                     withSpinner(color="#56070C")),
-                                                   bsCollapsePanel('Data distribution', style = 'info',
-                                                                   plotlyOutput('plotDatDistLog') %>%
-                                                                     withSpinner(color="#56070C")),
-                                                   bsCollapsePanel('Data completeness', style = 'info',
-                                                                   plotlyOutput('plotDatCompleteLog') %>%
-                                                                     withSpinner(color="#56070C")),
-                                                   bsCollapsePanel('Quantification status', style = 'info',
-                                                                   plotlyOutput('plotQuanStatusLog') %>%
-                                                                     withSpinner(color="#56070C"))
+                                                                     shinycssloaders::withSpinner(color="#56070C")),
+                                                   shinyBS::bsCollapsePanel('Data distribution', style = 'info',
+                                                                   plotly::plotlyOutput('plotDatDistLog') %>%
+                                                                     shinycssloaders::withSpinner(color="#56070C")),
+                                                   shinyBS::bsCollapsePanel('Data completeness', style = 'info',
+                                                                   plotly::plotlyOutput('plotDatCompleteLog') %>%
+                                                                     shinycssloaders::withSpinner(color="#56070C")),
+                                                   shinyBS::bsCollapsePanel('Quantification status', style = 'info',
+                                                                   plotly::plotlyOutput('plotQuanStatusLog') %>%
+                                                                     shinycssloaders::withSpinner(color="#56070C"))
                                                  )
                                 )
                          )
@@ -377,7 +396,7 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
-    metabObj <- read_metidq(file_path = load_rawdata_extraction(), silent = T)
+    metabObj <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_rawdata_extraction(), silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
     metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                              drop_metabolites = 'Metabolism Indicators',
@@ -417,7 +436,7 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
     validUploadedFile <- try(
-      metabObj <- read_metidq(file_path = input$uploadedFile$datapath,
+      metabObj <- MetAlyzer::read_metidq(file_path = input$uploadedFile$datapath,
                                     sheet = 1, silent = T),
       silent = T)
     if (!is(validUploadedFile, 'try-error')) {
@@ -1015,7 +1034,7 @@ server <- function(input, output, session) {
   })
   
   # Log of processed data distribution
-  output$plotDatDistLog <- renderPlotly({
+  output$plotDatDistLog <- plotly::renderPlotly({
     req(clickedRowIdx())
     actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[clickedRowIdx()]]
     g <- ggplot(actMetabAggreTbl, aes(x=ID, y=Concentration)) +
@@ -1027,11 +1046,11 @@ server <- function(input, output, session) {
     if (reactAnalysisLog$paramLogTbl$normalization[clickedRowIdx()] == 'None') {
       g <- g + scale_y_log10()
     }
-    ggplotly(g)
+    plotly::ggplotly(g)
   })
   
   # Log of processed data quantification status
-  output$plotQuanStatusLog <- renderPlotly({
+  output$plotQuanStatusLog <- plotly::renderPlotly({
     req(clickedRowIdx())
     actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[clickedRowIdx()]]
     smpStatusCountTbl <- actMetabAggreTbl %>%
@@ -1042,18 +1061,17 @@ server <- function(input, output, session) {
     #### Add color for NA quantification status
     status2Color <- c(Valid = '#33a02c', LOQ = '#1f78b4', LOD = '#ff7f00', Invalid = '#e31a1c')
     statusCols <- status2Color[names(status2Color) %in% unique(smpStatusCountTbl$Status)]
-    ggplotly(
-      ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
+    g <- ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
         geom_col(position = "stack") +
         scale_fill_manual(values = statusCols) +
         labs(x = "Sample") +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-    )
+    plotly::ggplotly(g)
   })
   
   # Log of processed data completeness
-  output$plotDatCompleteLog <- renderPlotly({
+  output$plotDatCompleteLog <- plotly::renderPlotly({
     req(clickedRowIdx())
     actMetabAggreTbl <- reactAnalysisLog$metabAggreTblList[[clickedRowIdx()]]
     smpCompleteCountTbl <- actMetabAggreTbl %>%
@@ -1090,7 +1108,7 @@ server <- function(input, output, session) {
                 choices = c('None', smpChoiceGps),
                 selected = 'None', multiple = F)
   })
-  output$plotDatDist <- renderPlotly({
+  output$plotDatDist <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl, input$gpColsDatDist)
     metabAggreTbl <- datOverviewPack()$metabAggreTbl
     if (input$gpColsDatDist == 'None') {
@@ -1128,7 +1146,7 @@ server <- function(input, output, session) {
           'metabolites fail to fulfil 80% rule, which is recommended filtering out.',
           'Besides, is there any sample with high level of missingness?')
   })
-  output$plotDatComplete <- renderPlotly({
+  output$plotDatComplete <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
     smpCompleteCountTbl <- datOverviewPack()$metabAggreTbl %>%
       dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed', #c(0, NA)
@@ -1156,25 +1174,24 @@ server <- function(input, output, session) {
           'metabolites have less than 50% measurements with valid status (Valid, LOQ),',
           'which is recommended filtering out. Besides, is there any sample containing few valid values?')
   })
-  output$plotQuanStatus <- renderPlotly({
+  output$plotQuanStatus <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
     smpStatusCountTbl <- datOverviewPack()$metabAggreTbl %>%
       dplyr::group_by(ID, Status) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
-    # Prepare colors for quantification statuses
-    #### Add color for NA quantification status
-    status2Color <- c(Valid = '#33a02c', LOQ = '#1f78b4', LOD = '#ff7f00', Invalid = '#e31a1c')
-    statusCols <- status2Color[names(status2Color) %in% unique(smpStatusCountTbl$Status)]
-    ggplotly(
-      ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
+
+    status2Color <- c('Valid'='#33a02c', 'LOQ'='#1f78b4', 'LOD'='#ff7f00', 'Invalid'='#e31a1c')
+    
+    g <- ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
         geom_col(position = "stack") +
-        scale_fill_manual(values = statusCols) +
+        scale_fill_manual(values = status2Color) +
         labs(x = "Sample") +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-    )
-  })
+        
+    plotly::ggplotly(g)
+})
   
   # Export abundance matrix
   output$downloadRawAbunExport <- downloadHandler(
@@ -1255,7 +1272,7 @@ server <- function(input, output, session) {
   })
   
   # Vulcano plot
-  output$plotVolcano <- renderPlotly({
+  output$plotVolcano <- plotly::renderPlotly({
     req(reactLog2FCTbl())
     if (!input$highlightVulcano) {
       plotly_vulcano(reactLog2FCTbl(),
@@ -1269,7 +1286,7 @@ server <- function(input, output, session) {
   })
   
   # Scatter plot
-  output$plotScatter <- renderPlotly({
+  output$plotScatter <- plotly::renderPlotly({
     req(reactLog2FCTbl())
     # if (!input$highlightVulcano) {
     #   plot <- plotly_scatter(reactLog2FCTbl())
@@ -1298,7 +1315,7 @@ server <- function(input, output, session) {
   }, deleteFile = TRUE)
   
   # Network plot
-  output$plotNetwork <- renderPlotly({
+  output$plotNetwork <- plotly::renderPlotly({
     req(reactLog2FCTbl())
     # Use the height value for plot layout
     plotly_network(
@@ -1340,12 +1357,12 @@ server <- function(input, output, session) {
       } else {
         if (input$highlightVulcano) {
           req(reactVulcanoHighlight())
-          final_plot <- MetAlyzer::plot_vulcano(reactVulcanoHighlight(), 
+          final_plot <- plot_vulcano(reactVulcanoHighlight(), 
                                        x_cutoff = input$plotVolcanoLog2FCCutoff,
                                        y_cutoff = as.numeric(input$plotVolcanoPValCutoff),
                                        show_labels_for = input$metabChoicesVulcano)
         } else {
-          final_plot <- MetAlyzer::plot_vulcano(reactLog2FCTbl(), 
+          final_plot <- plot_vulcano(reactLog2FCTbl(), 
                                        x_cutoff = input$plotVolcanoLog2FCCutoff,
                                        y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         }

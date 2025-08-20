@@ -42,29 +42,32 @@ Imports:
     magrittr,
     viridis,
     viridisLite,
-    devtools
-Description: The 'MetAlyzer' S4 object provides methods to read and reformat metabolomics data for convenient data handling, statistics and downstream analysis. The resulting format corresponds to input data of the Shiny app 'MetaboExtract' (<https://www.metaboextract.shiny.dkfz.de/MetaboExtract/>).
-License: GPL-3
-Encoding: UTF-8
-Language: en-US
-RoxygenNote: 7.3.2
-Suggests:
+    devtools,
+    shinyBS,
     rmarkdown,
     knitr,
     kableExtra,
     gridExtra,
     plotly,
     shiny,
-    shinyBS,
     shinyWidgets,
     svglite,
     htmlwidgets,
     bslib,
-    vsn,
     writexl,
     tibble,
     remotes,
-    MetaProViz
+    shinycssloaders,
+    DT,
+    limma
+Description: The 'MetAlyzer' S4 object provides methods to read and reformat metabolomics data for convenient data handling, statistics and downstream analysis. The resulting format corresponds to input data of the Shiny app 'MetaboExtract' (<https://www.metaboextract.shiny.dkfz.de/MetaboExtract/>).
+License: GPL-3
+Encoding: UTF-8
+Language: en-US
+RoxygenNote: 7.3.2
+Suggests:
+    MetaProViz,
+    vsn
 Remotes: 
     saezlab/MetaProViz
 VignetteBuilder: knitr

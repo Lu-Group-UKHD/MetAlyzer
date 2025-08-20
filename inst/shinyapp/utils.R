@@ -36,13 +36,13 @@ calc_log2FC <- function(metalyzer_se, categorical) {
   fit <- limma::eBayes(fit)
   log2FCRes <- limma::topTable(fit, coef = 2, number = Inf) %>%
     tibble::rownames_to_column('Metabolite') %>%
-    dplyr::select(Metabolite, logFC, P.Value, adj.P.Val) %>%
-    dplyr::rename(log2FC = logFC, pval = P.Value, qval = adj.P.Val)
+    dplyr::select(Metabolite, logFC, t, P.Value, adj.P.Val) %>%
+    dplyr::rename(log2FC = logFC, tval = t, pval = P.Value, qval = adj.P.Val)
   # Combined all information into a table
   group_info <- combined_data[, c(1, ncol(feat_data)+1)]
   log2FCTab <- dplyr::left_join(aggregated_data, group_info, by = 'ID') %>%
     dplyr::left_join(log2FCRes, by = 'Metabolite') %>%
-    dplyr::select(Metabolite, Class, log2FC, pval, qval) %>%
+    dplyr::select(Metabolite, Class, log2FC, tval, pval, qval) %>%
     dplyr::distinct(Metabolite, .keep_all = TRUE)
   metalyzer_se@metadata$log2FC <- log2FCTab
   return(metalyzer_se)
@@ -110,10 +110,10 @@ plotly_scatter <- function(Log2FCTab) {
   p_data <- lapply(ordered_classes, function(class) {
     Log2FCTab %>%
       filter(.data$Class == class) %>%
-      bind_rows(data.frame(Class = rep(NA, 5)))
+      dplyr::bind_rows(data.frame(Class = rep(NA, 5)))
   }) %>%
-    bind_rows()
-  p_data <- bind_rows(data.frame(Class = rep(NA, 5)), p_data)
+    dplyr::bind_rows()
+  p_data <- dplyr::bind_rows(data.frame(Class = rep(NA, 5)), p_data)
   p_data$x <- seq(nrow(p_data))
   p_data <- filter(p_data, !is.na(.data$Class))
   
@@ -377,7 +377,7 @@ plot_vulcano <- function(Log2FCTab,
 }
 
 #' @title Plotly Log2FC Network Plot
-#' @description This function returns a list with interactive 
+#' @description This function returns a list with interactive
 #' networkplot based on log2 fold change data.
 #' 
 #' @param Log2FCTab A data frame containing log2 fold change data
@@ -387,7 +387,7 @@ plot_vulcano <- function(Log2FCTab,
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
 #' @param plot_height The height of the Plot in pixel [px]
-#' @param plot_column_name Column name in the Log2FC dataframe to plot; 
+#' @param plot_column_name Column name in the Log2FC dataframe to plot
 #' for multiple metabolites per node, the mean is used.
 plotly_network <- function(Log2FCTab,
                            q_value=0.05,
