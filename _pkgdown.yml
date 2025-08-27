@@ -1,9 +1,4 @@
 #https://pkgdown.r-lib.org/articles/customise.html
-name: MetAlzyer
-url: https://nilsmechtel.github.io/MetAlzyer
-
-output_dir: docs
-
 template:
   bootstrap: 5
   bootswatch: journal #https://bootswatch.com/ has different themes you can use #solar, journal
@@ -12,7 +7,7 @@ navbar:
   bg: primary #If you want a different style you can check on bootstrap, e.g. for bootswatch: flatly = https://bootswatch.com/flatly/
   structure:
     left: [home, intro, articles, reference, tutorials, news] #intro: “Get Started”, which links to a vignette with the same name as the package.#reference, if there are any .Rd files. #articles, if there are any vignettes or articles.#tutorials, if there any tutorials. #news, if NEWS.md exists.
-    right: [search, github, homepage, homepage2]
+    right: [search, github]
   components:
     #Customize articles:
     articles:
@@ -31,8 +26,7 @@ navbar:
     #Customize github:
     github:
       icon: "fa-brands fa-github"
-      href: https://github.com/nilsmechtel/MetAlyzer
-    #Customize homepage:
+      href: https://github.com/Lu-Group-UKHD/MetAlyzer
 
 home:
   sidebar:
@@ -40,7 +34,7 @@ home:
     components:
       links:
         title: Links
-        text: Browse [source code](https://github.com/nilsmechtel/MetAlyzer)
+        text: Browse [source code](https://github.com/Lu-Group-UKHD/MetAlyzer)
       funding:
         title: Funding
         text: We are grateful for [***SmartCare***](https://smart-care.mscoresys.de/research/computational-data-analysis)
