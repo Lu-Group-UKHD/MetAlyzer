@@ -13,5 +13,5 @@ data frame loaded from metalyzer_colors.RDS
 This function returns the vector loaded from metalyzer_colors.RDS.
 }
 \examples{
-fpath <- metalyzer_colors()
+fpath <- MetAlyzer::metalyzer_colors()
 }

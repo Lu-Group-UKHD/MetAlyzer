@@ -5,13 +5,15 @@
 #' @description This function prints quantiles and NAs of raw data.
 #'
 #' @param metalyzer_se SummarizedExperiment
+#' @importFrom stats quantile
+#' @importFrom SummarizedExperiment rowData assay
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' summarizeConcValues(metalyzer_se)
-summarizeConcValues <- function(metalyzer_se) {
+#' MetAlyzer::summarize_conc_values(metalyzer_se)
+summarize_conc_values <- function(metalyzer_se) {
   conc_values <- SummarizedExperiment::assay(
     metalyzer_se, "conc_values"
   )
@@ -34,13 +36,14 @@ summarizeConcValues <- function(metalyzer_se) {
 #' its percentage.
 #'
 #' @param metalyzer_se SummarizedExperiment
+#' @importFrom SummarizedExperiment assay 
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' summarizeQuantData(metalyzer_se)
-summarizeQuantData <- function(metalyzer_se) {
+#' MetAlyzer::summarize_quant_data(metalyzer_se)
+summarize_quant_data <- function(metalyzer_se) {
   # Print number of quantification status
   print_number <- function(quant_status, status, total) {
     number <- sum(quant_status == status, na.rm = TRUE)
@@ -81,20 +84,17 @@ summarizeQuantData <- function(metalyzer_se) {
 #' @param inplace If FALSE, return a copy. Otherwise, do operation inplace and
 #' return None.
 #' @return An updated SummarizedExperiment
-#' @import dplyr
-#' @importFrom rlang .data
+#' @importFrom dplyr mutate select filter
+#' @importFrom rlang .data enquos exprs
+#' @importFrom magrittr %>%
+#' @importFrom SummarizedExperiment colData
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' metalyzer_se <- filterMetaData(metalyzer_se, !is.na(Tissue))
-#' metalyzer_se <- filterMetaData(metalyzer_se, `Sample Description` %in% 1:6)
-#' # or
-#' filterMetaData(metalyzer_se, !is.na(Tissue), inplace = TRUE)
-#' filterMetaData(metalyzer_se, `Sample Description` %in% 1:6, inplace = TRUE)
-
-filterMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
+#' metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
+filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
   # Get the name of the metalyzer_se object
@@ -151,22 +151,18 @@ filterMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @param inplace If FALSE, return a copy. Otherwise, do operation inplace
 #' and return None.
 #' @return An updated SummarizedExperiment
+#' @importFrom SummarizedExperiment colData 
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' metalyzer_se <- updateMetaData(
+#' metalyzer_se <- MetAlyzer::update_meta_data(
 #'   metalyzer_se,
 #'   Date = Sys.Date(), Analyzed = TRUE
 #' )
-#' # or
-#' updateMetaData(
-#'   metalyzer_se,
-#'   Date = Sys.Date(), Analyzed = TRUE, inplace = TRUE
-#' )
 
-updateMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
+update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
   # Get the name of the metalyzer_se object
@@ -183,7 +179,6 @@ updateMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
       levels <- unique(new_col)
     }
     meta_data[, col_name] <- factor(new_col, levels = levels)
-  #  meta_data[, col_name][meta_data$Filter == TRUE] <- new_col  # raff nicht warum das hier ist, die Filter col ist doch weg
   }
   SummarizedExperiment::colData(metalyzer_se) <- meta_data
 
@@ -204,18 +199,19 @@ updateMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @param inplace If FALSE, return a copy. Otherwise, do operation inplace
 #' and return None.
 #' @return An updated SummarizedExperiment
+#' @importFrom SummarizedExperiment colData
+#' @importFrom S4Vectors DataFrame
+#' @importFrom dplyr rename
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' metalyzer_se <- renameMetaData(
+#' metalyzer_se <- MetAlyzer::rename_meta_data(
 #'   metalyzer_se,
 #'   Method = `Sample Description`
 #' )
-#' # or
-#' renameMetaData(metalyzer_se, Model_Organism = Tissue, inplace = TRUE)
-renameMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
+rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
   # Get the parent environment
   env <- parent.frame()
   # Get the name of the metalyzer_se object
@@ -266,20 +262,21 @@ renameMetaData <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @param inplace If FALSE, return a copy. Otherwise, do operation inplace
 #' and return None.
 #' @return An updated SummarizedExperiment
-#' @import dplyr
+#' @importFrom dplyr mutate group_by_at arrange_at select group_by filter 
 #' @importFrom data.table :=
+#' @importFrom rlang .data
+#' @importFrom magrittr %>%
+#' @importFrom SummarizedExperiment rowData assay colData
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' drop_metabolites <- c("C0", "C2", "C3", "Metabolism Indicators",
 #'   inplace = TRUE
 #' )
-#' metalyzer_se <- filterMetabolites(metalyzer_se, drop_metabolites)
-#' # or
-#' filterMetabolites(metalyzer_se, drop_metabolites, inplace = TRUE)
-filterMetabolites <- function(metalyzer_se,
+#' metalyzer_se <- MetAlyzer::filter_metabolites(metalyzer_se, drop_metabolites)
+filter_metabolites <- function(metalyzer_se,
                               drop_metabolites = c("Metabolism Indicators"),
                               drop_NA_concentration = FALSE,
                               drop_quant_status = NULL,
@@ -462,42 +459,11 @@ filterMetabolites <- function(metalyzer_se,
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #'
-#' aggregatedData(metalyzer_se)
-aggregatedData <- function(metalyzer_se) {
+#' MetAlyzer::aggregated_data(metalyzer_se)
+aggregated_data <- function(metalyzer_se) {
   return(metalyzer_se@metadata$aggregated_data)
-}
-
-# === Handle log2FC Data ===
-#' @title Get log2FC Data
-#'
-#' @description This function returns the tibble "log2FC".
-#'
-#' @param metalyzer_se SummarizedExperiment
-#' @export
-#'
-#' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_mutation_data_xl())
-#' metalyzer_se <- filterMetabolites(
-#'   metalyzer_se,
-#'   drop_metabolites = "Metabolism Indicators"
-#' )
-#' metalyzer_se <- renameMetaData(
-#'   metalyzer_se,
-#'   Mutant_Control = "Sample Description"
-#' )
-#' 
-#' metalyzer_se <- calculate_log2FC(
-#'   metalyzer_se,
-#'   categorical = "Mutant_Control",
-#'   impute_perc_of_min = 0.2,
-#'   impute_NA = TRUE
-#' )
-#'
-#' log2FC(metalyzer_se)
-log2FC <- function(metalyzer_se) {
-  return(metalyzer_se@metadata$log2FC)
 }
 
 # === Export data ===
@@ -509,21 +475,21 @@ log2FC <- function(metalyzer_se) {
 #' @param metalyzer_se SummarizedExperiment
 #' @param ... Additional columns from meta_data
 #' @param file_path file path
-#'
+#' @importFrom dplyr bind_cols select
+#' @importFrom SummarizedExperiment colData assay 
+#' @importFrom utils write.csv
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
 #' 
 #' output_file <- file.path(tempdir(), "metabolomics_data.csv")
-#' exportConcValues(
-#'   metalyzer_se,
-#'   `Sample Description`,
-#'   Tissue,
-#'   file_path = output_file
-#' )
+#' MetAlyzer::export_conc_values(metalyzer_se,
+#'                               `Sample Description`,
+#'                               file_path = output_file
+#'                               )
 #' unlink(output_file)
-exportConcValues <- function(metalyzer_se,
+export_conc_values <- function(metalyzer_se,
                              ...,
                              file_path = "metabolomics_data.csv") {
   meta_data <- as.data.frame(SummarizedExperiment::colData(metalyzer_se))
@@ -531,7 +497,7 @@ exportConcValues <- function(metalyzer_se,
   conc_values <- SummarizedExperiment::assay(
     metalyzer_se, "conc_values"
   )
-  df <- bind_cols(
+  df <- dplyr::bind_cols(
     dplyr::select(meta_data, ...),
     t(conc_values)
   )
@@ -542,4 +508,144 @@ exportConcValues <- function(metalyzer_se,
     file = file_path,
     row.names = FALSE
   )
+}
+
+# === Handle log2FC Data ===
+#' @title Get log2FC Data
+#'
+#' @description This function returns the tibble "log2FC".
+#'
+#' @param metalyzer_se SummarizedExperiment
+#' @export
+#' 
+#' @examples
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se@metadata$log2FC <- readRDS(MetAlyzer::toy_diffres())
+#' MetAlyzer::log2FC(metalyzer_se)
+log2FC <- function(metalyzer_se) {
+  return(metalyzer_se@metadata$log2FC)
+}
+
+#' save_plot is a helper function to save plots
+#'
+#' @description This function saves a given ggplot object to a specified folder and file format.
+#' It ensures that the folder structure exists and cleans the folder name to remove special characters.
+#'
+#' @param plot A ggplot object to be saved.
+#' @param folder_name Name of the folder where the plot will be saved. Special characters will be removed automatically. \strong{Default = date}
+#' @param folder_path \emph{Optional: } User-defined path where the folder should be created. 
+#' If not provided, results will be saved in `MetAlyzer_results` within the working directory. \strong{Default = NULL}
+#' @param file_name Name of the output file (without extension). \strong{Default = "network"}
+#' @param format File format for saving the plot (e.g., "png", "pdf", "svg"). \strong{Default = "pdf"}
+#' @param width Width of the saved plot in specified units. \strong{Default = 29.7}
+#' @param height Height of the saved plot in specified units. \strong{Default = 21.0}
+#' @param units Units for width and height (e.g., "in", "cm", "mm"). \strong{Default = "cm"}
+#' @param overwrite Logical: If `TRUE`, overwrite existing files without asking. If `FALSE`, prompt user before overwriting. \strong{Default = FALSE}
+#'
+#' @return The function does not return anything but saves the plot to the specified directory.
+#'
+#' @keywords save, plot, ggplot
+#' @import ggplot2
+
+save_plot <- function(plot,
+                      folder_name = format(Sys.Date(), "%Y-%m-%d"),
+                      folder_path = NULL,
+                      file_name = "network",
+                      format = "pdf",
+                      units = "cm",
+                      height = 21.0,
+                      width = 29.7,
+                      overwrite = FALSE) {
+  
+  # Don't save plot 
+  if(is.null(format)) {
+    return(invisible(NULL))
+  }
+  ##############
+  ### CHECKS ###
+  ##############
+  # Check for invalid folder names (NULL, TRUE, FALSE)
+  if (is.null(folder_name) || folder_name == "" || is.logical(folder_name)) {
+    message("Invalid folder_name provided. Using today's date as folder name.")
+    folder_name <- format(Sys.Date(), "%Y-%m-%d")
+  }
+
+  # Set default path if none is provided
+  if (is.null(folder_path)) {
+    folder_path <- file.path(getwd(), "MetAlyzer_results")
+    if (!dir.exists(folder_path)) {
+      dir.create(folder_path)
+    }
+  } else if (!dir.exists(folder_path)) {
+    message("Provided `folder_path` does not exist. Using default: ", folder_path)
+    folder_path <- getwd()
+  }
+
+  # Check for invalid file names (NULL, TRUE, FALSE)
+  if (is.null(file_name) || file_name == "" || is.logical(file_name)) {
+    message("Invalid folder_name provided. Using default folder name: 'network'")
+    file_name <- "network"
+  }
+
+  # Check for valid format
+  valid_formats <- c("pdf", "png", "svg")
+  if (!(format %in% valid_formats)) {
+    message("Invalid format provided. Please choose from: 'pdf', 'png', 'svg'. Fallback to default 'pdf'.")
+    format <- "pdf"
+  }
+
+  # Check for valid units
+  valid_units <- c("cm", "in", "mm", "px")
+  if (!(units %in% valid_units)) {
+    message("Invalid units provided. Please choose from: 'cm', 'in', 'mm', 'px'. Fallback to default: 'cm'.")
+    units <- "cm"
+  }
+
+  # Check for valid height and width (should be numeric and greater than 0)
+  if (!is.numeric(height) || height <= 0) {
+    message("Invalid height provided. Height must be a positive numeric value. Fallback to default: 21.0.")
+    height <- 21.0
+  }
+  if (!is.numeric(width) || width <= 0) {
+    message("Invalid width provided. Width must be a positive numeric value. Fallback to default: 29.7.")
+    width <- 29.7
+  }
+
+  # Check for valid overwrite value
+  if(!is.logical(overwrite)) {
+    message("Invalid overwrite value provided. Overwrite must be a boolean value. Fallback to default: FALSE")
+    overwrite <- FALSE
+  }
+  ##############
+  # Remove special characters from folder name
+  cleaned_folder_name <- gsub("[^a-zA-Z0-9 ]", "", folder_name)
+  if (folder_name != cleaned_folder_name) {
+    message("Special characters were removed from `folder_name`.")
+  }
+
+  # Create subdirectory for results
+  results_folder <- file.path(folder_path, cleaned_folder_name)
+  if (!dir.exists(results_folder)) {
+    dir.create(results_folder)
+  }
+
+  # Construct file path
+  file_path <- file.path(results_folder, paste0(file_name, ".", format))
+
+  # Check if the file already exists
+  if (file.exists(file_path)) {
+    if (!overwrite) {
+      response <- readline(prompt = paste("File", file_path, "already exists. Overwrite? (y/n): "))
+      if (tolower(response) != "y") {
+        message("File was not overwritten. Saving process canceled.")
+        return(invisible(NULL))  # Exit function without saving
+      }
+    }
+    message("Overwriting existing file: ", file_path)
+  }
+
+  # Save the plot
+  ggplot2::ggsave(filename = file_path, plot = plot, width = width, height = height, units = units)
+  
+  message("Plot saved at: ", file_path)
 }

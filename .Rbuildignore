@@ -17,3 +17,6 @@
 ^R/two_way_anova\.R$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$

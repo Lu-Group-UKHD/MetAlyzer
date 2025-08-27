@@ -1,0 +1,45 @@
+---
+title: "Standard Metabolomics"
+author:
+  - name: Luis Herfurth
+    affiliation:
+    - Heidelberg University
+output:
+  html_document:
+    self_contained: true
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    code_folding: show
+vignette: >
+  %\VignetteIndexEntry{Shiny App}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+bibliography: bibliography.bib
+editor_options:
+  chunk_output_type: console
+---
+
+
+1. Install the "devtools" package (if not already installed):
+
+
+```{r, eval=FALSE}
+install.packages("devtools")
+```
+
+
+2. Install the "dgeAnalysis" package:
+
+
+```{r, eval=FALSE}
+devtools::install_github("nilsmechtel/MetAlyzer")
+```
+
+
+3. Launch the application:
+
+
+```{r, eval=FALSE}
+MetAlyzer::start_app()
+```

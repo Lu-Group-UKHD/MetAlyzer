@@ -11,7 +11,6 @@ name: R-CMD-check
 jobs:
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
-
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
     strategy:
@@ -38,6 +37,15 @@ jobs:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install --cask xquartz
+
+      - name: Install OmnipathR first
+        run: |
+          Rscript -e "install.packages('remotes')"
+          Rscript -e "remotes::install_github('saezlab/OmnipathR@devel')"
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:

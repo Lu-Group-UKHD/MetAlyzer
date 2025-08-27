@@ -6,9 +6,23 @@
 #' @export
 #'
 #' @examples
-#' fpath <- example_extraction_data()
-example_extraction_data <- function() {
+#' fpath <- MetAlyzer::load_rawdata_extraction()
+load_rawdata_extraction <- function() {
   system.file("extdata", "extraction_data_MxP_Quant_500.xlsx", package = "MetAlyzer")
+}
+
+
+#' @title Get demodata from biocrates
+#'
+#' @description This function returns the Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04.xlsx file path.
+#'
+#' @return Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04 file path
+#' @export
+#'
+#' @examples
+#' fpath <- MetAlyzer::load_demodata_biocrates()
+load_demodata_biocrates <- function() {
+  system.file("extdata", "Metalyzer_demodataset_biocratesMxPQuant500XL_2025-04.xlsx", package = "MetAlyzer")
 }
 
 
@@ -20,23 +34,22 @@ example_extraction_data <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- example_mutation_data_xl()
+#' fpath <- MetAlyzer::example_mutation_data_xl()
 example_mutation_data_xl <- function() {
   system.file("extdata", "mutation_data_MxP_Quant_500_XL.xlsx", package = "MetAlyzer")
 }
 
-
-#' @title Get example meta data
+#' @title Get example log2fc data
 #'
-#' @description This function returns the data frame loaded from example_meta_data.RDS.
+#' @description This function returns the log2fc dataframe of the Metalyzer_demo dataset_biocrates MxP Quant 500 XL_2025-04 file, created with the MetaVizPro package.
 #'
-#' @return data frame loaded from example_meta_data.RDS
+#' @return toy_diffres.rds file path
 #' @export
 #'
 #' @examples
-#' fpath <- example_meta_data()
-example_meta_data <- function() {
-  readRDS(system.file("extdata", "example_meta_data.RDS", package = "MetAlyzer"))
+#' fpath <- MetAlyzer::toy_diffres()
+toy_diffres <- function() {
+  system.file("extdata", "toy_diffres_biocrates.rds", package = "MetAlyzer")
 }
 
 #' @title Get MetAlyzer colors
@@ -47,7 +60,7 @@ example_meta_data <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- metalyzer_colors()
+#' fpath <- MetAlyzer::metalyzer_colors()
 metalyzer_colors <- function() {
   readRDS(system.file("extdata", "metalyzer_colors.RDS", package = "MetAlyzer"))
 }
@@ -60,7 +73,7 @@ metalyzer_colors <- function() {
 #' @export
 #'
 #' @examples
-#' fpath <- polarity()
+#' fpath <- MetAlyzer::polarity()
 polarity <- function() {
   system.file("extdata", "polarity.csv", package = "MetAlyzer")
 }
@@ -68,13 +81,13 @@ polarity <- function() {
 
 #' @title Get pathway file path
 #'
-#' @description This function returns the pathway.xlsx file path.
+#' @description This function returns the latest pathway.xlsx file path.
 #'
 #' @return pathway.xlsx file path
 #' @export
 #'
 #' @examples
-#' fpath <- pathway()
+#' fpath <- MetAlyzer::pathway()
 pathway <- function() {
-  system.file("extdata", "Pathway_101024.xlsx", package = "MetAlyzer")
+  system.file("extdata", "Pathway_120325.xlsx", package = "MetAlyzer")
 }

@@ -5,19 +5,39 @@
 \title{Plot Pathway Network}
 \usage{
 plot_network(
-  metalyzer_se,
+  log2fc_df,
   q_value = 0.05,
+  metabolite_col_name = "Metabolite",
+  values_col_name = "log2FC",
+  stat_col_name = "qval",
   metabolite_text_size = 3,
   connection_width = 0.75,
   pathway_text_size = 6,
-  pathway_width = 4,
-  scale_colors = c("green", "black", "magenta")
+  pathway_width = 3,
+  exclude_pathways = NULL,
+  color_scale = "viridis",
+  gradient_colors = NULL,
+  save_as = NULL,
+  folder_name = format(Sys.Date(), "\%Y-\%m-\%d"),
+  folder_path = NULL,
+  file_name = "network",
+  format = "pdf",
+  width = 29.7,
+  height = 21,
+  units = "cm",
+  overwrite = FALSE
 )
 }
 \arguments{
-\item{metalyzer_se}{A Metalyzer object}
+\item{log2fc_df}{A dataframe with log2FC, qval, additional columns}
 
 \item{q_value}{The q-value threshold for significance}
+
+\item{metabolite_col_name}{Columnname that holds the Metabolites}
+
+\item{values_col_name}{Column name of a column that holds numeric values, to be plotted \strong{Default = "log2FC"}}
+
+\item{stat_col_name}{Columnname that holds numeric stat values that are used for significance \strong{Default = "qval"}}
 
 \item{metabolite_text_size}{The text size of metabolite labels}
 
@@ -27,32 +47,40 @@ plot_network(
 
 \item{pathway_width}{The line width of pathway-specific connection coloring}
 
-\item{scale_colors}{A vector of length 3 with colors for low, mid and high 
-of the gradient.}
+\item{exclude_pathways}{Pathway names that are exluded from plotting}
+
+\item{color_scale}{A string specifying the color scale to use. Options include `"viridis"`, `"plasma"`, `"magma"`, `"inferno"`, `"cividis"`, `"rocket"`, `"mako"`, and `"turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.}
+
+\item{gradient_colors}{A vector of length 2 or 3 specifying the colors for a custom gradient. If two colors are provided (`c(low, high)`), `scale_fill_gradient()` is used. If three colors are provided (`c(low, mid, high)`), `scale_fill_gradient2()` is used. If `NULL` or incorrectly specified, the viridis color scale is applied.}
+
+\item{save_as}{\emph{Optional: } Select the file type of output plots. Options are svg, pdf, png or NULL. \strong{Default = "NULL"}}
+
+\item{folder_name}{Name of the folder where the plot will be saved. Special characters will be removed automatically. \strong{Default = date}}
+
+\item{folder_path}{\emph{Optional: } User-defined path where the folder should be created. 
+If not provided, results will be saved in `MetAlyzer_results` within the working directory. \strong{Default = NULL}}
+
+\item{file_name}{Name of the output file (without extension). \strong{Default = "network"}}
+
+\item{format}{File format for saving the plot (e.g., "png", "pdf", "svg"). \strong{Default = "pdf"}}
+
+\item{width}{Width of the saved plot in specified units. \strong{Default = 29.7}}
+
+\item{height}{Height of the saved plot in specified units. \strong{Default = 21.0}}
+
+\item{units}{Units for width and height (e.g., "in", "cm", "mm"). \strong{Default = "cm"}}
+
+\item{overwrite}{Logical: If `TRUE`, overwrite existing files without asking. If `FALSE`, prompt user before overwriting. \strong{Default = FALSE}}
 }
 \value{
-ggplot object
+list with ggplot object and table of node summaries
 }
 \description{
 This function plots the log2 fold change for each metabolite and visualizes it, in a pathway network.
 }
 \examples{
-metalyzer_se <- MetAlyzer_dataset(file_path = example_mutation_data_xl())
-metalyzer_se <- filterMetabolites(
-  metalyzer_se,
-  drop_metabolites = "Metabolism Indicators"
-)
-metalyzer_se <- renameMetaData(
-  metalyzer_se,
-  Mutant_Control = "Sample Description"
-)
-
-metalyzer_se <- calculate_log2FC(
-  metalyzer_se,
-  categorical = "Mutant_Control",
-  impute_perc_of_min = 0.2,
-  impute_NA = FALSE
-)
-
-network <- plot_network(metalyzer_se, q_value = 0.05)
+log2fc_df <- readRDS(MetAlyzer::toy_diffres())
+network <- MetAlyzer::plot_network(log2fc_df, q_value = 0.05)
+network$Plot
+network$Table
 }

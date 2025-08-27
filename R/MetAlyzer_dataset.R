@@ -11,11 +11,12 @@
 #' @param status_list A list of HEX color codes for each quantification status.
 #' @param silent If TRUE, mute any print command.
 #' @return A Summarized Experiment object
+#' @import SummarizedExperiment
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer_dataset(file_path = example_extraction_data())
-MetAlyzer_dataset <- function(
+#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+read_metidq <- function(
     file_path,
     sheet = 1,
     status_list = list(
@@ -27,6 +28,31 @@ MetAlyzer_dataset <- function(
       "Incomplete" = c("#CBD2D7", "#FFCCCC")
     ),
     silent = FALSE) {
+  # Input checks
+  if (!is.character(file_path) || length(file_path) != 1) {
+    stop("`file_path` must be a single character string.", call. = FALSE)
+  }
+  if (!file.exists(file_path)) {
+    stop("`file_path` does not exist: ", file_path, call. = FALSE)
+  }
+  if (!((is.numeric(sheet) && length(sheet) == 1 && sheet > 0 && floor(sheet) == sheet) ||
+        (is.character(sheet) && length(sheet) == 1))) {
+    stop("`sheet` must be a single positive integer or a single sheet name (character string).", call. = FALSE)
+  }
+  if (!is.list(status_list)) {
+    stop("`status_list` must be a list.", call. = FALSE)
+  }
+  if (length(status_list) > 0 && !all(sapply(status_list, function(x) is.character(x) && !any(is.na(x))))) {
+    stop("All elements in `status_list` must be character vectors of hex color codes.", call. = FALSE)
+  }
+  if (!is.logical(silent) || length(silent) != 1) {
+    stop("`silent` must be a single logical value (TRUE or FALSE).", call. = FALSE)
+  }
+
+  # Rest of the function code would go here...
+  if (!silent) {
+    message("Input checks passed. Proceeding with reading MetIDQ file.")
+  }
   # Print MetAlyzer logo
   if (silent == FALSE) {
     metalyzer_ascii_logo()
@@ -94,8 +120,8 @@ MetAlyzer_dataset <- function(
 
   # Print summary of conc_values and quant_status
   if (silent == FALSE) {
-    summarizeConcValues(se)
-    summarizeQuantData(se)
+    summarize_conc_values(se)
+    summarize_quant_data(se)
   }
 
   return(se)
@@ -107,8 +133,6 @@ MetAlyzer_dataset <- function(
 #'
 #' @keywords internal
 metalyzer_ascii_logo <- function() {
-  # http://patorjk.com/software/taag/#p=display&f=3D-ASCII&t=MetAlyzer
-  # Also try: Rectangles
   line1 <- "\n"
   line2a <- " _____ ______   _______  _________  ________  ___           ___   "
   line2b <- " ___ ________  _______   ________"
@@ -150,6 +174,7 @@ metalyzer_ascii_logo <- function() {
 #' given sheet.
 #'
 #' @param starter_list contains the file path and the sheet index
+#' @importFrom openxlsx read.xlsx
 #'
 #' @keywords internal
 open_file <- function(starter_list) {
@@ -294,6 +319,7 @@ slice_meta_data <- function(full_sheet, data_ranges) {
 #' them in a unified format.
 #'
 #' @param hex A 3, 4, 6 or 8 digit hex code
+#' @importFrom stringr str_extract_all
 #'
 #' @keywords internal
 unify_hex <- function(hex) {
@@ -334,6 +360,7 @@ unify_hex <- function(hex) {
 #' @param metabolites metabolites
 #' @param status_list status_list
 #' @param silent silent
+#' @importFrom openxlsx loadWorkbook getSheetNames
 #'
 #' @keywords internal
 read_quant_status <- function(
@@ -396,7 +423,9 @@ read_quant_status <- function(
 #' @param conc_values conc_values of a MetAlyzer object
 #' @param quant_status quant_status of a MetAlyzer object
 #' @param status_vec A vector of quantification status
-#' @import dplyr
+#' @importFrom dplyr arrange mutate group_by
+#' @importFrom tidyr gather
+#' @importFrom magrittr %>%
 #' @importFrom rlang .data
 #'
 #' @keywords internal
@@ -444,7 +473,16 @@ aggregate_data <- function(
   aggregated_data$Status <- factor(gathered_status$Status,
     levels = status_vec
   )
-  aggregated_data <- arrange(aggregated_data, .data$Metabolite)
+  aggregated_data <- dplyr::arrange(aggregated_data, .data$Metabolite)
 
   return(droplevels(aggregated_data))
+}
+
+#' @title Open file and read data
+#' @param ... Declare this function as out of date
+#'
+#' @description This function was deprecated in version v2.0.0
+#' 
+MetAlyzer_dataset <- function(...) {
+  cat("This function was deprecated in v2.0.0, please use read_metidq()\n")
 }

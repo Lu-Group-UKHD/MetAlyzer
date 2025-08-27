@@ -13,5 +13,5 @@ mutation_data_MxP_Quant_500_XL.xlsx file path
 This function returns the mutation_data_MxP_Quant_500_XL.xlsx file path.
 }
 \examples{
-fpath <- example_mutation_data_xl()
+fpath <- MetAlyzer::example_mutation_data_xl()
 }

@@ -7,3 +7,5 @@
 .Rproj.user
 ..Rcheck
 *_cache
+docs
+environment.yml

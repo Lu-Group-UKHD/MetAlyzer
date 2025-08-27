@@ -29,14 +29,12 @@ install_github("nilsmechtel/MetAlyzer")
 
 The package takes metabolomic measurements and the quantification status (e.g. "Valid", "LOQ", "LOD") as ".xlsx" files generated from the MetIDQ&trade; software. Additionally, meta data for each sample can be provided for further analysis.
 
-![MetAlyzer](vignettes/MetAlyzer_workflow.png)
-
 This is an extract from one of the provided example data sets.
-![Example_Data](vignettes/screenshot_xlsx.png)
+![Example_Data](vignettes/images/biocrates_output.png)
 
 #### Create MetAlyzer object:
-```{r}
-> metalyzer_se <- MetAlyzer_dataset(file_path = extraction_data())
+```r
+> metalyzer_se <- MetAlyzer_dataset(file_path = load_demodata_biocrates())
 
 
  _____ ______   _______  _________  ________  ___           ___    ___ ________  _______   ________
@@ -49,51 +47,58 @@ This is an extract from one of the provided example data sets.
                                                           \|____|/
 
 
-Info: Reading color code "FFFFCCCC" as "#FFCCCC"
-Info: Reading color code "FF00CD66" as "#00CD66"
-Info: Reading color code "FF6A5ACD" as "#6A5ACD"
-Info: Reading color code "FF87CEEB" as "#87CEEB"
-Info: Reading color code "FFFFFFCC" as "#FFFFCC"
+Info: Reading color code "FFCBD2D7" as "#CBD2D7"
+Info: Reading color code "FFB2D1DC" as "#B2D1DC"
+Info: Reading color code "FF7FB2C5" as "#7FB2C5"
+Info: Reading color code "FFB9DE83" as "#B9DE83"
+Info: Reading color code "FFB9DE83" as "#B9DE83"
+Info: Reading color code "FFFFF099" as "#FFF099"
+Info: Reading color code "FFFFF099" as "#FFF099"
+Info: Reading color code "FFA28BA3" as "#A28BA3"
+Info: Reading color code "FFA28BA3" as "#A28BA3"
+Info: Reading color code "FFB2D1DC" as "#B2D1DC"
+Info: Reading color code "FF7FB2C5" as "#7FB2C5"
 
 Measured concentration values:
 ------------------------------
-        0%        25%        50%        75%       100% 
-     0.000      0.017      1.760     21.200 288149.000 
+          0%          25%          50%          75%         100% 
+    0.000000     0.286299     1.289381     6.308854 12522.000000 
 
-NAs: 5348 (8.38%)
-Note: 'Metabolism Indicators' are frequently NA!
+NAs: 762 (3.74%)
+
 
 Measured quantification status:
 -------------------------------
-Valid: 24095 (37.77%)
-LOQ: 5799 (9.09%)
-LOD: 21789 (34.16%)
-Invalid: 12105 (18.98%)
+Valid: 15419 (75.66%)
+LOQ: 983 (4.82%)
+LOD: 3978 (19.52%)
 NAs: 0 (0%)
 ```
 
-### Downstream analysis:
-For further filtering, statistical analysis and plotting, the data is reformatted and aggregated into a tibble data frame.
+### Visualizations:
+The plotting functions plot_log2FC and plot_network can accept a standard data frame containing log2FC results, and a stat column.
 
-```{r}
-> aggregatedData(metalyzer_se)
-# A tibble: 63,788 × 5
-# Groups:   Metabolite [862]
-   ID    Metabolite Class          Concentration Status
-   <fct> <fct>      <fct>                  <dbl> <fct> 
- 1 9     C0         Acylcarnitines         203   Valid 
- 2 10    C0         Acylcarnitines          86.8 Valid 
- 3 11    C0         Acylcarnitines         246   Valid 
- 4 12    C0         Acylcarnitines         198   Valid 
- 5 13    C0         Acylcarnitines         369   Valid 
- 6 14    C0         Acylcarnitines         127   Valid 
- 7 15    C0         Acylcarnitines          36.1 Valid 
- 8 16    C0         Acylcarnitines          40.7 Valid 
- 9 17    C0         Acylcarnitines         189   Valid 
-10 18    C0         Acylcarnitines          16.1 LOD   
-# ℹ 63,778 more rows
-# ℹ Use `print(n = ...)` to see more rows
+```r
+diffres_df <- readRDS(MetAlyzer::toy_diffres())
 ```
+
+```r
+network <- MetAlyzer::plot_network(
+  diffres_df,
+  q_value = 0.05,
+  metabolite_col = "Metabolite",
+  values_col_name = "log2FC",
+  stat_col_name = "qval",
+  metabolite_text_size = 2,
+  connection_width = 0.75,
+  pathway_text_size = 4,
+  pathway_width = 4,
+)
+
+network$Plot
+```
+
+![Network](vignettes/images/network_demodata.png)
 
 ## Detailed instructions
 **For a comprehensive tutorial, please check out the [MetAlyzer Vignette](https://CRAN.R-project.org/package=MetAlyzer

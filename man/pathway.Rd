@@ -10,8 +10,8 @@ pathway()
 pathway.xlsx file path
 }
 \description{
-This function returns the pathway.xlsx file path.
+This function returns the latest pathway.xlsx file path.
 }
 \examples{
-fpath <- pathway()
+fpath <- MetAlyzer::pathway()
 }
