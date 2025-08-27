@@ -23,19 +23,27 @@ editor_options:
   chunk_output_type: console
 ---
 
+<style>
+.vscroll-plot {
+    width: 850px;
+    height: 500px;
+    overflow-y: scroll;
+    overflow-x: hidden;
+}
+</style>
+
+
 ```{r setup, message=FALSE, warning=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo=TRUE, cache=FALSE, collapse=TRUE, comment='#>', warning=FALSE, message=FALSE)
 
 #If you haven't done this yet, install the MetAlyzer package
-#devtools::install_github("nilsmechtel/MetAlyzer")
-#library(MetAlyzer)
-devtools::load_all()
+#devtools::install_github("Lu-Group-UKHD/MetAlyzer")
+library(MetAlyzer)
 
+#Load dependencies
 library(dplyr)
 
 ```
-
-Search the text for "@ADD" as at those points additions are still needed!
 
 ::: {style="text-align: justify"}
 The ***MetAlyzer*** R-package provides a robust toolkit for importing, handling, and analyzing metabolomics data generated 
@@ -55,10 +63,10 @@ helping to find pathway-level alterations and providing a systems perspective on
 As the output files contain layered information, inform of concentration values and color-coded quantification status (e.g., "Valid", "LOD", "LOQ"), 
 it is a tedious task to reliably process this data computationally, as the mix of numerical values and status codes hinders direct machine readability by standard analysis tools.
 To conveniently read the data in we provide the function `MetAlyzer::read_metidq()`, structuring the data into a SummarizedExperiment (SE) object [@Morgan2025SummarizedExperiment] for easy downstream analysis.
-For further demonstration we'll use a demo dataset kindly provided by BIOCRATES Life Sciences AG, featuring metabolite measurements across two groups (MxP®Quant 500 kit). @ADD info about the conditions and the biology - what would we expect from the biological system?. This dataset is included in the ***MetAlyzer*** R package as the example data.
+For further demonstration we'll use a demo dataset kindly provided by BIOCRATES Life Sciences AG, featuring metabolite measurements across two groups (MxP®Quant 500 kit). This dataset is included in the ***MetAlyzer*** R package as the example data.
 :::
 
-```{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates MetIDQ™.", out.width="70%", fig.align="center"}
+```{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates MetIDQ™.", out.width="90%", fig.align="center"}
 knitr::include_graphics("images/biocrates_output.png")
 ```
 
@@ -103,9 +111,9 @@ head(SummarizedExperiment::colData(metalyzer_se)) %>%
 ## Differential analysis results
 
 ::: {style="text-align: justify"}
-The ***MetAlyzer*** R package does not include differential analysis itself, as it's aim is to import Biocrates files and visualize the results. Given the many tools and 
-R packages dedicated for quality control and differential analysis, we decided to focus on the visualization part. Never the less, we will showcase how you can easily perform 
-differential analysis using the ***MetaProViz*** R package [@MetaProViz]. If you are not familiar with using R, you can use our shiny app, which will do the whole process from start to finish (@ADD LINK).\
+The ***MetAlyzer*** R package does not include processing or differential analysis itself, as it's aim is to import Biocrates files and visualize the results. Given the many tools and 
+R packages dedicated for quality control and differential analysis, we decided to not focus on this. Never the less, we will showcase how you can easily perform differential analysis using 
+the ***MetaProViz*** R package [@Schmidt2025]. If you are not familiar with using R, you can use our shiny app, which will do the whole process from start to finish (@ADD LINK).\
 If you already have differential analysis results, you can skip this section and just load our internal example data of differential analysis results `MetAlyzer::toy_diffres()`. 
 :::
 ```{r import, message=FALSE, warning=FALSE}
@@ -114,22 +122,24 @@ diffres_df <- readRDS(MetAlyzer::toy_diffres())
 head(diffres_df) %>%
   kableExtra::kbl(caption = "Preview of Assay containing colData.") %>%
   kableExtra::kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
+
+#@Add: t-value column into the example data!
 ```
 \
 ::: {style="text-align: justify"}
 This table contains columns for metabolite names (`Metabolite`), their class (`Class`), calculated log2 fold change (log2FC), and adjusted p-values (adj.P.Val). 
 We can directly use this dataframe as input to the to the ***MetAlyzer*** visualization functions.
-@Add: t-value column into the example data!
+
 :::
 
-<div class="vscroll-plot">
-```{r diffres, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+```{r diffres, eval=FALSE,echo=TRUE, results='hide'}
 ## -------------------------------------------------------------------------- ##
 ##  Skip this part if you already have generated differential analysis results ##
 ## -------------------------------------------------------------------------- ##
 
 # Ensure that you have performed all needed processing, normalisation and QC steps in MetIDQ™ or 
-# using external R-packages like MetaProViz before running the differential analysis.
+# using external R-packages like MetaProViz (https://saezlab.github.io/MetaProViz/articles/standard-metabolomics.html#run-metaproviz-analysis) 
+# before running the differential analysis.
 
 ##----- Create InputDF
 assay_matrix <- metalyzer_se %>%
@@ -148,7 +158,6 @@ feature_info <- metalyzer_se %>%
   as.data.frame()
   
 ##----- Processing
-#@ADD: I think we should rather export the processed file from MetIDQ and note down which steps had been done in the software. I would also extend the sample metainformation (e.g. replicate, tissue type etc.) and the feature information (metabolite IDs). At the moment the samples just have numbers, but I think we should give them ore meaningfull names including their Condition, replicate number etc. Ask @Gernot/Biocrates
 # For function details visit MetaProViz: https://saezlab.github.io/MetaProViz/reference/processing.html
 processing_res <- MetaProViz::processing(data= assay_matrix, 
                                          metadata_sample= sample_info, 
@@ -178,7 +187,6 @@ dma_group1_vs_group2 <- dma_res[["dma"]][["Group 1_vs_Group 2"]]%>%
     tval= t.val
   )
 ```
-</div>
 
 ::: {style="text-align: justify"}
 # MetAlyzer Plots
@@ -248,20 +256,19 @@ This summarization approach provides a concise overview within the network, high
 Due to the changing naming convention of Biocrates, we include old names in the excel file, which will show up as NA for later generated MetIDQ™ outputs (e.g. TG(14:0_32.2)), but this enables the analysis of older files as well. @ADD we need a date here, like from which year the exports work, and guidance how someone can export the required old names form MetIDQ as we know how that works
 :::
 
+```{r networkTable, message=FALSE, warning=FALSE}
+T14_node_expanded <- network$Table%>%
+  dplyr::filter(Label == "T14")%>%
+  tidyr::separate_rows(Metabolites, values, stat, sep = "\\s*;\\s*") %>%
+  dplyr::rename(p.val = stat, Log2FC = values) %>%
+  dplyr::mutate(
+    Log2FC = as.numeric(Log2FC),
+    p.val = as.numeric(p.val)
+  )
+```
+
 <div class="vscroll-plot">
-```{r networkTable, echo=FALSE, message=FALSE, warning=FALSE}
-nodes_list <- network$Table
-T14_node <- nodes_list[which(nodes_list$Label == "T14"), ]
-
-T14_node_expanded <- tidyr::separate_rows(T14_node,
-                                          Metabolites, values, stat,
-                                          sep = "\\s*;\\s*") %>%
-                     tibble::column_to_rownames("Metabolites") %>%
-                     dplyr::rename(p.adj = stat,
-                                   Log2FC = values) %>%
-                     dplyr::mutate(Log2FC = as.numeric(Log2FC),
-                                   p.adj = as.numeric(p.adj))
-
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 T14_node_expanded %>%
   kableExtra::kbl(caption = "T14 Node detailed Information") %>%
   kableExtra::kable_classic(full_width = F, html_font = "helvetica", font_size = 12)
@@ -269,16 +276,17 @@ T14_node_expanded %>%
 </div>
 
 :::
-For easy visualisation of the summarized nodes, you can use the MetaProViz Volcano Plot (package) [@MetaProViz].
+For easy visualisation of the summarized nodes, you can plot them as a Volcano plot or Lollipop graph.  this allows to inspect the direction of change (negative/positive Log2FC) and p-value of the differential analysis. Here we show a minimal example using ggplot2 (@ADD Reference).
 :::
 
-```{r vulcano, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6, fig.height=4.5, fig.align="left"}
-# https://saezlab.github.io/MetaProViz/reference/viz_volcano.html
-MetaProViz::viz_volcano(data = T14_node_expanded, 
-                        select_label = NULL,
-                        plot_name = "T14 Node of Group 1 vs Group 2")
+```{r message=FALSE, warning=FALSE, fig.width=6, fig.height=4.5, fig.align="left"}
+ggplot2::ggplot(T14_node_expanded %>%na.omit(), ggplot2::aes(x=Log2FC, y=Metabolites)) +
+  ggplot2::geom_segment(ggplot2::aes(x=0, xend=Log2FC, yend=factor(Metabolites)))+
+  ggplot2::geom_point(ggplot2::aes(size =p.val)) +
+  ggplot2::scale_size_continuous(trans = "reverse", range = c(6, 12))+
+  ggplot2::labs(title = "Lollipop Plot T14:0 Node")
 ```
-
+                        
 # Session information
 
 ```{r session_info, echo=FALSE}
