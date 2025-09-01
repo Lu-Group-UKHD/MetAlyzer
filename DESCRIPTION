@@ -42,7 +42,7 @@ Authors@R: c(
            role = c("aut")),
     person(given = "Junyan",
            family = "Lu",
-           role = c("aut", "Cre")),
+           role = c("aut", "cre")),
     person(given = "Gernot",
            family = "Poschet",
            role = c("aut"))
