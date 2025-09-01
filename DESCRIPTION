@@ -31,7 +31,7 @@ Authors@R: c(
            comment = c(ORCID = "0000-0002-8960-7719")),
     person(given = "Daniel",
            family = "Huebschmann",
-           family =role = c("aut"),
+           role = c("aut"),
            comment = c(ORCID = "0000-0002-6041-7049")),
     person(given = "Julio", 
            family = "Saez-Rodriguez", 
