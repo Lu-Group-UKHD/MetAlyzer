@@ -45,7 +45,7 @@ Authors@R: c(
            role = c("aut", "Cre")),
     person(given = "Gernot",
            family = "Poschet",
-           role = c("aut")),    
+           role = c("aut"))
            
 Maintainer: Junyan Lu <junyan.lu@uni-heidelberg.de>
 Depends:
