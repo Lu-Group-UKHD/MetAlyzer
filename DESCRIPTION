@@ -36,7 +36,7 @@ Authors@R: c(
            family = "Saez-Rodriguez", 
            role = "aut",
            comment = c(ORCID = "0000-0002-8552-8976")),
-    person(given = "Rüdiger",
+    person(given = "R\u00FCdiger",
            family = "Hell",
            role = c("aut")),
     person(given = "Junyan",
