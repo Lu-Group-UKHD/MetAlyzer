@@ -3,27 +3,51 @@ Type: Package
 Title: Read and Analyze 'MetIDQ&trade;' Software Output Files
 Version: 1.1.0
 Authors@R: c(
-    person(given = "Nils",
-           family = "Mechtel",
-           role = c("aut", "cre"),
-           email = "nils.mech@gmail.com",
-           comment = c(ORCID = "0000-0002-1278-7125")),
-    person(given = "Luis",
+    person(given = "Qian-Wu",
+           family = "Liao",
+           role = c("aut")),
+     person(given = "Luis",
            family = "Herfurth",
            role = c("aut"),
-           email = "luis.herfurth@stud.uni-heidelberg.de",
-           comment = c(ORCID = "0009-0000-9933-3056")),
+           comment = c(ORCID = "0009-0000-9933-3056")),       
+    person(given = "Christina", 
+           family = "Schmidt",
+           role = c("aut"),
+           comment = c(ORCID = "0000-0002-3867-0881")),
+    person(given = "Nils",
+           family = "Mechtel",
+           role = c("aut"),
+           comment = c(ORCID = "0000-0002-1278-7125")),
+    person(given = "Hagen",
+           family = "Gegner",
+           role = c("aut")),
+    person(given = "Alice",
+           family = "Limonciel",
+           role = c("aut")),       
     person(given = "Carolin",
            family = "Andresen",
            role = c("aut"),
-           email = "carolinandresen@googlemail.com",
            comment = c(ORCID = "0000-0002-8960-7719")),
     person(given = "Daniel",
            family = "Huebschmann",
            role = c("aut"),
-           email = "d.huebschmann@dkfz-heidelberg.de",
-           comment = c(ORCID = "0000-0002-6041-7049")))
-Maintainer: Nils Mechtel <nils.mech@gmail.com>
+           comment = c(ORCID = "0000-0002-6041-7049")),
+    person(given = "Julio", 
+           family = "Saez-Rodriguez", 
+           role = "aut",
+           comment = c(ORCID = "0000-0002-8552-8976")),
+    person(given = "R\u00FCdiger",
+           family = "Hell",
+           role = c("aut")),
+    person(given = "Junyan",
+           family = "Lu",
+           email = "junyan.lu@uni-heidelberg.de",
+           role = c("aut", "cre")),
+    person(given = "Gernot",
+           family = "Poschet",
+           role = c("aut"))
+           )
+Maintainer: Junyan Lu <junyan.lu@uni-heidelberg.de>
 Depends:
     R (>= 4.0.0)
 biocViews:
@@ -73,4 +97,3 @@ Remotes:
 VignetteBuilder: knitr
 URL: https://github.com/nilsmechtel/MetAlyzer
 BugReports: https://github.com/nilsmechtel/MetAlyzer/issues
-

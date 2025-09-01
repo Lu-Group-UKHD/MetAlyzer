@@ -22,7 +22,7 @@ read_metidq <- function(
     status_list = list(
       "Valid" = c("#B9DE83", "#00CD66"),
       "LOQ" = c("#B2D1DC", "#7FB2C5", "#87CEEB"), # <LLOQ or > ULOQ
-      "LOD" = c("#A28BA3", "#6A5ACD"), # < LOD
+      "LOD" = c("#A28BA3", "#6A5ACD", "#BBA7B9"), # < LOD
       "ISTD Out of Range" = c("#FFF099", "#FFFF33"),
       "Invalid" = "#FFFFCC",
       "Incomplete" = c("#CBD2D7", "#FFCCCC")
