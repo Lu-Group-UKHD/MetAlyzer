@@ -3,9 +3,13 @@
 #' of the data using limma. Note that the data has to be filtered and log2 transformed
 #' already.
 #' 
-#' @param metalyzer_se A Metalyzer object
-#' @param categorical A character specifying the column from sample metadata containing two groups
-calc_log2FC <- function(metalyzer_se, categorical) {
+#' @param metalyzer_se A MetAlyzer object
+#' @param group A character specifying the sample metadata column containing two
+#' groups that will be compared
+#' @param group_level A vector of characters specifying the group members in 'group',
+#' which decides the direction of comparisons. For example, c('A', 'B') compares
+#' A to B, and vice versa. Default is NULL (alphabetically)
+calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
   aggregated_data <- metalyzer_se@metadata$aggregated_data
   # Prepare abundance data
   #### Do not know why Metabolite column is grouped by MetAlyzer
@@ -17,7 +21,7 @@ calc_log2FC <- function(metalyzer_se, categorical) {
     tibble::as_tibble(rownames = 'ID')
   # Use original column names whose spaces are not replaced with '.'
   colnames(smp_metadata) <- c('ID', colnames(colData(metalyzer_se)))
-  smp_metadata <- dplyr::select(smp_metadata, ID, all_of(categorical))
+  smp_metadata <- dplyr::select(smp_metadata, ID, all_of(group))
   # Combine abundance data and sample metadata to ensure matched information
   combined_data <- dplyr::left_join(feat_data, smp_metadata, by = 'ID')
   # Retrieve data matrix and sample metadata from combined data to conduct limma
@@ -25,9 +29,13 @@ calc_log2FC <- function(metalyzer_se, categorical) {
     tibble::column_to_rownames('ID') %>%
     t()
   group_vec <- combined_data[, ncol(feat_data)+1, drop = T]
-  # Sanity check if specified categorical can split data into two groups
+  # Sanity check if specified 'group' splits data into two groups
   if (length(unique(group_vec)) != 2) {
-    stop("The specified categorical cannot split data into two groups.")
+    stop("The specified 'group' does not split data into two groups.")
+  }
+  # Level groups to which samples belong to determine direction of comparison
+  if (!is.null(group_level)) {
+    group_vec <- relevel(factor(group_vec), ref = group_level[2])
   }
   
   # Compute log2(FC), p-values, and adjusted p-values using limma

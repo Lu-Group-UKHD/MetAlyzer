@@ -959,7 +959,8 @@ server <- function(input, output, session) {
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
       metabObj <- calc_log2FC(metalyzer_se = metabObj,
-                              categorical = selectedChoiceGp)
+                              group = selectedChoiceGp,
+                              group_level = selectedChoices)
       reactLog2FCTbl(MetAlyzer:::log2FC(metabObj))
       
       # Update the slider input, for custom inputs
