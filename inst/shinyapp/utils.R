@@ -4,7 +4,7 @@
 #' already.
 #' 
 #' @param metalyzer_se A Metalyzer object
-#' @param categorical A character specifying the column containing two groups
+#' @param categorical A character specifying the column from sample metadata containing two groups
 calc_log2FC <- function(metalyzer_se, categorical) {
   aggregated_data <- metalyzer_se@metadata$aggregated_data
   # Prepare abundance data
@@ -233,14 +233,14 @@ plotly_scatter <- function(Log2FCTab) {
   return(list(Plot = plotly_plot, Legend = legend))
 }
 
-#' @title Plotly Log2FC Vulcano Plot
-#' @descritpion This function returns a list with interactive 
-#' vulcanoplot based on log2 fold change data.
+#' @title ggplotly: Vulcano Plot
+#' @descritpion This function creates an interactive vulcano plot
 #' 
-#' @param Log2FCTab A data frame containing log2 fold change data
-#' @param y_cutoff A numeric value specifying the cutoff for q-value
-#' @param x_cutoff A numeric value specifying the cutoff for log2 fold change
-plotly_vulcano <- function(Log2FCTab, y_cutoff = 0.05, x_cutoff = 1.5) {
+#' @param Log2FCTab A data frame containing metabolite differential results, which
+#' can be retrieved by MetAlyzer::log2FC(se) where se has gone through function 'calc_log2FC'
+#' @param x_cutoff A numeric value specifying the cutoff for log2 fold changes
+#' @param y_cutoff A numeric value specifying the cutoff for q-values
+plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
   # Make Colors unique for each class
   polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
   polarity_df <- utils::read.csv(polarity_file) %>%
@@ -251,32 +251,38 @@ plotly_vulcano <- function(Log2FCTab, y_cutoff = 0.05, x_cutoff = 1.5) {
     arrange(.data$Polarity)
   class_colors <- metalyzer_colors()
   names(class_colors) <- levels(polarity_df$Class)
+  # Add color for insignificant metabolites
+  class_colors <- c(class_colors, c(`Not Significant` = 'grey50'))
+  
+  #### NAs are produced not due to insignificance
   ## Data: Replace NAs
-  Log2FCTab$log2FC[is.na(Log2FCTab$log2FC)] <- 0
-  Log2FCTab$qval[is.na(Log2FCTab$qval)] <- 1
+  # Log2FCTab$log2FC[is.na(Log2FCTab$log2FC)] <- 0
+  # Log2FCTab$qval[is.na(Log2FCTab$qval)] <- 1
+  
+  ## Data: Remove metabolites with missing stats
+  Log2FCTab <- Log2FCTab[!(is.na(Log2FCTab$log2FC) | is.na(Log2FCTab$qval)),]
   
   if("highlight" %in% colnames(Log2FCTab)) {
-    # rename factor levels for improving Legend understanding
-    Log2FCTab$highlight <- factor(Log2FCTab$highlight, levels = c(FALSE, TRUE), labels = c("Other metabolites", "Highlighted metabolite(s)"))
+    # Level highlights to make highlighted metabolites on top of plot and rename
+    # factor levels for Legend understanding
+    Log2FCTab$highlight <- factor(Log2FCTab$highlight, levels = c(FALSE, TRUE),
+                                  labels = c("Other metabolites", "Highlighted metabolite(s)"))
     
-    ## Plot: Create vulcano ggplot object with highlighted points
-    p_fc_vulcano_highlighted <- ggplot(Log2FCTab %>%
-                                         arrange(desc(highlight)),
-                                       aes(x = .data$log2FC,
-                                           y = -log10(.data$qval),
-                                           color = .data$highlight)) +
-      geom_point(size = 1.5, aes(text = paste0(Metabolite, 
-                                               "\nClass: ", Class, 
-                                               "\nLog2(FC): ", round(log2FC, digits=2), 
-                                               "\nAdj. p-value: ", round(qval, digits=4),
-                                               "\nP-value: ", round(pval, digits=4)))) +
+    ## Plot: Create vulcano ggplot object with highlighted metabolites
+    p_fc_vulcano_highlighted <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
+                                                      color = .data$highlight)) +
+      geom_point(size = 1.5, aes(text = paste0(Metabolite,
+                                               "\nClass: ", Class,
+                                               "\nLog2(FC): ", round(log2FC, digits=2),
+                                               "\np-value: ", round(pval, digits=4),
+                                               "\nAdj. p-value: ", round(qval, digits=4)))) +
       geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
       scale_color_manual('',
                          breaks = c("Other metabolites", "Highlighted metabolite(s)"),
-                         values = c("#d3d3d3","#56070C")) +
-      theme_bw() +
-      labs(x = 'Log2(FC)', y = "-Log10(p-value)")
+                         values = c("grey50", "#56070C")) +
+      labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
+      theme_bw()
     
     ## Interactive: Create interactive plot
     p_vulcano_highlighted <- ggplotly(p_fc_vulcano_highlighted, tooltip = "text")
@@ -284,32 +290,26 @@ plotly_vulcano <- function(Log2FCTab, y_cutoff = 0.05, x_cutoff = 1.5) {
     return(p_vulcano_highlighted)
   } else {
     # Data Vulcano: Prepare Dataframe for vulcano plot
-    Log2FCTab$Class <- Log2FCTab$Class
-    Log2FCTab$ClassColor <- Log2FCTab$Class
+    Log2FCTab$ClassColor <- as.character(Log2FCTab$Class) #Class was factor, so 'Not Significant' could not be assigned.
     Log2FCTab$ClassColor[Log2FCTab$qval > y_cutoff] <- "Not Significant"
     Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < x_cutoff] <- "Not Significant"
-    
-    breaks <- unique(Log2FCTab$Class)
-    values <- class_colors[names(class_colors) %in% Log2FCTab$Class]
+    # Level ClassColor so that 'Not Significant' is at end of legend
+    Log2FCTab$ClassColor <- factor(Log2FCTab$ClassColor, levels = c(levels(Log2FCTab$Class), 'Not Significant'))
     
     ## Plot: Create vulcano ggplot object
-    p_fc_vulcano <- ggplot(Log2FCTab,
-                           aes(x = .data$log2FC,
-                               y = -log10(.data$qval),
-                               color = .data$ClassColor)) +
+    p_fc_vulcano <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
+                                          color = .data$ClassColor)) +
       geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
       geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
-      geom_point(size = 1.5, aes(text = paste0(Metabolite, 
-                                               "\nClass: ", Class, 
-                                               "\nLog2(FC): ", round(log2FC, digits=2), 
-                                               "\nAdj. p-value: ", round(qval, digits=4),
-                                               "\nP-value: ", round(pval, digits=4)))) +
+      geom_point(size = 1.5, aes(text = paste0(Metabolite,
+                                               "\nClass: ", Class,
+                                               "\nLog2(FC): ", round(log2FC, digits=2),
+                                               "\np-value: ", round(pval, digits=4),
+                                               "\nAdj. p-value: ", round(qval, digits=4)))) +
       scale_color_manual('Class',
-                         breaks = breaks,
-                         values = values,
-                         drop = FALSE) +
-      theme_bw() +
-      labs(x = 'Log2(FC)', y = "-Log10(p-value)")
+                         values = class_colors[names(class_colors) %in% Log2FCTab$ClassColor]) + #drop = F may cause confusion?
+      labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
+      theme_bw()
     
     ## Interactive: Create interactive plot
     p_vulcano <- ggplotly(p_fc_vulcano, tooltip = "text")
@@ -317,62 +317,78 @@ plotly_vulcano <- function(Log2FCTab, y_cutoff = 0.05, x_cutoff = 1.5) {
     return(p_vulcano)
   }
 }
-#' Vulcano Plot Visualization
-#'
-#' This method creates a vulcano plot of the log2 fold change for each metabolite.
-#'
-#' @param Log2FCTab DF with metabolites as row names and columns including log2FC, Class, qval columns.
-#' @param x_cutoff Number of the desired log2 fold change cutoff for assessing significance.
-#' @param y_cutoff Number of the desired p value cutoff for assessing significance.
-#' @param show_labels_for Vector with Strings of Metabolite names or classes.
-plot_vulcano <- function(Log2FCTab,
-                         x_cutoff = 1.5,
-                         y_cutoff = 0.05,
-                         show_labels_for = NULL) {
 
+#' @title ggplot: Vulcano plot
+#' @description This function creates a Static vulcano plot
+#'
+#' @param Log2FCTab A data frame containing metabolite differential results, which
+#' can be retrieved by MetAlyzer::log2FC(se) where se has gone through function 'calc_log2FC'
+#' @param x_cutoff A numeric value specifying the cutoff for log2 fold changes
+#' @param y_cutoff A numeric value specifying the cutoff for q-values
+#' @param show_labels_for A vector of characters specifying the metabolite names
+#' or classes to label. Note that metabolites belonging to specified classes will be labeled
+plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels_for = NULL) {
+  # Make Colors unique for each class
+  polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
+  polarity_df <- utils::read.csv(polarity_file) %>%
+    select(.data$Class,
+           .data$Polarity) %>%
+    mutate(Class = factor(.data$Class),
+           Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
+    arrange(.data$Polarity)
+  class_colors <- metalyzer_colors()
+  names(class_colors) <- levels(polarity_df$Class)
+  # Add color for insignificant metabolites
+  class_colors <- c(class_colors, c(`Not Significant` = 'grey50'))
+  
+  #### Users should be interested in whatever they specify for 'show_labels_for',
+  #### even if some of them are not significant
   ## Data: only color classes that are significantly differentially expressed
-
-  Log2FCTab$Class[Log2FCTab$qval > y_cutoff] <- NA
-  Log2FCTab$Class[abs(Log2FCTab$log2FC) < x_cutoff] <- NA
-
+  # Log2FCTab$Class[Log2FCTab$qval > y_cutoff] <- NA
+  # Log2FCTab$Class[abs(Log2FCTab$log2FC) < x_cutoff] <- NA
+  
+  Log2FCTab$ClassColor <- as.character(Log2FCTab$Class) #Class was factor, so 'Not Significant' could not be assigned.
+  Log2FCTab$ClassColor[Log2FCTab$qval > y_cutoff] <- "Not Significant"
+  Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < x_cutoff] <- "Not Significant"
+  # Level ClassColor so that 'Not Significant' is at end of legend
+  Log2FCTab$ClassColor <- factor(Log2FCTab$ClassColor, levels = c(levels(Log2FCTab$Class), 'Not Significant'))
+  
   ## Data: Determine labels
-  Log2FCTab$labels <- ""  # Initialize labels as empty strings
-
+  Log2FCTab$labels <- NA #'' takes space and there will be a lot of ''
   if (!is.null(show_labels_for)) {
-    found_metabolites <- show_labels_for[show_labels_for %in% Log2FCTab$Metabolite]
-    found_classes <- show_labels_for[show_labels_for %in% Log2FCTab$Class]
-    
-    not_found <- setdiff(show_labels_for, c(found_metabolites, found_classes))
-    
-    if (length(not_found) > 0) {
-      print(paste("Warning: The following values were not found in the Metabolites / Classes:", paste(not_found, collapse = ", ")))
+    metabLabels <- Log2FCTab$Metabolite %in% show_labels_for
+    metabClassLabels <- as.character(Log2FCTab$Class) %in% show_labels_for
+    if (sum(metabLabels) > 0 || sum(metabClassLabels) > 0) {
+      Log2FCTab$labels[metabLabels] <- Log2FCTab$Metabolite[metabLabels]
+      Log2FCTab$labels[metabClassLabels] <- Log2FCTab$Metabolite[metabClassLabels]
     }
     
-    if (length(found_metabolites) > 0 || length(found_classes) > 0) {
-      Log2FCTab$labels[Log2FCTab$Metabolite %in% show_labels_for] <- Log2FCTab$Metabolite
-      Log2FCTab$labels[Log2FCTab$Class %in% show_labels_for] <- Log2FCTab$Metabolite
-      Log2FCTab$labels[is.na(Log2FCTab$Class)] <- ""
+    # Report missing specified labels
+    missLabels <- show_labels_for[!show_labels_for %in% c(Log2FCTab$Metabolite[metabLabels],
+                                                          as.character(Log2FCTab$Class)[metabClassLabels])]
+    if (length(missLabels) > 0) {
+      print(paste("Warning: The following Metabolites/Classes were not found in the data:",
+                  paste(missLabels, collapse = ", ")))
     }
   }
-
-  vulcano <- ggplot(Log2FCTab,
-                   aes(x = .data$log2FC,
-                       y = -log10(.data$qval),
-                       color = .data$Class,
-                       label = labels)) +
-      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black",
-                 linetype="dashed") +
-      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
-      geom_point(size = 1) +
-      theme(plot.title = element_text(face = 'bold.italic', hjust = 0.5),
-            legend.key = element_rect(fill = 'white')) +
-      labs(x = 'log2(FC)', y = "-log10(p)") +
-      geom_label_repel(size = 2, color = 'black',
-                       box.padding = 0.6,
-                       point.padding = 0,
-                       min.segment.length = 0,
-                       max.overlaps = Inf,
-                       force = 10)
+  
+  ## Plot: Create vulcano ggplot object
+  vulcano <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
+                                   color = .data$ClassColor, label = labels)) +
+    geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
+    geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
+    geom_point(size = 1.5) +
+    geom_label_repel(size = 2, color = 'black',
+                     box.padding = 0.6,
+                     point.padding = 0,
+                     min.segment.length = 0,
+                     max.overlaps = Inf,
+                     force = 10) +
+    scale_color_manual('Class',
+                       values = class_colors[names(class_colors) %in% Log2FCTab$ClassColor]) + #drop = F may cause confusion?
+    labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
+    theme_bw()
+  
   return(vulcano)
 }
 
