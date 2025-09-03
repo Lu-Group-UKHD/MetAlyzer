@@ -167,14 +167,12 @@ ui <- fluidPage(
                            fluidRow(
                              style = "display: flex; align-items: center;",
                              column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%')),
-                             conditionalPanel(
-                               condition = "input.computeLog2FC > 0", # Check if the compute button has been clicked
-                               fluidRow(
-                                 column(width = 5, downloadButton('downloadLog2FC', 'Download log2FC Table', width = '100%'))
-                               ),
+                             column(width = 6, offset = 1,
+                                    conditionalPanel(condition = "input.computeLog2FC > 0", # Check if the compute button has been clicked
+                                                     downloadButton('downloadLog2FC', 'Download log₂(FC) result', width = '100%')
+                                    )
                              ),
                            ),
-                           
                            tags$br(),
                            tags$h4('Vulcano Plot', style = 'color:steelblue;font-weight:bold'), #Log₂(FC) Visualization
                            #### Highlighting in scatter plot is to be fixed 
@@ -190,7 +188,7 @@ ui <- fluidPage(
                            fluidRow(
                              column(width = 6, sliderInput('plotVolcanoLog2FCCutoff', 'Log₂(FC)',
                                                            min = 0, max = 10, value = 1, step = 0.1, ticks = F)),
-                             column(width = 6, selectInput('plotVolcanoPValCutoff', 'P-value',
+                             column(width = 6, selectInput('plotVolcanoPValCutoff', 'q-value',
                                                            choices = c('0.0001', '0.001', '0.01', '0.05', '0.1'), #to avoid scientific notation
                                                            multiple = F, selected = 0.05))
                            )
@@ -1227,26 +1225,16 @@ server <- function(input, output, session) {
       write.csv(exportfeatIdTbl, file)
     }
   )
-  
+  # Export differential analysis result table
   output$downloadLog2FC <- downloadHandler(
     filename = function() {
-      paste0("Log2FC_values_", Sys.Date(), ".xlsx") 
+      paste0("Log2FC_results_", Sys.Date(), ".xlsx") 
     },
-    
     content = function(file) {
       data_to_export <- reactLog2FCTbl()
-      
-      if (is.null(data_to_export) || nrow(data_to_export) == 0) {
-        shiny::showNotification("Please compute the log2FC values first.", type = "warning")
-
-        if(is.null(data_to_export)) data_to_export <- data.frame()
-      }
-      
       writexl::write_xlsx(data_to_export, path = file)
     }
   )
-
-
   
   # Visualize log2(FC)
   # Give sign before log2(FC) calculation
@@ -1342,10 +1330,11 @@ server <- function(input, output, session) {
     updateSliderInput(session, 'networkPathwayWidth', value = 10)
   })
   
-  # Download the log2(FC) visuals as html
+  # Download log2(FC) visuals
+  # Vulcano plot
   output$downloadVulcanoPlot <- downloadHandler(
     filename = function() {
-      paste0("vulcano_plot.", input$formatVulcano)
+      paste0("vulcano_plot_", Sys.Date(), '.', input$formatVulcano)
     },
     content = function(file) {
       if (input$formatVulcano == "html") {
@@ -1372,26 +1361,32 @@ server <- function(input, output, session) {
                                      x_cutoff = input$plotVolcanoLog2FCCutoff,
                                      y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         }
-        ggsave(filename = file, plot = final_plot, device = input$formatVulcano, dpi = 300)
+        ggsave(filename = file, plot = final_plot, device = input$formatVulcano,
+               dpi = 400, units = "cm", width = 38.0, height = 21.0)
       }
     }
   )
+  
+  # Scatter plot
   output$downloadScatterPlot <- downloadHandler(
     filename = function() {
-      paste0("scatter_plot.", input$formatScatter)
+      paste0("scatter_plot_", Sys.Date(), '.', input$formatScatter)
     },
     content = function(file) {
-      
       if (input$formatScatter == "html") {
         htmlwidgets::saveWidget(plotly_scatter(reactLog2FCTbl())$Plot, file, selfcontained = TRUE)
       } else {
-        ggsave(filename = file, plot = MetAlyzer::plot_scatter(reactLog2FCTbl()), device = input$formatScatter, dpi = 300, units = "cm", width = 32.0, height = 21.0)
+        #### Make theme similar to vulcano plot for better visualization
+        ggsave(filename = file, plot = MetAlyzer::plot_scatter(reactLog2FCTbl()),
+               device = input$formatScatter, dpi = 400, units = "cm", width = 32.0, height = 21.0)
       }
     }
   )
+  
+  # Network diagram
   output$downloadNetworkPlot <- downloadHandler(
     filename = function() {
-      paste0("network_plot.", input$formatNetwork)
+      paste0("network_plot_", Sys.Date(), '.', input$formatNetwork)
     },
     content = function(file) {
       if (input$formatNetwork == "html") {
@@ -1405,10 +1400,9 @@ server <- function(input, output, session) {
         )
         htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
-        final_plot <- MetAlyzer::plot_network(
-          reactLog2FCTbl()
-        )
-        ggsave(filename = file, plot = final_plot, device = input$formatNetwork, dpi = 300, units = "cm", width = 32.0, height = 21.0)
+        final_plot <- MetAlyzer::plot_network(reactLog2FCTbl())$Plot
+        ggsave(filename = file, plot = final_plot, device = input$formatNetwork,
+               dpi = 400, units = "cm", width = 32.0, height = 21.0)
       }
     }
   )

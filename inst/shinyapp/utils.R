@@ -385,7 +385,7 @@ plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels
                                    color = .data$ClassColor, label = labels)) +
     geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
     geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
-    geom_point(size = 1.5) +
+    geom_point(size = 6) +
     geom_label_repel(size = 2, color = 'black',
                      box.padding = 0.6,
                      point.padding = 0,
@@ -395,7 +395,12 @@ plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels
     scale_color_manual('Class',
                        values = class_colors[names(class_colors) %in% Log2FCTab$ClassColor]) + #drop = F may cause confusion?
     labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
-    theme_bw()
+    theme_bw() +
+    theme(axis.title = element_text(face = 'bold', size = 22),
+          axis.text = element_text(face = 'bold', size = 16),
+          axis.ticks = element_line(linewidth = 0.8),
+          legend.title = element_text(size = 22),
+          legend.text = element_text(size = 20))
   
   return(vulcano)
 }
