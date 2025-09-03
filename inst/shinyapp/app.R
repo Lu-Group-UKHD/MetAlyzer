@@ -47,23 +47,23 @@ ui <- fluidPage(
                                            choices = character(0), multiple = T),
                                fluidRow(
                                  column(width = 8, sliderInput('featCompleteCutoffFiltering',
-                                                               'Select % of observed values each metabolite should have:',
+                                                               'Select % of quantified values per metabolite:',
                                                                min = 0, max = 100, value = 80))
                                ),
                                fluidRow(
                                  column(width = 8, sliderInput('featValidCutoffFiltering',
-                                                               'Select % of valid values each metabolite should have:',
-                                                               min = 0, max = 100, value = 50)),
+                                                               'Select % of valid quantifications per metabolite:',
+                                                               min = 0, max = 100, value = 0)),
                                  column(width = 3, offset = 1,
                                         checkboxGroupInput('featValidStatusFiltering', 'Validity',
                                                            choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
                                                            selected = c('Valid', 'LOQ'))),
                                  shinyBS::bsTooltip('featCompleteCutoffFiltering',
-                                                    'Metabolites with observed values below this cutoff are removed.'),
+                                                    'Metabolites with quantification rates below this cutoff are removed.'),
                                  shinyBS::bsTooltip('featValidCutoffFiltering',
-                                                    'Metabolites with valid values below this cutoff are removed.'),
+                                                    'Metabolites with valid quantifications below this cutoff are removed.'),
                                  shinyBS::bsTooltip('featValidStatusFiltering',
-                                                    'The selected is considered valid for filtering.')
+                                                    'The selected is considered valid quantification for filtering.')
                                )
                              ),
                              shinyBS::bsCollapsePanel(
@@ -416,7 +416,7 @@ server <- function(input, output, session) {
     
     # Set parameters back to default
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
-    updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+    updateSliderInput(session, 'featValidCutoffFiltering', value = 0)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
     updateMaterialSwitch(session, 'imputation', value = T)
     updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
@@ -461,7 +461,7 @@ server <- function(input, output, session) {
       
       # Set parameters back to default
       updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
-      updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+      updateSliderInput(session, 'featValidCutoffFiltering', value = 0)
       updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
       updateMaterialSwitch(session, 'imputation', value = T)
       updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
@@ -863,7 +863,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
     # }
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
-    updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+    updateSliderInput(session, 'featValidCutoffFiltering', value = 0)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
     # Set parameters for sample filtering back to default
     # Make choices lists so that sole choice in certain choice group can be shown
@@ -1149,7 +1149,7 @@ server <- function(input, output, session) {
     req(datOverviewPack()$featCompleteLvTbl)
     featCompleteLevels <- datOverviewPack()$featCompleteLvTbl$CompleteRatio
     paste(sum(featCompleteLevels < 0.8), 'out of', nrow(reactMetabObj$metabObj),
-          'metabolites fail to fulfil 80% rule, which is recommended filtering out.',
+          'metabolites fail to fulfil the 80% rule, the recommended filtering threshold.',
           'Besides, is there any sample with high level of missingness?')
   })
   output$plotDatComplete <- plotly::renderPlotly({
@@ -1177,8 +1177,8 @@ server <- function(input, output, session) {
       dplyr::mutate(TotalValidCount = ValidCount + LOQCount,
                     ValidRatio = TotalValidCount / TotalCount)
     paste(sum(featStatusValid$ValidRatio < 0.5), 'out of', nrow(reactMetabObj$metabObj),
-          'metabolites have less than 50% measurements with valid status (Valid, LOQ),',
-          'which is recommended filtering out. Besides, is there any sample containing few valid values?')
+          'metabolites have fewer than 50% valid quantifications (Valid, LOQ) and',
+          'could be filtered out. Besides, is there any sample containing just few valid quantifications?')
   })
   output$plotQuanStatus <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
