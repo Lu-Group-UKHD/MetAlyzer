@@ -1,14 +1,131 @@
-#' @title Calculate log2 fold change
-#' @description This function calculates log2(FC), p-values, and adjusted p-values
-#' of the data using limma. Note that the data has to be filtered and log2 transformed
-#' already.
+#' @title Half-minimum imputation
+#' @description Impute NA concentrations using half-minimum (HM) and update the
+#' `Concentration` column in the aggregated data in the input `SummarizedExperiment`
+#' (SE) object. If all values of a feature are NA, they stay NA.
+#'
+#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.
+#' @returns An SE object with the imputed `Concentration` column in the aggregated
+#' data accessible via `metalyzer_se@metadata$aggregated_data`.
 #' 
-#' @param metalyzer_se A MetAlyzer object
+#' @importFrom dplyr select filter mutate case_when summarise ungroup
+data_imputation <- function(metalyzer_se) {
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  # Prepare HM values for corresponding features
+  #### Note that aggregated data is already grouped by Metabolite by MetAlyzer
+  HM_feats <- dplyr::filter(aggregated_data, Concentration >= 0, !is.na(Concentration)) %>%
+    dplyr::summarise(HM = min(Concentration) * 0.5)
+  # Do HM imputation, which replaces missing values with half of minimum of observed
+  # values in corresponding variables
+  aggregated_data <- dplyr::left_join(aggregated_data, HM_feats, by = 'Metabolite') %>%
+    #### Let NaN stay NaN for now
+    dplyr::mutate(Concentration = dplyr::case_when(Concentration %in% NA ~ HM,
+                                                   !Concentration %in% NA ~ Concentration)) %>%
+    dplyr::select(-HM) %>%
+    dplyr::ungroup()
+  metalyzer_se@metadata$aggregated_data <- aggregated_data
+  return(metalyzer_se)
+}
+
+#' @title glog2 transformation
+#' @description Perform generalized log2 transformation on data
+#'
+#' @param x A matrix or vector containing numerical values.
+#' @returns A glog2-transformed matrix or vector.
+glog2 <- function(x) {
+  (asinh(x)-log(2))/log(2)
+}
+
+#' @title Normalization
+#' @description Normalize concentration values among samples using glog2 transformation,
+#' median normalization, total ion count (TIC) normalization, or variance stabilizing
+#' normalization (VSN) and update the `Concentration` column in the aggregated data
+#' in the input `SummarizedExperiment` (SE) object.
+#'
+#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.
+#' @param norm_method A character specifying the normalization method to use, which
+#' should be one of 'log2' (default), 'median', 'TIC', or 'VSN'.
+#' @returns An SE object with the normalized `Concentration` column in the aggregated
+#' data accessible via `metalyzer_se@metadata$aggregated_data`.
+#' 
+#' @importFrom dplyr select mutate left_join ungroup
+#' @importFrom tidyr pivot_wider pivot_longer
+#' @importFrom tibble as_tibble column_to_rownames
+#' @import vsn
+data_normalization <- function(metalyzer_se, norm_method = 'log2') {
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  # Create temporary aggregated data for concatenating needed information later
+  #### Do not know why Metabolite column is grouped by MetAlyzer
+  tmp_aggregated_data <- dplyr::ungroup(aggregated_data) %>%
+    dplyr::select(-Concentration)
+  # Prepare data matrix for conducting normalization
+  data_mat <- dplyr::ungroup(aggregated_data) %>%
+    dplyr::select(Metabolite, ID, Concentration) %>%
+    tidyr::pivot_wider(names_from = 'ID', values_from = 'Concentration') %>%
+    tibble::column_to_rownames('Metabolite') %>%
+    as.matrix()
+  if (norm_method %in% 'TIC') {
+    # Do TIC normalization
+    row_sums <- rowSums(data_mat, na.rm = T)
+    median_rowSums <- median(row_sums)
+    norm_data <- apply(data_mat, 2, function(smp_conc) {
+      smp_conc/row_sums * median_rowSums
+    }) %>%
+      glog2()
+  } else if (norm_method %in% 'VSN') {
+    # Do vsn normalization
+    fit <- vsnMatrix(data_mat)
+    norm_data <- predict(fit, data_mat)
+  } else if (norm_method %in% 'median') {
+    # Do median normalization that conducts median scaling on log2 transformed data
+    # Use generalized log2 transformation to avoid -Inf
+    log2_data <- glog2(data_mat)
+    median_smpConc <- apply(log2_data, 2, function(smp_conc) {median(smp_conc, na.rm = T)})
+    median_allVals <- median(log2_data, na.rm = T)
+    norm_data <- sapply(seq_len(ncol(log2_data)), function(i) {
+      log2_data[, i] - median_smpConc[i] + median_allVals
+    })
+    colnames(norm_data) <- colnames(data_mat)
+    
+    # Substantial negative values exist in log2 transformed data due to values smaller
+    # than 1 in original data, which will cause problem in limma::normalizeBetweenArrays
+    # that somehow also performs log transformation..
+    #' Warning message:
+    #' In log(apply(x, 2, median, na.rm = TRUE)) : NaNs produced
+    # norm_data <- glog2(data_mat) %>%
+    #   limma::normalizeBetweenArrays(method = 'scale')
+  } else if (norm_method %in% 'log2') {
+    # Do log2 transformation
+    norm_data <- glog2(data_mat)
+  }
+  # Convert matrix to aggregated long data
+  aggregated_data <- tibble::as_tibble(norm_data, rownames = 'Metabolite') %>%
+    tidyr::pivot_longer(cols = -'Metabolite',
+                        names_to = 'ID',
+                        values_to = 'Concentration') %>%
+    #### Make character columns class factor as original aggregated data
+    dplyr::mutate(Metabolite = factor(Metabolite, levels = levels(tmp_aggregated_data$Metabolite)),
+                  ID = factor(ID, levels = levels(tmp_aggregated_data$ID))) %>%
+    dplyr::left_join(tmp_aggregated_data, by = c('ID', 'Metabolite')) %>%
+    dplyr::select(ID, Metabolite, Class, Concentration, Status)
+  metalyzer_se@metadata$aggregated_data <- aggregated_data
+  return(metalyzer_se)
+}
+
+#' @title Differential analysis
+#' @description Perform differential analysis and add the results table to the input
+#' `SummarizedExperiment` (SE) object. The analysis is conducted using the \pkg{limma}
+#' package, yielding log2 fold changes, p-values, and adjusted p-values. Note that
+#' the input data must already be log2 transformed, and should be subset if the
+#' variable of interest contains more than two groups.
+#' 
+#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.
 #' @param group A character specifying the sample metadata column containing two
-#' groups that will be compared
-#' @param group_level A vector of characters specifying the group members in 'group',
-#' which decides the direction of comparisons. For example, c('A', 'B') compares
-#' A to B, and vice versa. Default is NULL (alphabetically)
+#' groups that will be compared.
+#' @param group_level A length-2 vector of characters specifying the group members
+#' in `group`, which decides the direction of comparisons. For example, c('A', 'B')
+#' compares Group A to B, and vice versa. Default is NULL (alphabetically).
+#' @returns An SE object with an added table of differential analysis results, accessible
+#' via `metalyzer_se@metadata$log2FC`.
 calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
   aggregated_data <- metalyzer_se@metadata$aggregated_data
   # Prepare abundance data
@@ -54,6 +171,163 @@ calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
     dplyr::distinct(Metabolite, .keep_all = TRUE)
   metalyzer_se@metadata$log2FC <- log2FCTab
   return(metalyzer_se)
+}
+
+
+#' @title Vulcano plot - ggplotly
+#' @descritpion Create an interactive vulcano plot using `ggplotly()`.
+#' 
+#' @param Log2FCTab A data frame containing the differential analysis results table
+#' accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
+#' output from \code{\link[MetAlyzer]{read_metidq()}} and has gone through `calc_log2FC()`.
+#' @param x_cutoff,y_cutoff Numerical values specifying the cutoffs for log2 fold
+#' changes and q-values. Default is 1.5 and 0.05, respectively.
+#' @returns A `plotly` object
+plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
+  # Remove metabolites with missing stats
+  Log2FCTab <- Log2FCTab[!(is.na(Log2FCTab$log2FC) | is.na(Log2FCTab$qval)),]
+  
+  if(!"highlight" %in% colnames(Log2FCTab)) {
+    # Define metabolic class colors using pre-specified color set
+    polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
+    polarity_df <- utils::read.csv(polarity_file) %>%
+      select(Class, Polarity) %>%
+      mutate(Class = factor(Class),
+             Polarity = factor(Polarity, levels = c('LC', 'FIA'))) %>%
+      arrange(Polarity)
+    class_colors <- MetAlyzer::metalyzer_colors()
+    names(class_colors) <- levels(polarity_df$Class)
+    # Add color for insignificant metabolites
+    class_colors <- c(class_colors, c(`Not Significant` = 'grey50'))
+    
+    # Define color class for each metabolite
+    Log2FCTab$ClassColor <- as.character(Log2FCTab$Class) #Class was factor, so 'Not Significant' could not be assigned.
+    Log2FCTab$ClassColor[Log2FCTab$qval > y_cutoff] <- "Not Significant"
+    Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < x_cutoff] <- "Not Significant"
+    # Level ClassColor so that 'Not Significant' is at end of legend
+    Log2FCTab$ClassColor <- factor(Log2FCTab$ClassColor, levels = c(levels(Log2FCTab$Class), 'Not Significant'))
+    
+    # Create static vulcano ggplot object
+    vulcano <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
+                                     color = .data$ClassColor)) +
+      geom_point(size = 2, aes(text = paste0(Metabolite,
+                                             "\nClass: ", Class,
+                                             "\nLog2(FC): ", round(log2FC, digits = 2),
+                                             "\np-value: ", round(pval, digits = 4),
+                                             "\nAdj. p-value: ", round(qval, digits = 4)))) +
+      geom_vline(xintercept = c(-x_cutoff, x_cutoff), col = "black", linetype = "dashed") +
+      geom_hline(yintercept = -log10(y_cutoff), col = "black", linetype = "dashed") +
+      scale_color_manual('Class',
+                         values = class_colors[names(class_colors) %in% Log2FCTab$ClassColor]) + #drop = F may cause confusion?
+      labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
+      theme_bw()
+    
+    # Create interactive vulcano plotly object
+    final_vulcano <- ggplotly(vulcano, tooltip = "text")
+  } else {
+    # Level highlights to make highlighted metabolites on top of plot and rename
+    # factor levels for Legend understanding
+    Log2FCTab$highlight <- factor(Log2FCTab$highlight, levels = c(FALSE, TRUE),
+                                  labels = c("Other metabolites", "Highlighted metabolite(s)"))
+    
+    # Create static vulcano ggplot object with highlighted metabolites
+    vulcano_highlighted <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
+                                                 color = .data$highlight)) +
+      geom_point(size = 2, aes(text = paste0(Metabolite,
+                                             "\nClass: ", Class,
+                                             "\nLog2(FC): ", round(log2FC, digits = 2),
+                                             "\np-value: ", round(pval, digits = 4),
+                                             "\nAdj. p-value: ", round(qval, digits = 4)))) +
+      geom_vline(xintercept = c(-x_cutoff, x_cutoff), col = "black", linetype = "dashed") +
+      geom_hline(yintercept = -log10(y_cutoff), col = "black", linetype = "dashed") +
+      scale_color_manual('',
+                         breaks = c("Other metabolites", "Highlighted metabolite(s)"),
+                         values = c("grey50", "#56070C")) +
+      labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
+      theme_bw()
+    
+    # Create interactive vulcano plotly object with highlighted metabolites
+    final_vulcano <- ggplotly(vulcano_highlighted, tooltip = "text")
+  }
+  
+  return(final_vulcano)
+}
+
+#' @title Vulcano plot - ggplot
+#' @description Create a static vulcano plot using `ggplot`.
+#'
+#' @param Log2FCTab A data frame containing the differential analysis results table
+#' accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
+#' output from \code{\link[MetAlyzer]{read_metidq()}} and has gone through `calc_log2FC()`.
+#' @param x_cutoff,y_cutoff Numerical values specifying the cutoffs for log2 fold
+#' changes and q-values. Default is 1.5 and 0.05, respectively.
+#' @param show_labels_for A vector of characters specifying the names of metabolites
+#' or classes to label. Note that the metabolites of a specified class will be labeled.
+#' Default is NULL.
+#' @returns A `ggplot` object
+plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels_for = NULL) {
+  # Define metabolic class colors using pre-specified color set
+  polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
+  polarity_df <- utils::read.csv(polarity_file) %>%
+    select(Class, Polarity) %>%
+    mutate(Class = factor(Class),
+           Polarity = factor(Polarity, levels = c('LC', 'FIA'))) %>%
+    arrange(Polarity)
+  class_colors <- MetAlyzer::metalyzer_colors()
+  names(class_colors) <- levels(polarity_df$Class)
+  # Add color for insignificant metabolites
+  class_colors <- c(class_colors, c(`Not Significant` = 'grey50'))
+  
+  #### Users should be interested in whatever they specify for 'show_labels_for',
+  #### even if some of them are not significant
+  ## Data: only color classes that are significantly differentially expressed
+  # Log2FCTab$Class[Log2FCTab$qval > y_cutoff] <- NA
+  # Log2FCTab$Class[abs(Log2FCTab$log2FC) < x_cutoff] <- NA
+  
+  # Define color class for each metabolite
+  Log2FCTab$ClassColor <- as.character(Log2FCTab$Class) #Class was factor, so 'Not Significant' could not be assigned.
+  Log2FCTab$ClassColor[Log2FCTab$qval > y_cutoff] <- "Not Significant"
+  Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < x_cutoff] <- "Not Significant"
+  # Level ClassColor so that 'Not Significant' is at end of legend
+  Log2FCTab$ClassColor <- factor(Log2FCTab$ClassColor, levels = c(levels(Log2FCTab$Class), 'Not Significant'))
+  
+  # Prepare labels
+  Log2FCTab$Label <- NA
+  if (!is.null(show_labels_for)) {
+    metabLabels <- Log2FCTab$Metabolite %in% show_labels_for
+    metabClassLabels <- as.character(Log2FCTab$Class) %in% show_labels_for
+    if (sum(metabLabels) > 0 || sum(metabClassLabels) > 0) {
+      Log2FCTab$Label[metabLabels] <- Log2FCTab$Metabolite[metabLabels]
+      Log2FCTab$Label[metabClassLabels] <- Log2FCTab$Metabolite[metabClassLabels]
+    }
+    
+    # Report missing specified labels
+    missLabels <- show_labels_for[!show_labels_for %in% c(Log2FCTab$Metabolite[metabLabels],
+                                                          as.character(Log2FCTab$Class)[metabClassLabels])]
+    if (length(missLabels) > 0) {
+      print(paste("Warning: The following Metabolites/Classes were not found in the data:",
+                  paste(missLabels, collapse = ", ")))
+    }
+  }
+  
+  # Create static vulcano ggplot object
+  # Arrange order of metabolites in row based on significance, so that significant
+  # metabolites are shown on top of insignificant ones
+  Log2FCTab <- Log2FCTab[c(which(Log2FCTab$ClassColor %in% 'Not Significant'),
+                           which(!Log2FCTab$ClassColor %in% 'Not Significant')),]
+  vulcano <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
+                                   color = .data$ClassColor, label = Label)) +
+    geom_point(size = 4) +
+    geom_vline(xintercept = c(-x_cutoff, x_cutoff), col = "black", linetype = "dashed") +
+    geom_hline(yintercept = -log10(y_cutoff), col = "black", linetype = "dashed") +
+    geom_label_repel(size = 2, color = 'black', box.padding = 0.6, point.padding = 0,
+                     min.segment.length = 0, max.overlaps = Inf, force = 10) +
+    scale_color_manual('Class',
+                       values = class_colors[names(class_colors) %in% Log2FCTab$ClassColor]) + #drop = F may cause confusion?
+    labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
+    theme_bw()
+  
+  return(vulcano)
 }
 
 #' @title Plotly Log2FC Scatter Plot
@@ -239,170 +513,6 @@ plotly_scatter <- function(Log2FCTab) {
   legend <- grid.arrange(scatter_legend, ncol=1)
   
   return(list(Plot = plotly_plot, Legend = legend))
-}
-
-#' @title ggplotly: Vulcano Plot
-#' @descritpion This function creates an interactive vulcano plot
-#' 
-#' @param Log2FCTab A data frame containing metabolite differential results, which
-#' can be retrieved by MetAlyzer::log2FC(se) where se has gone through function 'calc_log2FC'
-#' @param x_cutoff A numeric value specifying the cutoff for log2 fold changes
-#' @param y_cutoff A numeric value specifying the cutoff for q-values
-plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
-  # Make Colors unique for each class
-  polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
-  polarity_df <- utils::read.csv(polarity_file) %>%
-    select(.data$Class,
-           .data$Polarity) %>%
-    mutate(Class = factor(.data$Class),
-           Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
-    arrange(.data$Polarity)
-  class_colors <- metalyzer_colors()
-  names(class_colors) <- levels(polarity_df$Class)
-  # Add color for insignificant metabolites
-  class_colors <- c(class_colors, c(`Not Significant` = 'grey50'))
-  
-  #### NAs are produced not due to insignificance
-  ## Data: Replace NAs
-  # Log2FCTab$log2FC[is.na(Log2FCTab$log2FC)] <- 0
-  # Log2FCTab$qval[is.na(Log2FCTab$qval)] <- 1
-  
-  ## Data: Remove metabolites with missing stats
-  Log2FCTab <- Log2FCTab[!(is.na(Log2FCTab$log2FC) | is.na(Log2FCTab$qval)),]
-  
-  if("highlight" %in% colnames(Log2FCTab)) {
-    # Level highlights to make highlighted metabolites on top of plot and rename
-    # factor levels for Legend understanding
-    Log2FCTab$highlight <- factor(Log2FCTab$highlight, levels = c(FALSE, TRUE),
-                                  labels = c("Other metabolites", "Highlighted metabolite(s)"))
-    
-    ## Plot: Create vulcano ggplot object with highlighted metabolites
-    p_fc_vulcano_highlighted <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
-                                                      color = .data$highlight)) +
-      geom_point(size = 1.5, aes(text = paste0(Metabolite,
-                                               "\nClass: ", Class,
-                                               "\nLog2(FC): ", round(log2FC, digits=2),
-                                               "\np-value: ", round(pval, digits=4),
-                                               "\nAdj. p-value: ", round(qval, digits=4)))) +
-      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
-      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
-      scale_color_manual('',
-                         breaks = c("Other metabolites", "Highlighted metabolite(s)"),
-                         values = c("grey50", "#56070C")) +
-      labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
-      theme_bw()
-    
-    ## Interactive: Create interactive plot
-    p_vulcano_highlighted <- ggplotly(p_fc_vulcano_highlighted, tooltip = "text")
-    
-    return(p_vulcano_highlighted)
-  } else {
-    # Data Vulcano: Prepare Dataframe for vulcano plot
-    Log2FCTab$ClassColor <- as.character(Log2FCTab$Class) #Class was factor, so 'Not Significant' could not be assigned.
-    Log2FCTab$ClassColor[Log2FCTab$qval > y_cutoff] <- "Not Significant"
-    Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < x_cutoff] <- "Not Significant"
-    # Level ClassColor so that 'Not Significant' is at end of legend
-    Log2FCTab$ClassColor <- factor(Log2FCTab$ClassColor, levels = c(levels(Log2FCTab$Class), 'Not Significant'))
-    
-    ## Plot: Create vulcano ggplot object
-    p_fc_vulcano <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
-                                          color = .data$ClassColor)) +
-      geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
-      geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
-      geom_point(size = 1.5, aes(text = paste0(Metabolite,
-                                               "\nClass: ", Class,
-                                               "\nLog2(FC): ", round(log2FC, digits=2),
-                                               "\np-value: ", round(pval, digits=4),
-                                               "\nAdj. p-value: ", round(qval, digits=4)))) +
-      scale_color_manual('Class',
-                         values = class_colors[names(class_colors) %in% Log2FCTab$ClassColor]) + #drop = F may cause confusion?
-      labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
-      theme_bw()
-    
-    ## Interactive: Create interactive plot
-    p_vulcano <- ggplotly(p_fc_vulcano, tooltip = "text")
-    
-    return(p_vulcano)
-  }
-}
-
-#' @title ggplot: Vulcano plot
-#' @description This function creates a Static vulcano plot
-#'
-#' @param Log2FCTab A data frame containing metabolite differential results, which
-#' can be retrieved by MetAlyzer::log2FC(se) where se has gone through function 'calc_log2FC'
-#' @param x_cutoff A numeric value specifying the cutoff for log2 fold changes
-#' @param y_cutoff A numeric value specifying the cutoff for q-values
-#' @param show_labels_for A vector of characters specifying the metabolite names
-#' or classes to label. Note that metabolites belonging to specified classes will be labeled
-plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels_for = NULL) {
-  # Make Colors unique for each class
-  polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
-  polarity_df <- utils::read.csv(polarity_file) %>%
-    select(.data$Class,
-           .data$Polarity) %>%
-    mutate(Class = factor(.data$Class),
-           Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
-    arrange(.data$Polarity)
-  class_colors <- metalyzer_colors()
-  names(class_colors) <- levels(polarity_df$Class)
-  # Add color for insignificant metabolites
-  class_colors <- c(class_colors, c(`Not Significant` = 'grey50'))
-  
-  #### Users should be interested in whatever they specify for 'show_labels_for',
-  #### even if some of them are not significant
-  ## Data: only color classes that are significantly differentially expressed
-  # Log2FCTab$Class[Log2FCTab$qval > y_cutoff] <- NA
-  # Log2FCTab$Class[abs(Log2FCTab$log2FC) < x_cutoff] <- NA
-  
-  Log2FCTab$ClassColor <- as.character(Log2FCTab$Class) #Class was factor, so 'Not Significant' could not be assigned.
-  Log2FCTab$ClassColor[Log2FCTab$qval > y_cutoff] <- "Not Significant"
-  Log2FCTab$ClassColor[abs(Log2FCTab$log2FC) < x_cutoff] <- "Not Significant"
-  # Level ClassColor so that 'Not Significant' is at end of legend
-  Log2FCTab$ClassColor <- factor(Log2FCTab$ClassColor, levels = c(levels(Log2FCTab$Class), 'Not Significant'))
-  
-  ## Data: Determine labels
-  Log2FCTab$labels <- NA #'' takes space and there will be a lot of ''
-  if (!is.null(show_labels_for)) {
-    metabLabels <- Log2FCTab$Metabolite %in% show_labels_for
-    metabClassLabels <- as.character(Log2FCTab$Class) %in% show_labels_for
-    if (sum(metabLabels) > 0 || sum(metabClassLabels) > 0) {
-      Log2FCTab$labels[metabLabels] <- Log2FCTab$Metabolite[metabLabels]
-      Log2FCTab$labels[metabClassLabels] <- Log2FCTab$Metabolite[metabClassLabels]
-    }
-    
-    # Report missing specified labels
-    missLabels <- show_labels_for[!show_labels_for %in% c(Log2FCTab$Metabolite[metabLabels],
-                                                          as.character(Log2FCTab$Class)[metabClassLabels])]
-    if (length(missLabels) > 0) {
-      print(paste("Warning: The following Metabolites/Classes were not found in the data:",
-                  paste(missLabels, collapse = ", ")))
-    }
-  }
-  
-  ## Plot: Create vulcano ggplot object
-  vulcano <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
-                                   color = .data$ClassColor, label = labels)) +
-    geom_vline(xintercept=c(-x_cutoff, x_cutoff), col="black", linetype="dashed") +
-    geom_hline(yintercept=-log10(y_cutoff), col="black", linetype="dashed") +
-    geom_point(size = 6) +
-    geom_label_repel(size = 2, color = 'black',
-                     box.padding = 0.6,
-                     point.padding = 0,
-                     min.segment.length = 0,
-                     max.overlaps = Inf,
-                     force = 10) +
-    scale_color_manual('Class',
-                       values = class_colors[names(class_colors) %in% Log2FCTab$ClassColor]) + #drop = F may cause confusion?
-    labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
-    theme_bw() +
-    theme(axis.title = element_text(face = 'bold', size = 22),
-          axis.text = element_text(face = 'bold', size = 16),
-          axis.ticks = element_line(linewidth = 0.8),
-          legend.title = element_text(size = 22),
-          legend.text = element_text(size = 20))
-  
-  return(vulcano)
 }
 
 #' @title Plotly Log2FC Network Plot
@@ -732,109 +842,6 @@ read_named_region <- function(file_path, named_region) {
   return(df)
 }
 
-
-#' @title Impute aggregated data in SE MetAlyzer object
-#' @description This function imputes NA concentrations using half-minimum (HM).
-#' If values of a feature are all NA, they stay NA. The imputed values are stored
-#' in column 'Concentration' of aggregated data.
-#'
-#' @param metalyzer_se A MetAlyzer object
-#' @import dplyr
-data_imputation <- function(metalyzer_se) {
-  aggregated_data <- metalyzer_se@metadata$aggregated_data
-  # Prepare HM values for corresponding features
-  #### Note that aggregated data is already grouped by Metabolite by MetAlyzer
-  HM_feats <- dplyr::filter(aggregated_data, Concentration >= 0, !is.na(Concentration)) %>%
-    dplyr::summarise(HM = min(Concentration) * 0.5)
-  # Do HM imputation, which replaces missing values with half of minimum of observed
-  # values in corresponding variables
-  aggregated_data <- dplyr::left_join(aggregated_data, HM_feats, by = 'Metabolite') %>%
-    #### Let NaN stay NaN for now
-    dplyr::mutate(Concentration = dplyr::case_when(Concentration %in% NA ~ HM,
-                                                   !Concentration %in% NA ~ Concentration)) %>%
-    dplyr::select(-HM) %>%
-    dplyr::ungroup()
-  metalyzer_se@metadata$aggregated_data <- aggregated_data
-  return(metalyzer_se)
-}
-
-#' @title Generalized log2 transform data
-#' @description This function conducts generalized log2 transformation on data
-#'
-#' @param x A matrix or a vector containing numerical values
-glog2 <- function(x) {
-  (asinh(x)-log(2))/log(2)
-}
-
-#' @title Normalize aggregated data in SE MetAlyzer object
-#' @description This function normalizes concentration values among samples using
-#' total ion count (TIC) normalization, variance stabilizing normalization (VSN),
-#' median normalization, or log2 transformation. The normalized values are stored
-#' in column 'Concentration' of aggregated data.
-#'
-#' @param metalyzer_se A MetAlyzer object
-#' @param norm_method A character specifying the normalization method to use, which
-#' should be one of 'TIC', 'VSN', 'median', or 'log2'
-#' @import dplyr, limma
-data_normalization <- function(metalyzer_se, norm_method) {
-  aggregated_data <- metalyzer_se@metadata$aggregated_data
-  # Create temporary aggregated data for concatenating needed information later
-  #### Do not know why Metabolite column is grouped by MetAlyzer
-  tmp_aggregated_data <- dplyr::ungroup(aggregated_data) %>%
-    dplyr::select(-Concentration)
-  # Prepare data matrix for conducting normalization
-  data_mat <- dplyr::ungroup(aggregated_data) %>%
-    dplyr::select(Metabolite, ID, Concentration) %>%
-    tidyr::pivot_wider(names_from = 'ID', values_from = 'Concentration') %>%
-    tibble::column_to_rownames('Metabolite') %>%
-    as.matrix()
-  if (norm_method %in% 'TIC') {
-    # Do TIC normalization
-    row_sums <- rowSums(data_mat, na.rm = T)
-    median_rowSums <- median(row_sums)
-    norm_data <- apply(data_mat, 2, function(smp_conc) {
-      smp_conc/row_sums * median_rowSums
-    }) %>%
-      glog2()
-  } else if (norm_method %in% 'VSN') {
-    # Do vsn normalization
-    fit <- vsnMatrix(data_mat)
-    norm_data <- predict(fit, data_mat)
-  } else if (norm_method %in% 'median') {
-    # Do median normalization that conducts median scaling on log2 transformed data
-    # Use generalized log2 transformation to avoid -Inf
-    log2_data <- glog2(data_mat)
-    median_smpConc <- apply(log2_data, 2, function(smp_conc) {median(smp_conc, na.rm = T)})
-    median_allVals <- median(log2_data, na.rm = T)
-    norm_data <- sapply(seq_len(ncol(log2_data)), function(i) {
-      log2_data[, i] - median_smpConc[i] + median_allVals
-    })
-    colnames(norm_data) <- colnames(data_mat)
-    
-    # Substantial negative values exist in log2 transformed data due to values smaller
-    # than 1 in original data, which will cause problem in limma::normalizeBetweenArrays
-    # that somehow also performs log transformation..
-    #' Warning message:
-    #' In log(apply(x, 2, median, na.rm = TRUE)) : NaNs produced
-    # norm_data <- glog2(data_mat) %>%
-    #   limma::normalizeBetweenArrays(method = 'scale')
-  } else if (norm_method %in% 'log2') {
-    # Do log2 transformation
-    norm_data <- glog2(data_mat)
-  }
-  # Convert matrix to aggregated long data
-  aggregated_data <- tibble::as_tibble(norm_data, rownames = 'Metabolite') %>%
-    tidyr::pivot_longer(cols = -'Metabolite',
-                        names_to = 'ID',
-                        values_to = 'Concentration') %>%
-    #### Make character columns class factor as original aggregated data
-    dplyr::mutate(Metabolite = factor(Metabolite, levels = levels(tmp_aggregated_data$Metabolite)),
-                  ID = factor(ID, levels = levels(tmp_aggregated_data$ID))) %>%
-    dplyr::left_join(tmp_aggregated_data, by = c('ID', 'Metabolite')) %>%
-    dplyr::select(ID, Metabolite, Class, Concentration, Status)
-  metalyzer_se@metadata$aggregated_data <- aggregated_data
-  return(metalyzer_se)
-}
 #' @title Get the File Path of a File Inside the Data Folder
 #' @description This function returns the file path for a specified file inside the `data` folder of a Shiny app.
 #' It works both locally during development and when the app is deployed on shinyapps.io. The function first tries 
