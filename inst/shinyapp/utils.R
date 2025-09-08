@@ -190,13 +190,11 @@ plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
   if(!"highlight" %in% colnames(Log2FCTab)) {
     # Define metabolic class colors using pre-specified color set
     polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
-    polarity_df <- utils::read.csv(polarity_file) %>%
-      select(Class, Polarity) %>%
-      mutate(Class = factor(Class),
-             Polarity = factor(Polarity, levels = c('LC', 'FIA'))) %>%
-      arrange(Polarity)
+    metab_classes <- utils::read.csv(polarity_file) %>%
+      dplyr::pull(Class) %>%
+      factor()
     class_colors <- MetAlyzer::metalyzer_colors()
-    names(class_colors) <- levels(polarity_df$Class)
+    names(class_colors) <- levels(metab_classes)
     # Add color for insignificant metabolites
     class_colors <- c(class_colors, c(`Not Significant` = 'grey50'))
     
@@ -208,8 +206,7 @@ plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
     Log2FCTab$ClassColor <- factor(Log2FCTab$ClassColor, levels = c(levels(Log2FCTab$Class), 'Not Significant'))
     
     # Create static vulcano ggplot object
-    vulcano <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
-                                     color = .data$ClassColor)) +
+    vulcano <- ggplot(Log2FCTab, aes(x=log2FC, y=-log10(qval), color=ClassColor)) +
       geom_point(size = 2, aes(text = paste0(Metabolite,
                                              "\nClass: ", Class,
                                              "\nLog2(FC): ", round(log2FC, digits = 2),
@@ -231,8 +228,7 @@ plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
                                   labels = c("Other metabolites", "Highlighted metabolite(s)"))
     
     # Create static vulcano ggplot object with highlighted metabolites
-    vulcano_highlighted <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
-                                                 color = .data$highlight)) +
+    vulcano_highlighted <- ggplot(Log2FCTab, aes(x=log2FC, y=-log10(qval), color=highlight)) +
       geom_point(size = 2, aes(text = paste0(Metabolite,
                                              "\nClass: ", Class,
                                              "\nLog2(FC): ", round(log2FC, digits = 2),
@@ -254,7 +250,7 @@ plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
 }
 
 #' @title Vulcano plot - ggplot
-#' @description Create a static vulcano plot using `ggplot`.
+#' @description Create a static vulcano plot using `ggplot()`.
 #'
 #' @param Log2FCTab A data frame containing the differential analysis results table
 #' accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
@@ -268,13 +264,11 @@ plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
 plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels_for = NULL) {
   # Define metabolic class colors using pre-specified color set
   polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
-  polarity_df <- utils::read.csv(polarity_file) %>%
-    select(Class, Polarity) %>%
-    mutate(Class = factor(Class),
-           Polarity = factor(Polarity, levels = c('LC', 'FIA'))) %>%
-    arrange(Polarity)
+  metab_classes <- utils::read.csv(polarity_file) %>%
+    dplyr::pull(Class) %>%
+    factor()
   class_colors <- MetAlyzer::metalyzer_colors()
-  names(class_colors) <- levels(polarity_df$Class)
+  names(class_colors) <- levels(metab_classes)
   # Add color for insignificant metabolites
   class_colors <- c(class_colors, c(`Not Significant` = 'grey50'))
   
@@ -315,8 +309,7 @@ plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels
   # metabolites are shown on top of insignificant ones
   Log2FCTab <- Log2FCTab[c(which(Log2FCTab$ClassColor %in% 'Not Significant'),
                            which(!Log2FCTab$ClassColor %in% 'Not Significant')),]
-  vulcano <- ggplot(Log2FCTab, aes(x = .data$log2FC, y = -log10(.data$qval),
-                                   color = .data$ClassColor, label = Label)) +
+  vulcano <- ggplot(Log2FCTab, aes(x=log2FC, y=-log10(qval), color=ClassColor, label=Label)) +
     geom_point(size = 4) +
     geom_vline(xintercept = c(-x_cutoff, x_cutoff), col = "black", linetype = "dashed") +
     geom_hline(yintercept = -log10(y_cutoff), col = "black", linetype = "dashed") +
@@ -330,174 +323,152 @@ plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels
   return(vulcano)
 }
 
-#' @title Plotly Log2FC Scatter Plot
-#' @description This function returns a list with interactive 
-#' scatterplot based on log2 fold change data.
+#' @title Scatter plot - ggplotly
+#' @description Return a list containing an interactive scatter plot made using
+#' `ggplotly()` and its static legend using `ggplot()`. The x-axis represents metabolic
+#' classes, the y-axis shows log2 fold changes, and each point corresponds to a metabolite.
 #' 
-#' @param Log2FCTab A data frame containing log2 fold change data
+#' @param Log2FCTab A data frame containing the differential analysis results table
+#' accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
+#' output from \code{\link[MetAlyzer]{read_metidq()}} and has gone through `calc_log2FC()`.
+#' @returns A `plotly` object
 plotly_scatter <- function(Log2FCTab) {
-  ### Data Wrangling
-  ## Background: Define colors for significance 
-  signif_colors=c("#5F5F5F"=1,
-                  "#FEBF6E"=0.1,
-                  "#EE5C42"=0.05,
-                  "#8B1A1A"=0.01)
+  # Remove metabolites with missing stats
+  Log2FCTab <- Log2FCTab[!(is.na(Log2FCTab$log2FC) | is.na(Log2FCTab$qval)),]
   
-  ## Background: Load polarity data
+  # Load polarity data containing metabolic classes and analytical techniques
   polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
-  
   polarity_df <- utils::read.csv(polarity_file) %>%
-    select(.data$Class,
-           .data$Polarity) %>%
-    mutate(Class = factor(.data$Class),
-           Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
-    arrange(.data$Polarity)
+    dplyr::select(Class, Polarity) %>%
+    dplyr::mutate(Class = factor(Class))
   
-  ## Background: Set class colors
-  class_colors <- metalyzer_colors()
-  
+  # Define metabolic class colors using pre-specified color set
+  class_colors <- MetAlyzer::metalyzer_colors()
   names(class_colors) <- levels(polarity_df$Class)
+  # Prepare color lists for LC- and FIA-derived classes
+  lc_classes <- polarity_df[polarity_df$Polarity %in% 'LC' & polarity_df$Class %in% unique(Log2FCTab$Class), 'Class']
+  lc_colors <- class_colors[names(class_colors) %in% as.character(lc_classes)]
+  fia_classes <- polarity_df[polarity_df$Polarity %in% 'FIA' & polarity_df$Class %in% unique(Log2FCTab$Class), 'Class']
+  fia_colors <- class_colors[names(class_colors) %in% as.character(fia_classes)]
   
-  ## Background: Define LC and FIA classes with color
-  lc_polarity_df <- filter(polarity_df,
-                           .data$Polarity == 'LC',
-                           .data$Class %in% Log2FCTab$Class)
-  lc_colors <- class_colors[which(names(class_colors) %in% lc_polarity_df$Class)]
-  fia_polarity_df <- filter(polarity_df,
-                            .data$Polarity == 'FIA',
-                            .data$Class %in% Log2FCTab$Class)
-  fia_colors <- class_colors[which(names(class_colors) %in% fia_polarity_df$Class)]
-  
-  ## Legend: Manage breaks and values
-  breaks <- c(names(lc_colors), names(fia_colors))
-  values <- c(lc_colors,fia_colors)
-  names(values) <- NULL
-  
-  ## Data: Replace NAs
-  Log2FCTab$log2FC[is.na(Log2FCTab$log2FC)] <- 0
-  Log2FCTab$qval[is.na(Log2FCTab$qval)] <- 1
-  
-  ## Data: Add color to data based on significance
-  Log2FCTab$signif_color <- sapply(Log2FCTab$qval, function(q_val) {
+  # Assign metabolites with colors indicating significance
+  signif_colors = c("#5F5F5F" = 1,
+                    "#FEBF6E" = 0.1,
+                    "#EE5C42" = 0.05,
+                    "#8B1A1A" = 0.01)
+  Log2FCTab$SignifColor <- sapply(Log2FCTab$qval, function(q) {
     for (t in signif_colors) {
-      if (q_val <= t) {
-        color <- names(signif_colors)[which(signif_colors == t)]
+      if (q <= t) {
+        color <- names(signif_colors)[signif_colors %in% t]
       }
     }
     return(color)
   })
-  
-  ## Data: Add pseudo x-value to data as a order of metabolites
-  ordered_classes <- c(names(lc_colors), names(fia_colors))
-  p_data <- lapply(ordered_classes, function(class) {
-    Log2FCTab %>%
-      filter(.data$Class == class) %>%
-      dplyr::bind_rows(data.frame(Class = rep(NA, 5)))
-  }) %>%
-    dplyr::bind_rows()
-  p_data <- dplyr::bind_rows(data.frame(Class = rep(NA, 5)), p_data)
-  p_data$x <- seq(nrow(p_data))
-  p_data <- filter(p_data, !is.na(.data$Class))
-  
-  ## Legend: Significance color
-  signif_colors <- sort(signif_colors, decreasing = TRUE)
-  signif_labels <- list()
+  # Prepare labels for significance colors in legend
+  signif_labels <- c()
+  # signif_colors <- sort(signif_colors, decreasing = TRUE)
   for (i in seq_along(signif_colors)) {
     t <- signif_colors[i]
     names(t) <- NULL
     if (i < length(signif_colors)) {
       t2 <- signif_colors[i+1]
       names(t2) <- NULL
-      label <- bquote(.(t) ~ "\u2265 q-value >" ~ .(t2))
+      # label <- bquote(.(t) ~ "\u2265 q >" ~ .(t2))
+      label <- paste0(t, ' \u2265 q > ', t2)
     } else {
-      label <- bquote(.(t) ~ "\u2265 q-value")
+      # label <- bquote(.(t) ~ "\u2265 q")
+      label <- paste0(t, ' \u2265 q')
     }
-    signif_labels[[i]] <- label
+    signif_labels <- c(signif_labels, label)
   }
   
-  ## Background: Create data for background rects
-  rects_df <- p_data %>%
-    group_by(.data$Class) %>%
-    summarise(Start = min(.data$x)-1,
-              End = max(.data$x)+1,
-              Color = class_colors[unique(.data$Class)],
-              n = n())
-  rects_df$Class <- factor(rects_df$Class, levels = breaks)
-  rects_df$Technique <- sapply(rects_df$Class, function(c) {
-    if (c %in% names(lc_colors)) {
-      technique <- 'LC'
-    } else if (c %in% names(fia_colors)) {
-      technique <- 'FIA'
+  # Create pseudo x-axis values for metabolites to determine position of each metabolite
+  # and width of each metabolic class rectangle
+  ordered_classes <- c(names(lc_colors), names(fia_colors))
+  viz_df <- lapply(ordered_classes, function(cla) {
+    Log2FCTab %>%
+      dplyr::filter(Class == cla) %>%
+      dplyr::bind_rows(data.frame(Class = rep(NA, 5))) #gaps between rects
+  }) %>%
+    dplyr::bind_rows()
+  viz_df <- dplyr::bind_rows(data.frame(Class = rep(NA, 5)), viz_df)
+  viz_df$x <- seq_len(nrow(viz_df))
+  viz_df <- dplyr::filter(viz_df, !is.na(Class))
+  
+  # Create data for background class rectangles
+  rects_df <- dplyr::group_by(viz_df, Class) %>%
+    dplyr::summarise(Start = min(x) - 1,
+                     End = max(x) + 1,
+                     n = dplyr::n())
+  # Relevel class based on analytical techniques (LC and FIA)
+  rects_df$Class <- factor(rects_df$Class, levels = ordered_classes)
+  rects_df$Technique <- sapply(rects_df$Class, function(cla) {
+    if (cla %in% names(lc_colors)) {
+      'LC'
+    } else if (cla %in% names(fia_colors)) {
+      'FIA'
     } else {
-      technique <- NA
+      NA
     }
-    return(technique)
   })
-  
-  ## Background: Determine border line between last LC and first FIA class
-  lc_fia_border <- p_data %>%
-    filter(.data$Class %in% names(lc_colors)) %>%
-    select(.data$x) %>%
+  # Determine position of border line between LC and FIA
+  lc_fia_border <- dplyr::filter(viz_df, Class %in% names(lc_colors)) %>%
+    dplyr::pull(x) %>%
     max()
+  lc_fia_border <- lc_fia_border + 3
+  # Determine y-axis limits of rectangle
+  ylims <- c(min(Log2FCTab$log2FC) - 0.5, max(Log2FCTab$log2FC) + 0.5)
   
-  ylims <- c(min(Log2FCTab$log2FC) - 0.75, max(Log2FCTab$log2FC) + 0.75)
-  
-  ## Plot: Create ggplot object
-  p_scatter <- ggplot(p_data,
-                      aes(x = .data$x,
-                          y = .data$log2FC,
-                          color = .data$signif_color)) +
+  # Create static scatter ggplot object
+  scatter <- ggplot(viz_df, aes(x=x, y=log2FC, color=SignifColor)) +
     geom_rect(data = rects_df,
               inherit.aes = FALSE,
-              aes(xmin = .data$Start, xmax = .data$End,
-                  ymin = ylims[1], ymax = ylims[2],
-                  fill = .data$Class,
-                  text = paste0(Class, "\nTechnique: ", Technique, "\nNumber of metabolites: ", n)),
+              aes(xmin = Start, xmax = End, ymin = ylims[1], ymax = ylims[2], fill = Class,
+                  text = paste0(Class, "\nTechnique: ", Technique, "\nn(Metabolite): ", n)),
               show.legend = TRUE,
               alpha = 0.4) +
-    geom_vline(xintercept = 0, linewidth = 0.5, color = 'black') +
-    geom_vline(xintercept = lc_fia_border+3, linewidth = 0.5, color = 'black', linetype="dotted") +
-    geom_hline(yintercept = 0, linewidth = 0.5, color = 'black') +
-    geom_point(size = 1, aes(text = paste0(Metabolite, 
-                                           "\nClass: ", Class, 
-                                           "\nLog2(FC): ", round(log2FC, digits=2),  
-                                           "\nAdj. p-value: ", round(qval, digits=4),
-                                           "\nP-value: ", round(pval, digits=4)))) + 
-    scale_color_manual(paste0('Significance\n(linear model fit with FDR correction)'),
+    geom_hline(yintercept = 0, color = 'black') +
+    geom_vline(xintercept = 0, color = 'black') +
+    geom_vline(xintercept = lc_fia_border, linewidth = 1, color = 'black', linetype = "dotted") +
+    geom_point(size = 2, aes(text = paste0(Metabolite, 
+                                           "\nClass: ", Class,
+                                           "\nLog2(FC): ", round(log2FC, digits = 2),
+                                           "\np-value: ", round(pval, digits = 4),
+                                           "\nAdj. p-value: ", round(qval, digits = 4)))) +
+    scale_color_manual(paste0('Adjusted p-value (BH)'),
                        labels = signif_labels,
                        values = names(signif_colors),
-                       guide = guide_legend(order=1)) +
+                       guide = guide_legend(order = 1)) +
     scale_fill_manual('Class',
-                      breaks = breaks,
-                      values = values,
-                      drop = FALSE,
+                      values = c(lc_colors, fia_colors),
+                      # drop = FALSE,
                       guide = guide_legend(override.aes = list(alpha = 0.5),
-                                           order=2, ncol = 2)) +
-    theme(axis.ticks.x = element_blank(),
+                                           order = 2, ncol = 2)) +
+    labs(x = 'Metabolite', y = 'Log2(FC)') +
+    theme(axis.title = element_text(size = 11),
           axis.text.x = element_blank(),
-          plot.title = element_text(face = 'bold.italic', hjust = 0.5),
-          legend.key = element_rect(fill = 'white'),
+          axis.text.y = element_text(size = 11*0.8),
+          axis.ticks.x = element_blank(),
           panel.grid.major.x = element_blank(),
           panel.grid.major.y = element_line('#ECECEC'),
           panel.grid.minor.x = element_blank(),
           panel.grid.minor.y = element_line('#ECECEC'),
-          panel.background = element_blank()) +
-    labs(x = 'Metabolite', y = 'Log2(FC)')
+          panel.background = element_blank())
   
-  ## Interactive: Create interactive plot
-  plotly_plot <- ggplotly(p_scatter, tooltip = "text", showlegend = FALSE)
+  # Create interactive scatter plotly object
+  final_scatter <- ggplotly(scatter, tooltip = "text", showlegend = FALSE)
   
   # TODO: Find god to figure out why this is not working
   ## Highlight Metabolites by changing symbol
-  #if ("highlight" %in% colnames(p_data)) {
-  #  for (i in 1:nrow(p_data)) {
-  #    if (isTRUE(p_data$highlight[i])) {
-  #      print(p_data[i,])
-  #      x_val <- p_data$x[i]
-  #      y_val <- p_data$log2FC[i]
-  #      color_hex <- p_data$signif_color[i]
+  #if ("highlight" %in% colnames(viz_df)) {
+  #  for (i in 1:nrow(viz_df)) {
+  #    if (isTRUE(viz_df$highlight[i])) {
+  #      print(viz_df[i,])
+  #      x_val <- viz_df$x[i]
+  #      y_val <- viz_df$log2FC[i]
+  #      color_hex <- viz_df$SignifColor[i]
   #            
-  #      plotly_plot <- plotly_plot %>% add_trace(
+  #      final_scatter <- final_scatter %>% add_trace(
   #        x = x_val,
   #        y = y_val,
   #        type = "scatter",
@@ -508,11 +479,11 @@ plotly_scatter <- function(Log2FCTab) {
   #  }
   #}
   
-  # Grab Legend ggplot
-  scatter_legend <- ggpubr::get_legend(p_scatter)
-  legend <- grid.arrange(scatter_legend, ncol=1)
+  # Grab legend from ggplot object
+  scatter_legend <- cowplot::get_legend(scatter) %>%
+    gridExtra::grid.arrange(ncol = 1)
   
-  return(list(Plot = plotly_plot, Legend = legend))
+  return(list(Plot = final_scatter, Legend = scatter_legend))
 }
 
 #' @title Plotly Log2FC Network Plot
