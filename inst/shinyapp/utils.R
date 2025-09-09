@@ -182,7 +182,7 @@ calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
 #' output from \code{\link[MetAlyzer]{read_metidq()}} and has gone through `calc_log2FC()`.
 #' @param x_cutoff,y_cutoff Numerical values specifying the cutoffs for log2 fold
 #' changes and q-values. Default is 1.5 and 0.05, respectively.
-#' @returns A `plotly` object
+#' @returns A `plotly` object.
 plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
   # Remove metabolites with missing stats
   Log2FCTab <- Log2FCTab[!(is.na(Log2FCTab$log2FC) | is.na(Log2FCTab$qval)),]
@@ -260,7 +260,7 @@ plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
 #' @param show_labels_for A vector of characters specifying the names of metabolites
 #' or classes to label. Note that the metabolites of a specified class will be labeled.
 #' Default is NULL.
-#' @returns A `ggplot` object
+#' @returns A `ggplot` object.
 plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels_for = NULL) {
   # Define metabolic class colors using pre-specified color set
   polarity_file <- system.file("extdata", "polarity.csv", package = "MetAlyzer")
@@ -331,7 +331,7 @@ plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels
 #' @param Log2FCTab A data frame containing the differential analysis results table
 #' accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
 #' output from \code{\link[MetAlyzer]{read_metidq()}} and has gone through `calc_log2FC()`.
-#' @returns A `plotly` object
+#' @returns A list containing a `plotly` (plot) and `ggplot` (legend) object.
 plotly_scatter <- function(Log2FCTab) {
   # Remove metabolites with missing stats
   Log2FCTab <- Log2FCTab[!(is.na(Log2FCTab$log2FC) | is.na(Log2FCTab$qval)),]
@@ -486,7 +486,7 @@ plotly_scatter <- function(Log2FCTab) {
   return(list(Plot = final_scatter, Legend = scatter_legend))
 }
 
-#' @title Plotly Log2FC Network Plot
+#' @title Network diagram - ggplotly
 #' @description This function returns a list with interactive
 #' networkplot based on log2 fold change data.
 #' 
@@ -500,16 +500,16 @@ plotly_scatter <- function(Log2FCTab) {
 #' @param plot_column_name Column name in the Log2FC dataframe to plot
 #' for multiple metabolites per node, the mean is used.
 plotly_network <- function(Log2FCTab,
-                           q_value=0.05,
-                           metabolite_node_size=11,
-                           connection_width=1.25,
-                           pathway_text_size=20,
-                           pathway_width=10,
-                           plot_height=800,
-                           plot_column_name="log2FC") {
-  pathway_file <- get_data_file_path("Pathway_120325.xlsx")
+                           q_value = 0.05,
+                           metabolite_node_size = 11,
+                           connection_width = 1.25,
+                           pathway_text_size = 20,
+                           pathway_width = 10,
+                           plot_height = 800,
+                           plot_column_name = "log2FC") {
+  pathway_file <- get_shiny_data_path("Pathway_120325.xlsx")
   ## Read network nodes, edges and annotations
-  pathways <- read_named_region(pathway_file, "Pathways_Header")
+  pathways <- get_network_info(pathway_file, "Pathways_Header")
   invalid_annotations <- which(
     is.na(pathways$Label) |
       duplicated(pathways$Label) |
@@ -524,7 +524,7 @@ plotly_network <- function(Log2FCTab,
   }
   rownames(pathways) <- pathways$Label
   
-  nodes <- read_named_region(pathway_file, "Metabolites_Header")
+  nodes <- get_network_info(pathway_file, "Metabolites_Header")
   nodes$Pathway[is.na(nodes$Pathway)] <- ""
   invalid_nodes <- which(
     is.na(nodes$Label) |
@@ -542,7 +542,7 @@ plotly_network <- function(Log2FCTab,
   # Remove #1 at the end
   nodes$Label <- gsub("#[0-9]+", "", nodes$Label)
   
-  edges <- read_named_region(pathway_file, "Connections_Header")
+  edges <- get_network_info(pathway_file, "Connections_Header")
   invalid_edges <- which(
     !edges$Node1 %in% rownames(nodes) |
       !edges$Node2 %in% rownames(nodes) |
@@ -710,7 +710,7 @@ plotly_network <- function(Log2FCTab,
                      type = "scatter",
                      mode = "markers",
                      marker = list(color = nodes$add_col, 
-                                   colorbar = list(title = ""),
+                                   colorbar = list(title = ""), #### 'Log2(FC)'
                                    colorscale='Viridis',
                                    showscale = TRUE),
                      height = plot_height)
@@ -718,7 +718,7 @@ plotly_network <- function(Log2FCTab,
   # Add the edges
   p_network <- layout(
     network,
-    title = 'Log2(FC) with FDR Correction',
+    # title = 'Log2(FC) with FDR Correction', ####
     shapes = edges_area_combined,
     xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
     yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
@@ -736,10 +736,10 @@ plotly_network <- function(Log2FCTab,
       ay = 0,
       bgcolor = nodes$color[i],
       opacity = 1,
-      hovertext = paste0("log2 Fold Change: ", round(nodes$log2FC[i], 5),
-                         "\nPathway: ", nodes$Pathway[i],
-                         "\nadj. p-value: ", round(nodes$qval[i], 5),
-                         "\np-value: ", round(nodes$pval[i], 5))
+      hovertext = paste0("Pathway: ", nodes$Pathway[i],
+                         "\nLog2(FC): ", round(nodes$log2FC[i], 2),
+                         "\np-value: ", round(nodes$pval[i], 4),
+                         "\nAdj. p-value: ", round(nodes$qval[i], 4))
     )
   }
   
@@ -759,86 +759,68 @@ plotly_network <- function(Log2FCTab,
   return(p_network)
 }
 
-
-#' @title Read Named Regions
-#' @description This function reads in the named regions of an excel file.
+#' @title Pathway information extraction (Network)
+#' @description Extract the pathway information a certain region (`Pathways_Header`,
+#' `Metabolites_Header`, `Connections_Header`) in the EXCEL file (i.e., Pathway.xlsx)
+#' holds for making network diagrams.
 #'
-#' @param file_path The file path of the file
-#' @param named_region The region name u want to read in
+#' @param file_path A string presenting the file path.
+#' @param named_region A character specifying the name of a region in the file with
+#' the information to extract.
+#' @returns A data frame containing the information about the specified region
+#' 
 #' @keywords internal
-read_named_region <- function(file_path, named_region) {
-  full_sheet <- openxlsx::read.xlsx(
-    file_path,
-    sheet = 1,
-    colNames = FALSE,
-    skipEmptyRows = FALSE,
-    skipEmptyCols = FALSE,
-  )
-  full_sheet[nrow(full_sheet) + 1, ] <- NA
-  header <- colnames(openxlsx::read.xlsx(
-    file_path,
-    namedRegion = named_region
-  ))
-  coordinates <- lapply(header, function(col_name) {
-    data.frame(which(full_sheet == col_name, arr.ind = TRUE))
+get_network_info <- function(file_path, named_region) {
+  full_sheet <- openxlsx::read.xlsx(file_path, sheet = 1, rowNames = FALSE, colNames = FALSE,
+                                    skipEmptyRows = FALSE, skipEmptyCols = FALSE)
+  region_headers <- colnames(openxlsx::read.xlsx(file_path, namedRegion = named_region))
+  coordinates <- lapply(region_headers, function(hdr) {
+    as.data.frame(which(full_sheet == hdr, arr.ind = TRUE))
   }) %>%
     dplyr::bind_rows() %>%
     dplyr::arrange(row, col) %>%
     dplyr::group_by(row) %>%
-    dplyr::mutate(n = n()) %>%
-    dplyr::filter(n == length(header))
+    dplyr::mutate(n = dplyr::n()) %>%
+    dplyr::filter(n == length(region_headers))
   
-  header_row <- unique(coordinates$row)
-  first_row <- header_row + 1
-  cols <- coordinates$col
-  df <- full_sheet[
-    first_row:nrow(full_sheet),
-    cols
-  ]
-  colnames(df) <- header
-  last_row <- min(which(rowSums(is.na(df)) == length(header))) - 1
-  df <- df[1:last_row, ]
+  start_row <- unique(coordinates$row) + 1
+  selec_cols <- coordinates$col
+  region_info <- full_sheet[start_row:nrow(full_sheet), selec_cols]
+  end_row <- min(which(rowSums(is.na(region_info)) == length(region_headers))) - 1
+  # Regions 'Metabolites_Header' and 'Connections_Header' already have correct end rows.
+  if (!end_row %in% 'Inf') {
+    region_info <- region_info[1:end_row,]
+  }
+  colnames(region_info) <- region_headers
+  rownames(region_info) <- NULL
   
   for (numeric_col in c("x", "y", "Radius")) {
-    if (numeric_col %in% header) {
-      df[, numeric_col] <- as.numeric(df[, numeric_col])
+    if (numeric_col %in% region_headers) {
+      region_info[, numeric_col] <- as.numeric(region_info[, numeric_col])
     }
   }
-  for (trim_col in c("Label", "Pathway", "Color", "Node1", "Node2")) {
-    if (trim_col %in% header) {
-      df[, trim_col] <- stringr::str_trim(df[, trim_col])
+  for (character_col in c("Label", "Pathway", "Color", "Node1", "Node2")) {
+    if (character_col %in% region_headers) {
+      region_info[, character_col] <- stringr::str_trim(region_info[, character_col])
     }
   }
-  rownames(df) <- NULL
-  return(df)
+  
+  return(region_info)
 }
 
-#' @title Get the File Path of a File Inside the Data Folder
-#' @description This function returns the file path for a specified file inside the `data` folder of a Shiny app.
-#' It works both locally during development and when the app is deployed on shinyapps.io. The function first tries 
-#' to access the file using a relative path. If the file is not found, it falls back to the working directory to ensure 
-#' compatibility with the Shiny server environment.
+#' @title Data file path
+#' @description Output the full path for a specified file in the `data` folder of
+#' the \pkg{MetAlyzer} Shiny app, either published or in development.
 #'
-#' @param file_name A string representing the name of the file you want to access (e.g., "example.csv").
-#' @return A string representing the full path to the specified file.
-#' 
-#' @details This function is particularly useful in Shiny apps where the file needs to be accessed from both
-#' the local environment and the hosted environment on shinyapps.io. It ensures that the file can be correctly 
-#' located regardless of where the app is running.
+#' @param file_name A character specifying the name of a file to obtain.
+#' @returns A string presenting the full path to the specified file.
 #' 
 #' @examples
-#' # Get path to the file "Pathway_120325.xlsx" in the data folder
-#' file_path <- get_data_file_path("Pathway_120325.xlsx")
-#' 
-#' # Read the CSV file
-#' data <- read.csv(file_path)
-#' 
-#' @export
-get_data_file_path <- function(file_name) {
-  app_data_dir <- system.file("shinyapp", "data", package = "MetAlyzer")
-  
-  data_path <- file.path(app_data_dir, file_name)
-  
+#' file_path <- get_shiny_data_path("Pathway_120325.xlsx")
+#' @keywords internal
+get_shiny_data_path <- function(file_name) {
+  shiny_data_dir <- system.file("shinyapp", "data", package = "MetAlyzer")
+  data_path <- file.path(shiny_data_dir, file_name)
   if (file.exists(data_path)) {
     return(data_path)
   } else {
