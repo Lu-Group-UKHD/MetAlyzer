@@ -232,54 +232,76 @@ ui <- fluidPage(
       tags$br(),
       conditionalPanel(condition = "input.computeLog2FC",
                        shinyBS::bsCollapse(open = "",
-                                           shinyBS::bsCollapsePanel("Advanced Styles",
-                                                                    div(style = "display: flex;
-                                                                        flex-wrap: wrap;
-                                                                        justify-content: center;
-                                                                        align-items: center;
-                                                                        margin-bottom: 20px;
-                                                                        width: 80%;
-                                                                        margin-left: auto;
-                                                                        margin-right: auto",
-                                                                        # Plot Height Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkPlotHeight", 
-                                                                                        "Plot Height [100px]", 
-                                                                                        min = 4, max = 20, 
-                                                                                        value = 10, step = 1)
-                                                                        ),
-                                                                        # Metabolite Node Size Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkMetaboliteNodeSize", 
-                                                                                        "Metabolite Node Size", 
-                                                                                        min = 5, max = 50, 
-                                                                                        value = 11, step = 1)
-                                                                        ),
-                                                                        # Connection Width Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkConnectionWidth", 
-                                                                                        "Connection Width", 
-                                                                                        min = 0.5, max = 5, 
-                                                                                        value = 1.25, step = 0.25)
-                                                                        ),
-                                                                        # Pathway Text Size Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkPathwayTextSize", 
-                                                                                        "Pathway Text Size", 
-                                                                                        min = 10, max = 50, 
-                                                                                        value = 20, step = 1)
-                                                                        ),
-                                                                        # Pathway Width Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkPathwayWidth", 
-                                                                                        "Pathway Width", 
-                                                                                        min = 5, max = 30, 
-                                                                                        value = 10, step = 1)
-                                                                        ),
-                                                                        actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
-                                                                        shinyBS::bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
-                                                                    )
-                                           )
+                        shinyBS::bsCollapsePanel("Advanced Styles",
+                                                div(style = "display: flex;
+                                                            flex-wrap: wrap;
+                                                            justify-content: center;
+                                                            align-items: center;
+                                                            margin-bottom: 20px;
+                                                            width: 80%;
+                                                            margin-left: auto;
+                                                            margin-right: auto",
+                                                    # Plot Height Slider
+                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkPlotHeight", 
+                                                                    "Plot Height [100px]", 
+                                                                    min = 4, max = 20, 
+                                                                    value = 10, step = 1)
+                                                    ),
+                                                    # Metabolite Node Size Slider
+                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkMetaboliteNodeSize", 
+                                                                    "Metabolite Node Size", 
+                                                                    min = 5, max = 50, 
+                                                                    value = 11, step = 1)
+                                                    ),
+                                                    # Connection Width Slider
+                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkConnectionWidth", 
+                                                                    "Connection Width", 
+                                                                    min = 0.5, max = 5, 
+                                                                    value = 1.25, step = 0.25)
+                                                    ),
+                                                    # Pathway Text Size Slider
+                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkPathwayTextSize", 
+                                                                    "Pathway Text Size", 
+                                                                    min = 10, max = 50, 
+                                                                    value = 20, step = 1)
+                                                    ),
+                                                    # Pathway Width Slider
+                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkPathwayWidth", 
+                                                                    "Pathway Width", 
+                                                                    min = 5, max = 30, 
+                                                                    value = 10, step = 1)
+                                                    ),
+                                                    # Color Scale Selector --- ADDED
+                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                        selectInput("networkColorScale", "Color Scale",
+                                                                    choices = c("Viridis", "Plasma", "Magma", "Inferno", 
+                                                                                "Cividis", "Rocket", "Mako", "Turbo"),
+                                                                    selected = "Viridis")
+                                                    ),
+                                                    # Exclude Pathways Selector --- ADDED
+                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                        selectInput("networkExcludePathways", "Exclude Pathways",
+                                                                    choices = c("Bile Acids", "Eicosanoid Synthesis", "Hormones", 
+                                                                                "Beta Oxidation", "Choline/Betaine metabolism", 
+                                                                                "Lysine Metabolism", "Poly Amines", "Urea Cycle", 
+                                                                                "TCA Cycle", "Glutamate Metabolism", 
+                                                                                "Monoamine Metabolism", "Indole/Tryptophane Metabolism"),
+                                                                    multiple = TRUE)
+                                                    ),
+                                                    # Column Name Selector --- ADDED
+                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                        selectInput("networkColumnSelect", "Select Column", 
+                                                                    choices = NULL)
+                                                    ),
+                                                    actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
+                                                    shinyBS::bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
+                                                )
+                        )
                        )
       ),
       conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
@@ -1313,12 +1335,14 @@ server <- function(input, output, session) {
     req(reactLog2FCTbl())
     # Use the height value for plot layout
     plotly_network(
-      reactLog2FCTbl(), 
+      reactLog2FCTbl(),
+      exclude_pathways = input$networkExcludePathways,
       metabolite_node_size = input$networkMetaboliteNodeSize,
       connection_width = input$networkConnectionWidth,
       pathway_text_size = input$networkPathwayTextSize,
       pathway_width = input$networkPathwayWidth,
-      plot_height = input$networkPlotHeight*100
+      plot_height = input$networkPlotHeight*100,
+      color_scale = input$networkColorScale
     )
   })
   # Revert changed network plot style parameters back to default

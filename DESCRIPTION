@@ -59,6 +59,7 @@ Imports:
     tidyr,
     ggplot2,
     ggrepel,
+    ggpubr,
     utils,
     rlang,
     data.table,

@@ -86,17 +86,19 @@ plot_network <- function(log2fc_df,
   network_file <- MetAlyzer::pathway()
 
   ### Read in Excel file
-  pathways <- read_pathways(network_file)
-  nodes <- read_nodes(network_file, pathways)
-  edges <- read_edges(network_file, nodes, pathways)
+  pathways <- MetAlyzer:::read_pathways(network_file)
+  nodes <- MetAlyzer:::read_nodes(network_file, pathways)
+  edges <- MetAlyzer:::read_edges(network_file, nodes, pathways)
   
+  pathways <- dplyr::filter(pathways, !Pathway %in% exclude_pathways)
   nodes <- dplyr::filter(nodes, !Pathway %in% exclude_pathways)
+  edges <- dplyr::filter(edges, Node1 %in% nodes$Label | Node2 %in% nodes$Label)
   
   nodes_separated <- tidyr::separate_rows(nodes, Metabolites, sep = "\\s*;\\s*")
   
   nodes_joined <- dplyr::left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col_name))
 
-  updated_nodes_list <- calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, values_col_name, stat_col_name)
+  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, values_col_name, stat_col_name)
 
   # --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
@@ -116,7 +118,7 @@ plot_network <- function(log2fc_df,
   cols_to_summarise_unique <- setdiff(names(nodes_separated_shortend), c("Label", values_col_name, stat_col_name))
 
   summary_others <- nodes_separated_shortend %>%
-    dplyr::group_by(Label) %>%
+    dplyr::group_by(.data$Label) %>%
     dplyr::summarise(
       collapsed_count = dplyr::n(),
       dplyr::across(
@@ -127,8 +129,8 @@ plot_network <- function(log2fc_df,
     )
 
   nodes_collapsed <- left_join(summary_others, summary_log2fc, by = "Label") %>%
-    rename(values = values_collapsed, stat = stat_collapsed,) %>%
-    mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
+    dplyr::rename(values = values_collapsed, stat = stat_collapsed,) %>%
+    dplyr::mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
     
   # --- The dataframe for plotting ---
   nodes_original_processed <- updated_nodes_list$nodes
@@ -196,7 +198,7 @@ plot_network <- function(log2fc_df,
              message("gradient_colors is NULL or incorrectly specified. Falling back to viridis scale.")
              scale_fill_viridis(option = "D", name = values_col_name)  # default fallback
            },
-           scale_fill_viridis(option = get_color_option(color_scale), name = values_col_name)  # default to viridis
+           scale_fill_viridis(option = MetAlyzer:::get_color_option(color_scale), name = values_col_name)  # default to viridis
     ) +
 
     # Add annotations
@@ -220,7 +222,7 @@ plot_network <- function(log2fc_df,
     theme(plot.title = element_text(hjust = 0.5))
 
 
-    save_plot(network,
+    MetAlyzer:::save_plot(network,
               folder_name = folder_name,
               folder_path = folder_path,
               file_name = file_name,
