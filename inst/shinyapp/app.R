@@ -232,59 +232,57 @@ ui <- fluidPage(
       tags$br(),
       conditionalPanel(condition = "input.computeLog2FC",
                        shinyBS::bsCollapse(open = "",
-                        shinyBS::bsCollapsePanel("Advanced Styles",
-                                                div(style = "display: flex;
-                                                            flex-wrap: wrap;
-                                                            justify-content: center;
-                                                            align-items: center;
-                                                            margin-bottom: 20px;
-                                                            width: 80%;
-                                                            margin-left: auto;
-                                                            margin-right: auto",
+                        shinyBS::bsCollapsePanel("Advanced Options",
+                                                div(style = "display: grid;
+                                                              grid-template-columns: repeat(5, 1fr);
+                                                              gap: 15px;
+                                                              align-items: center;
+                                                              width: 80%;
+                                                              margin: 0 auto 20px;",
                                                     # Plot Height Slider
-                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                    div(style = "min-width: 150px; margin: 5px;",
                                                         sliderInput("networkPlotHeight", 
                                                                     "Plot Height [100px]", 
                                                                     min = 4, max = 20, 
                                                                     value = 10, step = 1)
                                                     ),
                                                     # Metabolite Node Size Slider
-                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                    div(style = "min-width: 150px; margin: 5px;",
                                                         sliderInput("networkMetaboliteNodeSize", 
                                                                     "Metabolite Node Size", 
                                                                     min = 5, max = 50, 
                                                                     value = 11, step = 1)
                                                     ),
                                                     # Connection Width Slider
-                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                    div(style = "min-width: 150px; margin: 5px;",
                                                         sliderInput("networkConnectionWidth", 
                                                                     "Connection Width", 
                                                                     min = 0.5, max = 5, 
                                                                     value = 1.25, step = 0.25)
                                                     ),
                                                     # Pathway Text Size Slider
-                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                    div(style = "min-width: 150px; margin: 5px;",
                                                         sliderInput("networkPathwayTextSize", 
                                                                     "Pathway Text Size", 
                                                                     min = 10, max = 50, 
                                                                     value = 20, step = 1)
                                                     ),
                                                     # Pathway Width Slider
-                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                    div(style = "min-width: 150px; margin: 5px;",
                                                         sliderInput("networkPathwayWidth", 
                                                                     "Pathway Width", 
                                                                     min = 5, max = 30, 
                                                                     value = 10, step = 1)
                                                     ),
                                                     # Color Scale Selector --- ADDED
-                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                    div(style = "min-width: 150px; margin: 5px;",
                                                         selectInput("networkColorScale", "Color Scale",
                                                                     choices = c("Viridis", "Plasma", "Magma", "Inferno", 
                                                                                 "Cividis", "Rocket", "Mako", "Turbo"),
                                                                     selected = "Viridis")
                                                     ),
                                                     # Exclude Pathways Selector --- ADDED
-                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
+                                                    div(style = "min-width: 150px; margin: 5px;",
                                                         selectInput("networkExcludePathways", "Exclude Pathways",
                                                                     choices = c("Bile Acids", "Eicosanoid Synthesis", "Hormones", 
                                                                                 "Beta Oxidation", "Choline/Betaine metabolism", 
@@ -294,12 +292,25 @@ ui <- fluidPage(
                                                                     multiple = TRUE)
                                                     ),
                                                     # Column Name Selector --- ADDED
-                                                    div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                        selectInput("networkColumnSelect", "Select Column", 
-                                                                    choices = NULL)
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        selectInput("networkValueColumn", "Plotted Value",
+                                                                    choices = c("log2FC", "pval", "qval"),
+                                                                    selected = "log2FC")
                                                     ),
-                                                    actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
-                                                    shinyBS::bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
+                                                    #Download controls --- MOVED
+                                                    div(style = "min-width: 150px;",
+                                                        selectInput("formatNetwork", label = "Format", choices = c("html", "png", "pdf", "svg"), selected = "html", width = '100%')
+                                                    ),
+                                                    div(style = "min-width: 150px;",
+                                                        downloadButton("downloadNetworkPlot", "Download", style = "width: 100%; margin-top: 5px;")
+                                                    ),
+                                                    #Default Settings --- MOVED
+                                                    div(style = "min-width: 150px; margin: 5px;"),
+                                                    div(style = "min-width: 150px; margin: 5px;"),
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                      actionButton('defaultNetworkPlotStyles', 'Default', width = '100%'),
+                                                      shinyBS::bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
+                                                    ),
                                                 )
                         )
                        )
@@ -311,11 +322,6 @@ ui <- fluidPage(
                            # Use the height value from the slider to control the plot's height
                            plotly::plotlyOutput('plotNetwork', height = "auto") %>%
                              shinycssloaders::withSpinner(color="#56070C"),
-                           fluidRow(style="display:flex; justify-content:center; margin-top:50px; margin-bottom:1rem;",
-                                    column(width = 2, 
-                                           selectInput("formatNetwork", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
-                                    column(width = 2, downloadButton("downloadNetworkPlot", "Download Network plot"))
-                           )
                        )
       )
     ),
@@ -1336,6 +1342,7 @@ server <- function(input, output, session) {
     # Use the height value for plot layout
     plotly_network(
       reactLog2FCTbl(),
+      values_col_name = input$networkValueColumn,
       exclude_pathways = input$networkExcludePathways,
       metabolite_node_size = input$networkMetaboliteNodeSize,
       connection_width = input$networkConnectionWidth,
@@ -1352,6 +1359,10 @@ server <- function(input, output, session) {
     updateSliderInput(session, 'networkConnectionWidth', value = 1.25)
     updateSliderInput(session, 'networkPathwayTextSize', value = 20)
     updateSliderInput(session, 'networkPathwayWidth', value = 10)
+    updateSelectInput(session, 'networkValueColumn', selected = "log2FC")
+    updateSelectInput(session, 'networkExcludePathways', selected = character(0))
+    updateSelectInput(session, "networkColorScale", selected = "Viridis")
+    updateSelectInput(session, "formatNetwork", selected = "html")
   })
   
   # Download log2(FC) visuals
@@ -1415,16 +1426,23 @@ server <- function(input, output, session) {
     content = function(file) {
       if (input$formatNetwork == "html") {
         final_plot <- plotly_network(
-          reactLog2FCTbl(), 
+          reactLog2FCTbl(),
+          values_col_name = input$networkValueColumn,
+          exclude_pathways = input$networkExcludePathways,
           metabolite_node_size = input$networkMetaboliteNodeSize,
           connection_width = input$networkConnectionWidth,
           pathway_text_size = input$networkPathwayTextSize,
           pathway_width = input$networkPathwayWidth,
-          plot_height = input$networkPlotHeight * 100
+          plot_height = input$networkPlotHeight*100,
+          color_scale = input$networkColorScale
         )
         htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
-        final_plot <- MetAlyzer::plot_network(reactLog2FCTbl())$Plot
+        final_plot <- MetAlyzer::plot_network(reactLog2FCTbl(),
+                                              values_col_name = input$networkValueColumn,
+                                              exclude_pathways = input$networkExcludePathways,
+                                              color_scale = input$networkColorScale
+                                              )$Plot
         ggsave(filename = file, plot = final_plot, device = input$formatNetwork,
                dpi = 400, units = "cm", width = 32.0, height = 21.0)
       }

@@ -531,46 +531,31 @@ plotly_network <- function(Log2FCTab,
   
   nodes_joined <- dplyr::left_join(nodes_separated, Log2FCTab, by = c("Metabolites" = metabolite_col_name))
 
-  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, values_col_name, stat_col_name)
+  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_sep_df = nodes_joined, nodes_orig_df = nodes, q_value = q_value, stat_col_name = stat_col_name, c("log2FC", "pval", "qval"))
   
   ### --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
 
   nodes_separated_shortend <- nodes_separated_processed %>%
-    dplyr::filter(!is.na(values_col_name)) %>%  
-    dplyr::select(c("Metabolites", "Pathway", "Label", "node_values", "node_stat", all_of(values_col_name), all_of(stat_col_name)))  
-  
-  summary_log2fc <- nodes_separated_shortend %>%
-    dplyr::group_by(Label) %>%
-    dplyr::summarise(
-      values_collapsed = paste(.data[[values_col_name]], collapse = "; "),
-      stat_collapsed = paste(.data[[stat_col_name]], collapse = "; "),
-      .groups = 'drop'
-    )
-
-  cols_to_summarise_unique <- setdiff(names(nodes_separated_shortend), c("Label", values_col_name, stat_col_name))
+    dplyr::filter(!is.na(values_col_name))
 
   summary_others <- nodes_separated_shortend %>%
     dplyr::group_by(.data$Label) %>%
     dplyr::summarise(
       collapsed_count = dplyr::n(),
       dplyr::across(
-        .cols = all_of(cols_to_summarise_unique), # Use the identified columns
+        .cols = all_of(colnames(nodes_separated_shortend)[!colnames(nodes_separated_shortend) %in% "Label"]),
         .fns = ~ paste(unique(.), collapse = "; ")
       ),
       .groups = 'drop'
     )
-
-  nodes_collapsed <- left_join(summary_others, summary_log2fc, by = "Label") %>%
-    dplyr::rename(values = values_collapsed, stat = stat_collapsed,) %>%
-    dplyr::mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
     
   # --- The dataframe for plotting ---
   nodes_original_processed <- updated_nodes_list$nodes
 
   ## Draw network
   # Preparing Hexcodes for Annotation Colors
-  nodes_original_processed$color <- create_viridis_style(color_scale,
+  nodes_original_processed$color <- MetAlyzer:::create_viridis_style(color_scale,
                                              type = "hex",
                                              data = nodes_original_processed,
                                              values_col_name = values_col_name)
@@ -616,13 +601,13 @@ plotly_network <- function(Log2FCTab,
   edges_area_combined <- c(area_shapes, edge_shapes)
 
   # Create the nodes
-  network <- plot_ly(nodes_original_processed,
+  network <- plotly::plot_ly(nodes_original_processed,
                      x = nodes_original_processed$x,
                      y = nodes_original_processed$y,
                      type = "scatter",
                      mode = "markers",
                      marker = list(
-                      color = nodes_original_processed[[values_col_name]], colorscale = create_viridis_style(color_scale, type = "scale"),
+                      color = nodes_original_processed[[values_col_name]], colorscale = MetAlyzer:::create_viridis_style(color_scale, type = "scale"),
                       showscale = TRUE,
                       colorbar = list(
                         title = values_col_name
@@ -653,7 +638,8 @@ plotly_network <- function(Log2FCTab,
       opacity = 1,
       hovertext = paste0("log2 Fold Change: ", round(nodes_original_processed$log2FC[i], 5),
                          "\nPathway: ", nodes_original_processed$Pathway[i],
-                         "\nadj. p-value: ", round(nodes_original_processed$qval[i], 5))
+                         "\nadj. p-value: ", round(nodes_original_processed$qval[i], 5),
+                         "\np-value: ", round(nodes_original_processed$pval[i], 5))
     )
   }
 
@@ -670,140 +656,4 @@ plotly_network <- function(Log2FCTab,
     )
   }
   return(p_network)
-}
-
-#' Creates a viridis color style for Plotly plots.
-#'
-#' This function can generate either a Plotly-compatible colorscale for a
-#' color bar or a vector of hex color codes for manual coloring.
-#'
-#' @param color_scale The name of the palette (e.g., "Magma", "Viridis").
-#' @param type The desired output type: "scale" (for a color bar) or "hex"
-#'   (for a vector of hex codes). Defaults to "scale".
-#' @param data The data frame containing the values. Only required if type = "hex".
-#' @param values_col_name The name of the column with numeric values. Only
-#'   required if type = "hex".
-#'
-#' @return A data frame if type is "scale", or a character vector if type is "hex".
-create_viridis_style <- function(color_scale,
-                                 type = "scale",
-                                 data = NULL,
-                                 values_col_name = NULL) {
-  option <- switch(color_scale,
-                   "Magma"   = "A",
-                   "Inferno" = "B",
-                   "Plasma"  = "C",
-                   "Viridis" = "D",
-                   "Cividis" = "E",
-                   "Rocket"  = "F",
-                   "Mako"    = "G",
-                   "Turbo"   = "H",
-                   "D"
-  )
-  if (type == "scale") {
-    n_colors <- 11 # A small number of steps is efficient for a Plotly scale
-    palette_colors <- viridis(n_colors, option = option)
-    stop_points <- seq(0, 1, length.out = n_colors)
-    return(data.frame(stop = stop_points, color = palette_colors))
-
-  } else if (type == "hex") {
-    if (is.null(data) || is.null(values_col_name)) {
-      stop("For type = 'hex', you must provide 'data' and 'values_col_name'.")
-    }
-
-    n_colors <- 256
-    palette <- viridis(n_colors, option = option)
-
-    values <- data[[values_col_name]]
-    valid_values <- na.omit(as.numeric(values))
-
-    if (length(valid_values) == 0) return(rep("grey", length(values)))
-
-    value_range <- range(valid_values)
-
-    if (diff(value_range) == 0) {
-      middle_color <- palette[n_colors / 2]
-      return(ifelse(is.na(values), "grey", middle_color))
-    }
-
-    breaks <- seq(value_range[1], value_range[2], length.out = n_colors + 1)
-
-    return(sapply(values, function(val) {
-      if (is.na(val)) {
-        "grey"
-      } else {
-        color_index <- findInterval(val, breaks, all.inside = TRUE)
-        palette[color_index]
-      }
-    }))
-  } else {
-    stop("Invalid 'type' specified. Please choose 'scale' or 'hex'.")
-  }
-}
-
-#' @title Read Named Regions
-#' @description This function reads in the named regions of an excel file.
-#'
-#' @param file_path A string presenting the file path.
-#' @param named_region A character specifying the name of a region in the file with
-#' the information to extract.
-#' @returns A data frame containing the information about the specified region
-#' 
-#' @keywords internal
-get_network_info <- function(file_path, named_region) {
-  full_sheet <- openxlsx::read.xlsx(file_path, sheet = 1, rowNames = FALSE, colNames = FALSE,
-                                    skipEmptyRows = FALSE, skipEmptyCols = FALSE)
-  region_headers <- colnames(openxlsx::read.xlsx(file_path, namedRegion = named_region))
-  coordinates <- lapply(region_headers, function(hdr) {
-    as.data.frame(which(full_sheet == hdr, arr.ind = TRUE))
-  }) %>%
-    dplyr::bind_rows() %>%
-    dplyr::arrange(row, col) %>%
-    dplyr::group_by(row) %>%
-    dplyr::mutate(n = dplyr::n()) %>%
-    dplyr::filter(n == length(region_headers))
-  
-  start_row <- unique(coordinates$row) + 1
-  selec_cols <- coordinates$col
-  region_info <- full_sheet[start_row:nrow(full_sheet), selec_cols]
-  end_row <- min(which(rowSums(is.na(region_info)) == length(region_headers))) - 1
-  # Regions 'Metabolites_Header' and 'Connections_Header' already have correct end rows.
-  if (!end_row %in% 'Inf') {
-    region_info <- region_info[1:end_row,]
-  }
-  colnames(region_info) <- region_headers
-  rownames(region_info) <- NULL
-  
-  for (numeric_col in c("x", "y", "Radius")) {
-    if (numeric_col %in% region_headers) {
-      region_info[, numeric_col] <- as.numeric(region_info[, numeric_col])
-    }
-  }
-  for (character_col in c("Label", "Pathway", "Color", "Node1", "Node2")) {
-    if (character_col %in% region_headers) {
-      region_info[, character_col] <- stringr::str_trim(region_info[, character_col])
-    }
-  }
-  
-  return(region_info)
-}
-
-#' @title Data file path
-#' @description Output the full path for a specified file in the `data` folder of
-#' the \pkg{MetAlyzer} Shiny app, either published or in development.
-#'
-#' @param file_name A character specifying the name of a file to obtain.
-#' @returns A string presenting the full path to the specified file.
-#' 
-#' @examples
-#' file_path <- get_shiny_data_path("Pathway_120325.xlsx")
-#' @keywords internal
-get_shiny_data_path <- function(file_name) {
-  shiny_data_dir <- system.file("shinyapp", "data", package = "MetAlyzer")
-  data_path <- file.path(shiny_data_dir, file_name)
-  if (file.exists(data_path)) {
-    return(data_path)
-  } else {
-    return(file.path(getwd(), "data", file_name))
-  }
 }
