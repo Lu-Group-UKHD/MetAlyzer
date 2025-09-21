@@ -226,7 +226,6 @@ ui <- fluidPage(
       )
     ), # TabPanel 2 End
     tabPanel(
-      #### Add title to scale, i.e., log2(FC)?
       'Network',
       # Lower network plot a bit
       tags$br(),
@@ -322,7 +321,14 @@ ui <- fluidPage(
                            # Use the height value from the slider to control the plot's height
                            plotly::plotlyOutput('plotNetwork', height = "auto") %>%
                              shinycssloaders::withSpinner(color="#56070C"),
+                       ),
+                       div(style = "width: 80%; margin: auto; margin-bottom: 200px;",
+                        tags$h3(strong('Node Vulcano plot'), style = "margin-top:1rem;"),
+                        selectInput("selectedNodesVulcano", "Select Node(s)", choices = "T14", selected="T14", multiple = TRUE),
+                        plotly::plotlyOutput('plotVolcanoNodes') %>%
+                          shinycssloaders::withSpinner(color="#56070C"),
                        )
+                           
       )
     ),
     tabPanel(
@@ -1337,9 +1343,11 @@ server <- function(input, output, session) {
   }, deleteFile = TRUE)
   
   # Network plot
-  output$plotNetwork <- plotly::renderPlotly({
+  network_data <- reactive({
+    # Ensure the base data is available before proceeding
     req(reactLog2FCTbl())
-    # Use the height value for plot layout
+
+    # Call the expensive function just one time
     plotly_network(
       reactLog2FCTbl(),
       values_col_name = input$networkValueColumn,
@@ -1352,6 +1360,56 @@ server <- function(input, output, session) {
       color_scale = input$networkColorScale
     )
   })
+
+  output$plotNetwork <- plotly::renderPlotly({
+    # Access the pre-calculated plot from the reactive expression
+    req(network_data())
+    network_data()$Plot
+  })
+  output$plotVolcanoNodes <- plotly::renderPlotly({
+    # Require both the network data and a selection from the user
+    req(network_data(), input$selectedNodesVulcano)
+    
+    # Access the pre-calculated table from the reactive expression
+    Table_nodes <- network_data()$Table
+
+    # The rest of your data processing logic remains the same
+    nodes_selected2 <- Table_nodes %>%
+      dplyr::filter(.data$Label %in% input$selectedNodesVulcano) %>%
+      tidyr::separate_rows(.data$Metabolites, .data$log2FC, .data$qval, .data$pval, .data$Class, sep = "\\s*;\\s*") %>%
+      dplyr::mutate(
+        log2FC = as.numeric(.data$log2FC),
+        qval = as.numeric(.data$qval),
+        pval = as.numeric(.data$pval),
+        Metabolite = Metabolites,
+        Class = gsub("\"", "", .data$Class),
+      ) %>%
+      dplyr::filter(.data$Class != "NA") %>%
+      dplyr::mutate(Class = as.factor(Class))
+    
+    plotly_vulcano(nodes_selected2)
+  })
+  observeEvent(network_data(), {
+    # Get the table of nodes from our central reactive
+    node_table <- network_data()$Table
+    
+    # Extract the unique pathway labels to use as choices
+    node_choices <- unique(node_table$Label)
+    
+    # Update the selectInput on the UI side
+    # Assumes your selectInput has the id "selectedNodesVulcano"
+    updateSelectInput(session, 
+                      inputId = "selectedNodesVulcano",
+                      choices = node_choices,
+                      # Keep the current selection if it's still valid, otherwise pick the first one
+                      selected = if (!is.null(input$selectedNodesVulcano) && input$selectedNodesVulcano %in% node_choices) {
+                                  input$selectedNodesVulcano
+                                } else {
+                                  node_choices[1]
+                                }
+    )
+  })
+
   # Revert changed network plot style parameters back to default
   observeEvent(input$defaultNetworkPlotStyles, {
     updateSliderInput(session, 'networkPlotHeight', value = 10)
@@ -1435,7 +1493,7 @@ server <- function(input, output, session) {
           pathway_width = input$networkPathwayWidth,
           plot_height = input$networkPlotHeight*100,
           color_scale = input$networkColorScale
-        )
+        )$Plot
         htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
         final_plot <- MetAlyzer::plot_network(reactLog2FCTbl(),

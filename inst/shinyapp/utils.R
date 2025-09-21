@@ -540,15 +540,19 @@ plotly_network <- function(Log2FCTab,
     dplyr::filter(!is.na(values_col_name))
 
   summary_others <- nodes_separated_shortend %>%
-    dplyr::group_by(.data$Label) %>%
+    dplyr::group_by(Label) %>%
     dplyr::summarise(
       collapsed_count = dplyr::n(),
       dplyr::across(
-        .cols = all_of(colnames(nodes_separated_shortend)[!colnames(nodes_separated_shortend) %in% "Label"]),
+        .cols = all_of(c("Pathway", "x", "y", "Shape")),
         .fns = ~ paste(unique(.), collapse = "; ")
       ),
+      dplyr::across(
+        .cols = !all_of(c("Pathway", "x", "y", "Shape")),
+        .fns = ~ paste(., collapse = "; ")
+      ),
       .groups = 'drop'
-    )
+  )
     
   # --- The dataframe for plotting ---
   nodes_original_processed <- updated_nodes_list$nodes
@@ -616,7 +620,7 @@ plotly_network <- function(Log2FCTab,
                      height = plot_height)
 
   # Add the edges
-  p_network <- layout(
+  p_network <- plotly::layout(
     network,
     # title = 'Log2(FC) with FDR Correction', ####
     shapes = edges_area_combined,
@@ -626,7 +630,7 @@ plotly_network <- function(Log2FCTab,
 
   # Add annotations over the nodes
   for (i in 1:nrow(nodes_original_processed)) {
-    p_network <- p_network %>% add_annotations(
+    p_network <- p_network %>% plotly::add_annotations(
       text = nodes_original_processed$Label[i],
       x = nodes_original_processed$x[i],
       y = nodes_original_processed$y[i],
@@ -645,7 +649,7 @@ plotly_network <- function(Log2FCTab,
 
   # Add annotations for the pathways
   for (i in 1:nrow(pathways)) {
-    p_network <- p_network %>% add_annotations(
+    p_network <- p_network %>% plotly::add_annotations(
       text = pathways$Pathway[i],
       x = pathways$x[i],
       y = pathways$y[i],
@@ -655,5 +659,5 @@ plotly_network <- function(Log2FCTab,
       font = list(size = pathway_text_size, color = pathways$Color[i])
     )
   }
-  return(p_network)
+  return(list("Plot" = p_network, "Table" = summary_others))
 }

@@ -122,7 +122,7 @@ plot_network <- function(log2fc_df,
       collapsed_count = dplyr::n(),
       dplyr::across(
         .cols = all_of(cols_to_summarise_unique), # Use the identified columns
-        .fns = ~ paste(unique(.), collapse = "; ")
+        .fns = ~ paste(., collapse = "; ")
       ),
       .groups = 'drop'
     )
