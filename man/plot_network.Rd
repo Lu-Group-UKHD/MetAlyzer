@@ -15,7 +15,7 @@ plot_network(
   pathway_text_size = 6,
   pathway_width = 3,
   exclude_pathways = NULL,
-  color_scale = "viridis",
+  color_scale = "Viridis",
   gradient_colors = NULL,
   save_as = NULL,
   folder_name = format(Sys.Date(), "\%Y-\%m-\%d"),

@@ -8,8 +8,8 @@ calculate_node_aggregates_conditional(
   nodes_sep_df,
   nodes_orig_df,
   q_value,
-  values_col_name,
-  stat_col_name
+  stat_col_name,
+  ...
 )
 }
 \arguments{
@@ -21,9 +21,9 @@ Must contain Label.}
 
 \item{q_value}{Significance threshold for q-values (e.g., 0.05).}
 
-\item{values_col_name}{plotted column}
-
 \item{stat_col_name}{p value column name}
+
+\item{values_col_name}{plotted column}
 }
 \value{
 A list containing two dataframes:

@@ -59,6 +59,7 @@ Imports:
     tidyr,
     ggplot2,
     ggrepel,
+    ggpubr,
     utils,
     rlang,
     data.table,
@@ -88,7 +89,7 @@ Description: The 'MetAlyzer' S4 object provides methods to read and reformat met
 License: GPL-3
 Encoding: UTF-8
 Language: en-US
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Suggests:
     MetaProViz,
     vsn

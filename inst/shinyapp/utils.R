@@ -490,178 +490,79 @@ plotly_scatter <- function(Log2FCTab) {
 #' @description This function returns a list with interactive
 #' networkplot based on log2 fold change data.
 #' 
-#' @param Log2FCTab A data frame containing log2 fold change data
-#' @param q_value A numeric value specifying the cutoff for q-value
-#' @param metabolite_node_size The text size of the metabolite Nodes
+#' @param Log2FCTab A dataframe with log2FC, qval, additional columns
+#' @param q_value The q-value threshold for significance
+#' @param values_col_name Column name of a column that holds numeric values, to be plotted \strong{Default = "log2FC"}
+#' @param stat_col_name Columnname that holds numeric stat values that are used for significance \strong{Default = "qval"}
+#' @param metabolite_col_name Columnname that holds the Metabolites
+#' @param exclude_pathways Pathway names that are exluded from plotting
+#' @param metabolite_node_size The text size of metabolite nodes
 #' @param connection_width The line width of connections between metabolites
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
 #' @param plot_height The height of the Plot in pixel [px]
-#' @param plot_column_name Column name in the Log2FC dataframe to plot
-#' for multiple metabolites per node, the mean is used.
+#' @param color_scale A string specifying the color scale to use. Options include `"viridis"`, `"plasma"`, `"magma"`, `"inferno"`, `"cividis"`, `"rocket"`, `"mako"`, and `"turbo"`, which use the `viridis` color scales.
 plotly_network <- function(Log2FCTab,
-                           q_value = 0.05,
+                           q_value=0.05,
+                           metabolite_col_name = "Metabolite",
+                           values_col_name = "log2FC",
+                           stat_col_name = "qval",
+                           exclude_pathways = NULL,
                            metabolite_node_size = 11,
                            connection_width = 1.25,
                            pathway_text_size = 20,
                            pathway_width = 10,
                            plot_height = 800,
-                           plot_column_name = "log2FC") {
-  pathway_file <- get_shiny_data_path("Pathway_120325.xlsx")
-  ## Read network nodes, edges and annotations
-  pathways <- get_network_info(pathway_file, "Pathways_Header")
-  invalid_annotations <- which(
-    is.na(pathways$Label) |
-      duplicated(pathways$Label) |
-      is.na(pathways$x) |
-      is.na(pathways$y) |
-      is.na(pathways$Color)
+                           color_scale = "viridis") {
+  network_file <- MetAlyzer::pathway()
+
+  ### Read in Excel file
+  pathways <- MetAlyzer:::read_pathways(network_file)
+  nodes <- MetAlyzer:::read_nodes(network_file, pathways)
+  edges <- MetAlyzer:::read_edges(network_file, nodes, pathways)
+
+  pathways <- dplyr::filter(pathways, !Pathway %in% exclude_pathways)
+  nodes <- dplyr::filter(nodes, !Pathway %in% exclude_pathways)
+  edges <- dplyr::filter(edges, Node1 %in% nodes$Label & Node2 %in% nodes$Label)
+  
+  nodes <- dplyr::filter(nodes, !Pathway %in% exclude_pathways)
+  
+  nodes_separated <- tidyr::separate_rows(nodes, Metabolites, sep = "\\s*;\\s*")
+  
+  nodes_joined <- dplyr::left_join(nodes_separated, Log2FCTab, by = c("Metabolites" = metabolite_col_name))
+
+  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_sep_df = nodes_joined, nodes_orig_df = nodes, q_value = q_value, stat_col_name = stat_col_name, c("log2FC", "pval", "qval"))
+  
+  ### --- Create the dataframe for excel export ---
+  nodes_separated_processed <- updated_nodes_list$nodes_separated
+
+  nodes_separated_shortend <- nodes_separated_processed %>%
+    dplyr::filter(!is.na(values_col_name))
+
+  summary_others <- nodes_separated_shortend %>%
+    dplyr::group_by(Label) %>%
+    dplyr::summarise(
+      collapsed_count = dplyr::n(),
+      dplyr::across(
+        .cols = all_of(c("Pathway", "x", "y", "Shape")),
+        .fns = ~ paste(unique(.), collapse = "; ")
+      ),
+      dplyr::across(
+        .cols = !all_of(c("Pathway", "x", "y", "Shape")),
+        .fns = ~ paste(., collapse = "; ")
+      ),
+      .groups = 'drop'
   )
-  if (length(invalid_annotations) > 0) {
-    # print warning and remove
-    cat("Warning: Removing", length(invalid_annotations), "invalid pathways.\n")
-    pathways <- pathways[-invalid_annotations, ]
-  }
-  rownames(pathways) <- pathways$Label
-  
-  nodes <- get_network_info(pathway_file, "Metabolites_Header")
-  nodes$Pathway[is.na(nodes$Pathway)] <- ""
-  invalid_nodes <- which(
-    is.na(nodes$Label) |
-      duplicated(nodes$Label) |
-      is.na(nodes$x) |
-      is.na(nodes$y) |
-      !nodes$Pathway %in% c(rownames(pathways), "")
-  )
-  if (length(invalid_nodes) > 0) {
-    # print warning and remove
-    cat("Warning: Removing", length(invalid_nodes), "invalid nodes.\n")
-    nodes <- nodes[-invalid_nodes, ]
-  }
-  rownames(nodes) <- nodes$Label
-  # Remove #1 at the end
-  nodes$Label <- gsub("#[0-9]+", "", nodes$Label)
-  
-  edges <- get_network_info(pathway_file, "Connections_Header")
-  invalid_edges <- which(
-    !edges$Node1 %in% rownames(nodes) |
-      !edges$Node2 %in% rownames(nodes) |
-      edges$Node1 == edges$Node2
-  )
-  if (length(invalid_edges) > 0) {
-    # print warning and remove
-    cat("Warning: Removing", length(invalid_edges), "invalid connections.\n")
-    edges <- edges[-invalid_edges, ]
-  }
-  
-  edges$x_start <- nodes[edges$Node1, "x"]
-  edges$y_start <- nodes[edges$Node1, "y"]
-  edges$x_end <- nodes[edges$Node2, "x"]
-  edges$y_end <- nodes[edges$Node2, "y"]
-  edges$Color <- sapply(rownames(edges), function(rowname) {
-    from <- edges[rowname, "Node1"]
-    to <- edges[rowname, "Node2"]
-    from_pathway <- nodes[from, "Pathway"]
-    to_pathway <- nodes[to, "Pathway"]
-    color <- NA
-    if (from_pathway == to_pathway & from_pathway != "") {
-      color <- pathways[from_pathway, "Color"]
-    }
-    return(color)
-  })
-  
-  ## Add log2FC to nodes_df
-  signif_df <- filter(Log2FCTab,
-                      !is.na(.data$log2FC),
-                      !is.na(.data$qval),
-                      !is.na(.data$pval),
-                      .data$qval <= q_value)
-  
-  
-  nodes$log2FC <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 significantly changed
-      l2fc <- sum(tmp_df$log2FC) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
-      # Not significantly changed but measured
-      l2fc <- sum(Log2FCTab$log2FC[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
-    } else {
-      # Not measured
-      l2fc <- NA
-    }
-    return(l2fc)
-  })
-  
-  ## Add p-value to nodes_df
-  nodes$qval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 significantly changed
-      qval <- sum(tmp_df$qval) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
-      # Not significantly changed but measured
-      qval <- sum(Log2FCTab$qval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
-    } else {
-      # Not measured
-      qval <- NA
-    }
-    return(qval)
-  })
-  
-  ## Add p-value to nodes_df
-  nodes$pval <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(signif_df, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 significantly changed
-      pval <- sum(tmp_df$pval) / nrow(tmp_df)
-    } else if (nrow(tmp_df) == 0 && any(m_vec %in% Log2FCTab$Metabolite)) {
-      # Not significantly changed but measured
-      pval <- sum(Log2FCTab$pval[which(Log2FCTab$Metabolite %in% m_vec)]) / length(m_vec)
-    } else {
-      # Not measured
-      pval <- NA
-    }
-    return(pval)
-  })
-  
-  nodes$add_col <- sapply(strsplit(nodes$Metabolites, ";"), function(m_vec) {
-    tmp_df <- filter(Log2FCTab, .data$Metabolite %in% m_vec)
-    if (nrow(tmp_df) > 0) {
-      # Alteast 1 value per Node
-      value <- sum(tmp_df[plot_column_name]) / nrow(tmp_df)
-    } else {
-      # Not measured
-      value <- NA
-    }
-    return(value)
-  })
-  
-  # In case the plotted column is log2FC or qval, as they are calculated differently
-  if (plot_column_name == "log2FC") {
-    nodes$add_col = nodes$log2FC
-  } else if (plot_column_name == "qval") {
-    nodes$add_col = nodes$qval
-  } else if (plot_column_name == "pval") {
-    nodes$add_col = nodes$pval
-  }
-  
+    
+  # --- The dataframe for plotting ---
+  nodes_original_processed <- updated_nodes_list$nodes
+
   ## Draw network
-  # Create a plot of the network using ggplotly
-  
   # Preparing Hexcodes for Annotation Colors
-  nodes$color <- sapply(nodes$add_col, function(value) {
-    if (is.na(value)) {
-      return("grey")
-    } else {
-      # Using the viridis color scale, adjust 'option' based on your preference
-      color_scale <- viridis(10, option = "D")
-      nodes_range <- na.omit(nodes$add_col)
-      
-      color_index <- findInterval(value, seq(min(nodes_range), max(nodes_range)+0.1, length.out = length(color_scale) + 1))
-      return(color_scale[color_index])
-    }
-  })
+  nodes_original_processed$color <- MetAlyzer:::create_viridis_style(color_scale,
+                                             type = "hex",
+                                             data = nodes_original_processed,
+                                             values_col_name = values_col_name)
   
   # Prepare the Edges List
   area_shapes <- list()
@@ -702,50 +603,53 @@ plotly_network <- function(Log2FCTab,
     edge_shapes[[i]] <- edge_shape
   }
   edges_area_combined <- c(area_shapes, edge_shapes)
-  
+
   # Create the nodes
-  network <- plot_ly(nodes,
-                     x = nodes$x,
-                     y = nodes$y,
+  network <- plotly::plot_ly(nodes_original_processed,
+                     x = nodes_original_processed$x,
+                     y = nodes_original_processed$y,
                      type = "scatter",
                      mode = "markers",
-                     marker = list(color = nodes$add_col, 
-                                   colorbar = list(title = ""), #### 'Log2(FC)'
-                                   colorscale='Viridis',
-                                   showscale = TRUE),
+                     marker = list(
+                      color = nodes_original_processed[[values_col_name]], colorscale = MetAlyzer:::create_viridis_style(color_scale, type = "scale"),
+                      showscale = TRUE,
+                      colorbar = list(
+                        title = values_col_name
+                      )
+                     ),
                      height = plot_height)
-  
+
   # Add the edges
-  p_network <- layout(
+  p_network <- plotly::layout(
     network,
     # title = 'Log2(FC) with FDR Correction', ####
     shapes = edges_area_combined,
     xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
     yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
-    hovermode = FALSE) 
-  
+    hovermode = FALSE)
+
   # Add annotations over the nodes
-  for (i in 1:nrow(nodes)) {
-    p_network <- p_network %>% add_annotations(
-      text = nodes$Label[i],
-      x = nodes$x[i],
-      y = nodes$y[i],
+  for (i in 1:nrow(nodes_original_processed)) {
+    p_network <- p_network %>% plotly::add_annotations(
+      text = nodes_original_processed$Label[i],
+      x = nodes_original_processed$x[i],
+      y = nodes_original_processed$y[i],
       arrowhead = 0,
       font = list(size = metabolite_node_size, color = "white"),
       ax = 0,
       ay = 0,
-      bgcolor = nodes$color[i],
+      bgcolor = nodes_original_processed$color[i],
       opacity = 1,
-      hovertext = paste0("Pathway: ", nodes$Pathway[i],
-                         "\nLog2(FC): ", round(nodes$log2FC[i], 2),
-                         "\np-value: ", round(nodes$pval[i], 4),
-                         "\nAdj. p-value: ", round(nodes$qval[i], 4))
+      hovertext = paste0("log2 Fold Change: ", round(nodes_original_processed$log2FC[i], 5),
+                         "\nPathway: ", nodes_original_processed$Pathway[i],
+                         "\nadj. p-value: ", round(nodes_original_processed$qval[i], 5),
+                         "\np-value: ", round(nodes_original_processed$pval[i], 5))
     )
   }
-  
+
   # Add annotations for the pathways
   for (i in 1:nrow(pathways)) {
-    p_network <- p_network %>% add_annotations(
+    p_network <- p_network %>% plotly::add_annotations(
       text = pathways$Pathway[i],
       x = pathways$x[i],
       y = pathways$y[i],
@@ -755,75 +659,5 @@ plotly_network <- function(Log2FCTab,
       font = list(size = pathway_text_size, color = pathways$Color[i])
     )
   }
-  
-  return(p_network)
-}
-
-#' @title Pathway information extraction (Network)
-#' @description Extract the pathway information a certain region (`Pathways_Header`,
-#' `Metabolites_Header`, `Connections_Header`) in the EXCEL file (i.e., Pathway.xlsx)
-#' holds for making network diagrams.
-#'
-#' @param file_path A string presenting the file path.
-#' @param named_region A character specifying the name of a region in the file with
-#' the information to extract.
-#' @returns A data frame containing the information about the specified region
-#' 
-#' @keywords internal
-get_network_info <- function(file_path, named_region) {
-  full_sheet <- openxlsx::read.xlsx(file_path, sheet = 1, rowNames = FALSE, colNames = FALSE,
-                                    skipEmptyRows = FALSE, skipEmptyCols = FALSE)
-  region_headers <- colnames(openxlsx::read.xlsx(file_path, namedRegion = named_region))
-  coordinates <- lapply(region_headers, function(hdr) {
-    as.data.frame(which(full_sheet == hdr, arr.ind = TRUE))
-  }) %>%
-    dplyr::bind_rows() %>%
-    dplyr::arrange(row, col) %>%
-    dplyr::group_by(row) %>%
-    dplyr::mutate(n = dplyr::n()) %>%
-    dplyr::filter(n == length(region_headers))
-  
-  start_row <- unique(coordinates$row) + 1
-  selec_cols <- coordinates$col
-  region_info <- full_sheet[start_row:nrow(full_sheet), selec_cols]
-  end_row <- min(which(rowSums(is.na(region_info)) == length(region_headers))) - 1
-  # Regions 'Metabolites_Header' and 'Connections_Header' already have correct end rows.
-  if (!end_row %in% 'Inf') {
-    region_info <- region_info[1:end_row,]
-  }
-  colnames(region_info) <- region_headers
-  rownames(region_info) <- NULL
-  
-  for (numeric_col in c("x", "y", "Radius")) {
-    if (numeric_col %in% region_headers) {
-      region_info[, numeric_col] <- as.numeric(region_info[, numeric_col])
-    }
-  }
-  for (character_col in c("Label", "Pathway", "Color", "Node1", "Node2")) {
-    if (character_col %in% region_headers) {
-      region_info[, character_col] <- stringr::str_trim(region_info[, character_col])
-    }
-  }
-  
-  return(region_info)
-}
-
-#' @title Data file path
-#' @description Output the full path for a specified file in the `data` folder of
-#' the \pkg{MetAlyzer} Shiny app, either published or in development.
-#'
-#' @param file_name A character specifying the name of a file to obtain.
-#' @returns A string presenting the full path to the specified file.
-#' 
-#' @examples
-#' file_path <- get_shiny_data_path("Pathway_120325.xlsx")
-#' @keywords internal
-get_shiny_data_path <- function(file_name) {
-  shiny_data_dir <- system.file("shinyapp", "data", package = "MetAlyzer")
-  data_path <- file.path(shiny_data_dir, file_name)
-  if (file.exists(data_path)) {
-    return(data_path)
-  } else {
-    return(file.path(getwd(), "data", file_name))
-  }
+  return(list("Plot" = p_network, "Table" = summary_others))
 }
