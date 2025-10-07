@@ -19,6 +19,17 @@ library(viridisLite)
 library(gridExtra)
 
 ui <- fluidPage(
+  tags$head(
+    tags$style(HTML("
+      .shiny-notification {
+        width: 300px;
+        position: fixed;
+        top: 15px;
+        right: 15px;
+        opacity: 1;
+      }
+    "))
+  ),
   titlePanel('Biocrates Metabolomics Analysis'),
   tabsetPanel(
     type = 'tabs',
@@ -430,7 +441,7 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
-    metabObj <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_rawdata_extraction(), silent = T)
+    metabObj <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_rawdata_extraction(), silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
     metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                               drop_metabolites = 'Metabolism Indicators',
@@ -470,7 +481,7 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
     validUploadedFile <- try(
-      metabObj <- MetAlyzer::read_metidq(file_path = input$uploadedFile$datapath,
+      metabObj <- MetAlyzer::read_metidq(conc_file_path = input$uploadedFile$datapath,
                                          sheet = 1, silent = T),
       silent = T)
     if (!is(validUploadedFile, 'try-error')) {
@@ -1506,6 +1517,78 @@ server <- function(input, output, session) {
       }
     }
   )
+
+  ### --- Notifications ---
+  current_notification_id <- reactiveVal(NULL)
+  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+
+  # 1. Notification for the "Process" button
+  observeEvent(input$updateProcessing, {
+    if (!is.null(current_notification_id())) {
+      removeNotification(current_notification_id())
+    }
+    notification_ui <- div(
+      tags$ul(
+        style = "padding-left: 20px; font-size: 0.9em;",
+        tags$li(tags$b("Removed Samples: "), paste(input$smpChoicesFiltering, collapse = ", ") %||% "None"),
+        tags$li(tags$b("Removed Metabolites: "), paste(input$featChoicesFiltering, collapse = ", ") %||% "None"),
+        tags$li(tags$b("% Quantified Cutoff: "), input$featCompleteCutoffFiltering),
+        tags$li(tags$b("% Valid Cutoff: "), input$featValidCutoffFiltering),
+        tags$li(tags$b("Imputation: "), ifelse(input$imputation, "Half-minimum", "None")),
+        tags$li(tags$b("Normalization: "), input$normalization)
+      )
+    )
+    new_id <- showNotification(
+      ui = notification_ui,
+      duration = 20,
+      closeButton = TRUE,
+      type = "error"
+    )
+    current_notification_id(new_id)
+  })
+
+  # 2. Notification for the "Revert/default" button
+  observeEvent(input$revertProcessing, {
+    if (!is.null(current_notification_id())) {
+      removeNotification(current_notification_id())
+    }
+    
+    new_id <- showNotification(
+      "Processing undone. Parameters reverted to default.",
+      duration = 5,
+      type = "message"
+    )
+    current_notification_id(new_id)
+  })
+
+  # Disclaimer for Uploading Data
+  #if (Sys.getenv("SHINY_PORT") != "") {
+  
+    showModal(modalDialog(
+        title = tags$b("Data Privacy Disclaimer", style = "color: #d9534f;"),
+        HTML("Please ensure that all uploaded data is <b>fully anonymized</b> and contains no sensitive patient information.
+            This application is hosted on a shared server (shinyapps.io), and we cannot guarantee the privacy of identifiable data.
+            <br><br>
+            By proceeding, you confirm that your are aware of this and proceed at your own risk.
+            <br><br>
+            You can find a guide to set up the application locally on your machine here:
+            <br>
+            link
+            <br>
+            or in the tutorial video at timpoint xx:xx:
+            <br>
+            link"),
+        # Replace the old footer with this new one
+        footer = tags$button(
+          "I Understand and Accept",
+          type = "button",
+          class = "btn btn-primary", # This class makes the button blue
+          `data-dismiss` = "modal"  # This ensures the button closes the pop-up
+        ),
+        easyClose = FALSE
+    ))
+  
+  #}
 }
 
 shinyApp(ui = ui, server = server)

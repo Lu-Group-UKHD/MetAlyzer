@@ -76,7 +76,7 @@ knitr::include_graphics("images/biocrates_output.png")
 fpath <- MetAlyzer::load_demodata_biocrates()
 
 # Load the data into a SummarizedExperiment object
-metalyzer_se <- MetAlyzer::read_metidq(file_path = fpath, 
+metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = fpath,
                                        silent = TRUE)
 
 # Display the object summary
