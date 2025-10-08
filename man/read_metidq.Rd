@@ -5,8 +5,10 @@
 \title{Open file and read data}
 \usage{
 read_metidq(
-  file_path,
+  conc_file_path,
+  status_file_path = NULL,
   sheet = 1,
+  multiple_files = FALSE,
   status_list = list(Valid = c("#B9DE83", "#00CD66"), LOQ = c("#B2D1DC", "#7FB2C5",
     "#87CEEB"), LOD = c("#A28BA3", "#6A5ACD", "#BBA7B9"), `ISTD Out of Range` =
     c("#FFF099", "#FFFF33"), Invalid = "#FFFFCC", Incomplete = c("#CBD2D7", "#FFCCCC")),
@@ -14,7 +16,12 @@ read_metidq(
 )
 }
 \arguments{
-\item{file_path}{A character specifying the file path to the Excel file.}
+\item{conc_file_path}{A character string specifying the file path to the
+Excel file containing concentration values.}
+
+\item{status_file_path}{An optional character string specifying the file path
+to the Excel file containing quantification status as text. If provided,
+the function operates in two-file mode. Defaults to NULL.}
 
 \item{sheet}{A numeric index specifying which sheet of the Excel file to use.}
 
@@ -33,5 +40,12 @@ The column "Sample Type" and the row "Class" are used as anchor cells in the
 Excel sheet and are therefore a requirement.
 }
 \examples{
-metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+# Single-file example
+se_single <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+
+# Two-file example
+# se_two <- MetAlyzer::read_metidq(
+#   conc_file_path = "path/to/concentrations.xlsx",
+#   status_file_path = "path/to/quant_status.xlsx"
+# )
 }

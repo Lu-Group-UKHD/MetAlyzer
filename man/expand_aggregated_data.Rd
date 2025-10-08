@@ -2,20 +2,22 @@
 % Please edit documentation in R/expand_aggregated_data.R
 \name{expand_aggregated_data}
 \alias{expand_aggregated_data}
-\title{Add column to aggregated_data}
+\title{Expand aggregated_data}
 \usage{
-expand_aggregated_data(metalyzer_se, meta_data_column)
+expand_aggregated_data(metalyzer_se, metadata_col)
 }
 \arguments{
-\item{metalyzer_se}{A Metalyzer object}
+\item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.}
 
-\item{meta_data_column}{A column from meta data}
+\item{metadata_col}{A vector of character(s) specifying the column in the sample
+metadata to add, accessible via `SummarizedExperiment::colData(metalyzer_se)`.}
 }
 \value{
-An updated Metalyzer object
+An SE object with the added sample metadata in the aggregated data accessible
+via `metalyzer_se@metadata$aggregated_data`.
 }
 \description{
-This function adds a column to the aggregated_data tibble by
-using information from the meta data.
+Add sample metadata into the aggregated_data in the input `SummarizedExperiment`
+(SE) object.
 }
 \keyword{internal}

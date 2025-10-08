@@ -2,7 +2,7 @@
 % Please edit documentation in R/MetAlyzer_handler.R
 \name{save_plot}
 \alias{save_plot}
-\title{save_plot is a helper function to save plots}
+\title{Save plots}
 \usage{
 save_plot(
   plot,

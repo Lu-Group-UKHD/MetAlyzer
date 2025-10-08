@@ -803,18 +803,21 @@ server <- function(input, output, session) {
     # Skip imputation and normalization if no sample or feature was left after filtering
     if (all(ncol(reactMetabObj$tmpMetabObj) != 0, nrow(reactMetabObj$tmpMetabObj) != 0)) {
       if (all(input$imputation, doneImputation() == 0)) {
-        reactMetabObj$tmpMetabObj <- data_imputation(reactMetabObj$tmpMetabObj)
+        reactMetabObj$tmpMetabObj <- MetAlyzer:::data_imputation(reactMetabObj$tmpMetabObj)
         doneImputation(1)
       }
       if (doneNormalization() == 0) {
         if (input$normalization == 'Total ion count (TIC) normalization') {
-          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'TIC')
+          reactMetabObj$tmpMetabObj <- MetAlyzer:::data_normalization(reactMetabObj$tmpMetabObj,
+                                                                      norm_method = 'TIC')
           doneNormalization(1)
         } else if (input$normalization == 'Median normalization') {
-          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'median')
+          reactMetabObj$tmpMetabObj <- MetAlyzer:::data_normalization(reactMetabObj$tmpMetabObj,
+                                                                      norm_method = 'median')
           doneNormalization(1)
         } else if (input$normalization == 'Log2 transformation') {
-          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'log2')
+          reactMetabObj$tmpMetabObj <- MetAlyzer:::data_normalization(reactMetabObj$tmpMetabObj,
+                                                                      norm_method = 'log2')
           doneNormalization(1)
         }
       }
@@ -990,7 +993,7 @@ server <- function(input, output, session) {
       # Do log2 transformation on data for 'calc_log2FC' if normalization was not performed
       if (doneNormalization() == 0) {
         oriConc <- metadata(metabObj)$aggregated_data$Concentration
-        metadata(metabObj)$aggregated_data$Concentration <- glog2(oriConc)
+        metadata(metabObj)$aggregated_data$Concentration <- MetAlyzer:::glog2(oriConc)
       }
       # Extract samples of interest
       selectedChoiceGp <- input$smpChoiceGpsLog2FC
@@ -1001,9 +1004,9 @@ server <- function(input, output, session) {
         metabObj <- MetAlyzer::filter_meta_data(metabObj, is.na(.data[[selectedChoiceGp]]) |
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
-      metabObj <- calc_log2FC(metalyzer_se = metabObj,
-                              group = selectedChoiceGp,
-                              group_level = selectedChoices)
+      metabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = metabObj,
+                                          group = selectedChoiceGp,
+                                          group_level = selectedChoices)
       reactLog2FCTbl(MetAlyzer:::log2FC(metabObj))
       
       # Update the slider input, for custom inputs

@@ -526,7 +526,9 @@ log2FC <- function(metalyzer_se) {
   return(metalyzer_se@metadata$log2FC)
 }
 
-#' save_plot is a helper function to save plots
+# === Helper functions ===
+
+#' @title Save plots
 #'
 #' @description This function saves a given ggplot object to a specified folder and file format.
 #' It ensures that the folder structure exists and cleans the folder name to remove special characters.
@@ -648,4 +650,187 @@ save_plot <- function(plot,
   ggplot2::ggsave(filename = file_path, plot = plot, width = width, height = height, units = units)
   
   message("Plot saved at: ", file_path)
+}
+
+#' @title Half-minimum imputation
+#' @description Impute NA concentrations using half-minimum (HM) and update the
+#' `Concentration` column in the aggregated data in the input `SummarizedExperiment`
+#' (SE) object. If all values of a feature are NA, they stay NA.
+#'
+#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.
+#' @returns An SE object with the imputed `Concentration` column in the aggregated
+#' data accessible via `metalyzer_se@metadata$aggregated_data`.
+#' 
+#' @importFrom dplyr select filter mutate case_when summarise ungroup
+#' 
+#' @keywords internal
+data_imputation <- function(metalyzer_se) {
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  # Prepare HM values for corresponding features
+  #### Note that aggregated data is already grouped by Metabolite by MetAlyzer
+  HM_feats <- dplyr::filter(aggregated_data, Concentration >= 0, !is.na(Concentration)) %>%
+    dplyr::summarise(HM = min(Concentration) * 0.5)
+  # Do HM imputation, which replaces missing values with half of minimum of observed
+  # values in corresponding variables
+  aggregated_data <- dplyr::left_join(aggregated_data, HM_feats, by = 'Metabolite') %>%
+    #### Let NaN stay NaN for now
+    dplyr::mutate(Concentration = dplyr::case_when(Concentration %in% NA ~ HM,
+                                                   !Concentration %in% NA ~ Concentration)) %>%
+    dplyr::select(-HM) %>%
+    dplyr::ungroup()
+  metalyzer_se@metadata$aggregated_data <- aggregated_data
+  return(metalyzer_se)
+}
+
+#' @title glog2 transformation
+#' @description Perform generalized log2 transformation on data
+#'
+#' @param x A matrix or vector containing numerical values.
+#' @returns A glog2-transformed matrix or vector.
+#' 
+#' @keywords internal
+glog2 <- function(x) {
+  (asinh(x)-log(2))/log(2)
+}
+
+#' @title Normalization
+#' @description Normalize concentration values among samples using glog2 transformation,
+#' median normalization, total ion count (TIC) normalization, or variance stabilizing
+#' normalization (VSN) and update the `Concentration` column in the aggregated data
+#' in the input `SummarizedExperiment` (SE) object.
+#'
+#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.
+#' @param norm_method A character specifying the normalization method to use, which
+#' should be one of 'log2' (default), 'median', 'TIC', or 'VSN'.
+#' @returns An SE object with the normalized `Concentration` column in the aggregated
+#' data accessible via `metalyzer_se@metadata$aggregated_data`.
+#' 
+#' @importFrom dplyr select mutate left_join ungroup
+#' @importFrom tidyr pivot_wider pivot_longer
+#' @importFrom tibble as_tibble column_to_rownames
+#' @import vsn
+#' 
+#' @keywords internal
+data_normalization <- function(metalyzer_se, norm_method = 'log2') {
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  # Create temporary aggregated data for concatenating needed information later
+  #### Do not know why Metabolite column is grouped by MetAlyzer
+  tmp_aggregated_data <- dplyr::ungroup(aggregated_data) %>%
+    dplyr::select(-Concentration)
+  # Prepare data matrix for conducting normalization
+  data_mat <- dplyr::ungroup(aggregated_data) %>%
+    dplyr::select(Metabolite, ID, Concentration) %>%
+    tidyr::pivot_wider(names_from = 'ID', values_from = 'Concentration') %>%
+    tibble::column_to_rownames('Metabolite') %>%
+    as.matrix()
+  if (norm_method %in% 'TIC') {
+    # Do TIC normalization
+    row_sums <- rowSums(data_mat, na.rm = T)
+    median_rowSums <- median(row_sums)
+    norm_data <- apply(data_mat, 2, function(smp_conc) {
+      smp_conc/row_sums * median_rowSums
+    }) %>%
+      MetAlyzer:::glog2()
+  } else if (norm_method %in% 'VSN') {
+    # Do vsn normalization
+    fit <- vsnMatrix(data_mat)
+    norm_data <- predict(fit, data_mat)
+  } else if (norm_method %in% 'median') {
+    # Do median normalization that conducts median scaling on log2 transformed data
+    # Use generalized log2 transformation to avoid -Inf
+    log2_data <- MetAlyzer:::glog2(data_mat)
+    median_smpConc <- apply(log2_data, 2, function(smp_conc) {median(smp_conc, na.rm = T)})
+    median_allVals <- median(log2_data, na.rm = T)
+    norm_data <- sapply(seq_len(ncol(log2_data)), function(i) {
+      log2_data[, i] - median_smpConc[i] + median_allVals
+    })
+    colnames(norm_data) <- colnames(data_mat)
+    
+    # Substantial negative values exist in log2 transformed data due to values smaller
+    # than 1 in original data, which will cause problem in limma::normalizeBetweenArrays
+    # that somehow also performs log transformation..
+    #' Warning message:
+    #' In log(apply(x, 2, median, na.rm = TRUE)) : NaNs produced
+    # norm_data <- glog2(data_mat) %>%
+    #   limma::normalizeBetweenArrays(method = 'scale')
+  } else if (norm_method %in% 'log2') {
+    # Do log2 transformation
+    norm_data <- MetAlyzer:::glog2(data_mat)
+  }
+  # Convert matrix to aggregated long data
+  aggregated_data <- tibble::as_tibble(norm_data, rownames = 'Metabolite') %>%
+    tidyr::pivot_longer(cols = -'Metabolite',
+                        names_to = 'ID',
+                        values_to = 'Concentration') %>%
+    #### Make character columns class factor as original aggregated data
+    dplyr::mutate(Metabolite = factor(Metabolite, levels = levels(tmp_aggregated_data$Metabolite)),
+                  ID = factor(ID, levels = levels(tmp_aggregated_data$ID))) %>%
+    dplyr::left_join(tmp_aggregated_data, by = c('ID', 'Metabolite')) %>%
+    dplyr::select(ID, Metabolite, Class, Concentration, Status)
+  metalyzer_se@metadata$aggregated_data <- aggregated_data
+  return(metalyzer_se)
+}
+
+#' @title Differential analysis
+#' @description Perform differential analysis and add the results table to the input
+#' `SummarizedExperiment` (SE) object. The analysis is conducted using the \pkg{limma}
+#' package, yielding log2 fold changes, p-values, and adjusted p-values. Note that
+#' the input data must already be log2 transformed, and should be subset if the
+#' variable of interest contains more than two groups.
+#' 
+#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.
+#' @param group A character specifying the sample metadata column containing two
+#' groups that will be compared.
+#' @param group_level A length-2 vector of characters specifying the group members
+#' in `group`, which decides the direction of comparisons. For example, c('A', 'B')
+#' compares Group A to B, and vice versa. Default is NULL (alphabetically).
+#' @returns An SE object with an added table of differential analysis results, accessible
+#' via `metalyzer_se@metadata$log2FC`.
+#' 
+#' @keywords internal
+calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
+  aggregated_data <- metalyzer_se@metadata$aggregated_data
+  # Prepare abundance data
+  #### Do not know why Metabolite column is grouped by MetAlyzer
+  feat_data <- dplyr::ungroup(aggregated_data) %>%
+    dplyr::select(Metabolite, ID, Concentration) %>%
+    tidyr::pivot_wider(names_from = 'Metabolite', values_from = 'Concentration')
+  # Prepare sample metadata of interest
+  smp_metadata <- colData(metalyzer_se) %>%
+    tibble::as_tibble(rownames = 'ID')
+  # Use original column names whose spaces are not replaced with '.'
+  colnames(smp_metadata) <- c('ID', colnames(colData(metalyzer_se)))
+  smp_metadata <- dplyr::select(smp_metadata, ID, all_of(group))
+  # Combine abundance data and sample metadata to ensure matched information
+  combined_data <- dplyr::left_join(feat_data, smp_metadata, by = 'ID')
+  # Retrieve data matrix and sample metadata from combined data to conduct limma
+  data_mat <- combined_data[, seq_len(ncol(feat_data))] %>%
+    tibble::column_to_rownames('ID') %>%
+    t()
+  group_vec <- combined_data[, ncol(feat_data)+1, drop = T]
+  # Sanity check if specified 'group' splits data into two groups
+  if (length(unique(group_vec)) != 2) {
+    stop("The specified 'group' does not split data into two groups.")
+  }
+  # Level groups to which samples belong to determine direction of comparison
+  if (!is.null(group_level)) {
+    group_vec <- relevel(factor(group_vec), ref = group_level[2])
+  }
+  
+  # Compute log2(FC), p-values, and adjusted p-values using limma
+  design <- model.matrix(~ group_vec)
+  fit <- limma::lmFit(data_mat, design = design)
+  fit <- limma::eBayes(fit)
+  log2FCRes <- limma::topTable(fit, coef = 2, number = Inf) %>%
+    tibble::rownames_to_column('Metabolite') %>%
+    dplyr::select(Metabolite, logFC, t, P.Value, adj.P.Val) %>%
+    dplyr::rename(log2FC = logFC, tval = t, pval = P.Value, qval = adj.P.Val)
+  # Combined all information into a table
+  group_info <- combined_data[, c(1, ncol(feat_data)+1)]
+  log2FCTab <- dplyr::left_join(aggregated_data, group_info, by = 'ID') %>%
+    dplyr::left_join(log2FCRes, by = 'Metabolite') %>%
+    dplyr::select(Metabolite, Class, log2FC, tval, pval, qval) %>%
+    dplyr::distinct(Metabolite, .keep_all = TRUE)
+  metalyzer_se@metadata$log2FC <- log2FCTab
+  return(metalyzer_se)
 }

@@ -14,8 +14,8 @@ create_viridis_style(
 \arguments{
 \item{color_scale}{The name of the palette (e.g., "Magma", "Viridis").}
 
-\item{type}{The desired output type: "scale" (for a color bar) or "hex"
-(for a vector of hex codes). Defaults to "scale".}
+\item{type}{The desired output type: "scale" (for a color bar), "hex" or "inital"
+(for a color scalde, a vector of hex codes, or the correct scale for viridis package). Defaults to "scale".}
 
 \item{data}{The data frame containing the values. Only required if type = "hex".}
 
