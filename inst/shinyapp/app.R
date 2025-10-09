@@ -13,12 +13,12 @@ library(htmlwidgets)
 library(svglite)
 library(writexl)
 library(bslib)
-source("utils.R")
 library(viridis)
 library(viridisLite)
 library(gridExtra)
 
 ui <- fluidPage(
+  # Define notification styles for 'Process' and 'Revert/Default' buttons
   tags$head(
     tags$style(HTML("
       .shiny-notification {
@@ -143,18 +143,42 @@ ui <- fluidPage(
                              shinyBS::bsCollapsePanel('Data distribution', style = 'primary',
                                                       uiOutput('updateGpColsDatDist'),
                                                       plotly::plotlyOutput('plotDatDist') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C")),
+                                                        shinycssloaders::withSpinner(color="#56070C"),
+                                                      fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
+                                                               column(width = 2,
+                                                                      selectInput("formatDatDist", label = NULL,
+                                                                                  choices = c("html", "png", "pdf", "svg"),
+                                                                                  selected = "html")),
+                                                               column(width = 2, downloadButton("downloadDatDist",
+                                                                                                "Download")))
+                                                      ),
                              shinyBS::bsCollapsePanel('Data completeness', style = 'primary',
                                                       shinyBS::bsCollapsePanel('Hint', style = 'success',
                                                                                textOutput('summDatComplete', container = strong)),
                                                       plotly::plotlyOutput('plotDatComplete') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C")),
+                                                        shinycssloaders::withSpinner(color="#56070C"),
+                                                      fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
+                                                               column(width = 2,
+                                                                      selectInput("formatDatComplete", label = NULL,
+                                                                                  choices = c("html", "png", "pdf", "svg"),
+                                                                                  selected = "html")),
+                                                               column(width = 2, downloadButton("downloadDatComplete",
+                                                                                                "Download")))
+                                                      ),
                              shinyBS::bsCollapsePanel('Quantification status', style = 'primary',
                                                       #### Adjust tab size
                                                       shinyBS::bsCollapsePanel('Hint', style = 'success',
                                                                                textOutput('summQuanStatus', container = strong)),
                                                       plotly::plotlyOutput('plotQuanStatus') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C"))
+                                                        shinycssloaders::withSpinner(color="#56070C"),
+                                                      fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
+                                                               column(width = 2,
+                                                                      selectInput("formatQuanStatus", label = NULL,
+                                                                                  choices = c("html", "png", "pdf", "svg"),
+                                                                                  selected = "html")),
+                                                               column(width = 2, downloadButton("downloadQuanStatus",
+                                                                                                "Download")))
+                                                      )
                            )
           )
         )
@@ -212,7 +236,6 @@ ui <- fluidPage(
                            tags$h4(strong('Vulcano plot'), style = "margin-top:1rem;"),
                            plotly::plotlyOutput('plotVolcano') %>%
                              shinycssloaders::withSpinner(color="#56070C"),
-                           #### Provide option of downloading static plot?
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
                                     column(width = 2, 
                                            selectInput("formatVulcano", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
@@ -524,7 +547,7 @@ server <- function(input, output, session) {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
         tags$strong('Please check if the uploaded file is exported from MetIDQ Software.'),
-        checkboxInput("check1", "Is the file exported from MetIDQ?", value = FALSE),
+        checkboxInput("check1", "Is the file exported from WebIDQ?", value = FALSE),
         checkboxInput("check2", "Does the file contain the 'Class' cell?", value = FALSE),
         checkboxInput("check3", "Does the file contain the 'Sample Type' column?", value = FALSE),
         checkboxInput("check4", "The Sample Type column contains the value 'Sample'? (only for rows with samples)", value = FALSE),
@@ -1143,6 +1166,8 @@ server <- function(input, output, session) {
   })
   
   
+  # Create reactive object for storing static overview plots for downloading
+  reactOverviewPlots <- reactiveValues(datDist = NULL, datComplete = NULL, quanStatus = NULL)
   # Show data overviews
   # Data distribution
   output$updateGpColsDatDist <- renderUI({
@@ -1179,6 +1204,9 @@ server <- function(input, output, session) {
     if (doneNormalization() == 0) {
       g <- g + scale_y_log10()
     }
+    # Update reactive object
+    reactOverviewPlots$datDist <- g
+    
     ggplotly(g)
   })
   
@@ -1206,14 +1234,16 @@ server <- function(input, output, session) {
       dplyr::group_by(ID, Completeness) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
-    ggplotly(
-      ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
-        geom_col(position = 'stack') +
-        scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
-        labs(x = 'Sample') +
-        theme_bw() +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-    )
+    g <- ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
+      geom_col(position = 'stack') +
+      scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
+      labs(x = 'Sample') +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    # Update reactive object
+    reactOverviewPlots$datComplete <- g
+    
+    ggplotly(g)
   })
   
   # Quantification status
@@ -1232,16 +1262,16 @@ server <- function(input, output, session) {
       dplyr::group_by(ID, Status) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
-
     status2Color <- c('Valid'='#33a02c', 'LOQ'='#1f78b4', 'LOD'='#ff7f00', 'Invalid'='#e31a1c')
-    
     g <- ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
         geom_col(position = "stack") +
         scale_fill_manual(values = status2Color) +
         labs(x = "Sample") +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-        
+    # Update reactive object
+    reactOverviewPlots$quanStatus <- g    
+    
     plotly::ggplotly(g)
 })
   
@@ -1317,13 +1347,13 @@ server <- function(input, output, session) {
   output$plotVolcano <- plotly::renderPlotly({
     req(reactLog2FCTbl())
     if (!input$highlightVulcano) {
-      plotly_vulcano(reactLog2FCTbl(),
-                     x_cutoff = input$plotVolcanoLog2FCCutoff,
-                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+      MetAlyzer:::plotly_vulcano(reactLog2FCTbl(),
+                                 x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                 y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
     } else {
-      plotly_vulcano(reactVulcanoHighlight(),
-                     x_cutoff = input$plotVolcanoLog2FCCutoff,
-                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+      MetAlyzer:::plotly_vulcano(reactVulcanoHighlight(),
+                                 x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                 y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
     }
   })
   
@@ -1331,16 +1361,16 @@ server <- function(input, output, session) {
   output$plotScatter <- plotly::renderPlotly({
     req(reactLog2FCTbl())
     # if (!input$highlightVulcano) {
-    #   plot <- plotly_scatter(reactLog2FCTbl())
+    #   plot <- MetAlyzer:::plotly_scatter(reactLog2FCTbl())
     # } else {
-    #   plot <- plotly_scatter(reactVulcanoHighlight())
+    #   plot <- MetAlyzer:::plotly_scatter(reactVulcanoHighlight())
     # }
-    plot <- plotly_scatter(reactLog2FCTbl())
+    plot <- MetAlyzer:::plotly_scatter(reactLog2FCTbl())
     hide_legend(plot$Plot)
   })
   output$plotScatterLegend <- renderImage({
     req(reactLog2FCTbl()) 
-    plot <- plotly_scatter(reactLog2FCTbl())
+    plot <- MetAlyzer:::plotly_scatter(reactLog2FCTbl())
     legend <- plot$Legend
     # A temp file to save the output.
     # This file will be removed later by renderImage
@@ -1362,7 +1392,7 @@ server <- function(input, output, session) {
     req(reactLog2FCTbl())
 
     # Call the expensive function just one time
-    plotly_network(
+    MetAlyzer:::plotly_network(
       reactLog2FCTbl(),
       values_col_name = input$networkValueColumn,
       exclude_pathways = input$networkExcludePathways,
@@ -1401,7 +1431,7 @@ server <- function(input, output, session) {
       dplyr::filter(.data$Class != "NA") %>%
       dplyr::mutate(Class = as.factor(Class))
     
-    plotly_vulcano(nodes_selected2)
+    MetAlyzer:::plotly_vulcano(nodes_selected2)
   })
   observeEvent(network_data(), {
     # Get the table of nodes from our central reactive
@@ -1437,6 +1467,59 @@ server <- function(input, output, session) {
     updateSelectInput(session, "formatNetwork", selected = "html")
   })
   
+  
+  # Download data overview
+  # Data distribution
+  output$downloadDatDist <- downloadHandler(
+    filename = function() {
+      paste0("data_distribution_", Sys.Date(), '.', input$formatDatDist)
+    },
+    content = function(file) {
+      if (input$formatDatDist == "html") {
+        final_plot <- ggplotly(reactOverviewPlots$datDist)
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
+      } else {
+        final_plot <- reactOverviewPlots$datDist
+        ggsave(filename = file, plot = final_plot, device = input$formatDatDist,
+               dpi = 400, units = "cm", width = 32.0, height = 21.0)
+      }
+    }
+  )
+  
+  # Missing pattern
+  output$downloadDatComplete <- downloadHandler(
+    filename = function() {
+      paste0("missing_pattern_", Sys.Date(), '.', input$formatDatComplete)
+    },
+    content = function(file) {
+      if (input$formatDatComplete == "html") {
+        final_plot <- ggplotly(reactOverviewPlots$datComplete)
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
+      } else {
+        final_plot <- reactOverviewPlots$datComplete
+        ggsave(filename = file, plot = final_plot, device = input$formatDatComplete,
+               dpi = 400, units = "cm", width = 32.0, height = 21.0)
+      }
+    }
+  )
+  
+  # Quantification status
+  output$downloadQuanStatus <- downloadHandler(
+    filename = function() {
+      paste0("quant_status_", Sys.Date(), '.', input$formatQuanStatus)
+    },
+    content = function(file) {
+      if (input$formatQuanStatus == "html") {
+        final_plot <- ggplotly(reactOverviewPlots$quanStatus)
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
+      } else {
+        final_plot <- reactOverviewPlots$quanStatus
+        ggsave(filename = file, plot = final_plot, device = input$formatQuanStatus,
+               dpi = 400, units = "cm", width = 32.0, height = 21.0)
+      }
+    }
+  )
+  
   # Download log2(FC) visuals
   # Vulcano plot
   output$downloadVulcanoPlot <- downloadHandler(
@@ -1447,26 +1530,26 @@ server <- function(input, output, session) {
       if (input$formatVulcano == "html") {
         if (input$highlightVulcano) {
           req(reactVulcanoHighlight())
-          final_plot <- plotly_vulcano(reactVulcanoHighlight(), 
-                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+          final_plot <- MetAlyzer:::plotly_vulcano(reactVulcanoHighlight(), 
+                                                   x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                                   y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         } else {
-          final_plot <- plotly_vulcano(reactLog2FCTbl(), 
-                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+          final_plot <- MetAlyzer:::plotly_vulcano(reactLog2FCTbl(), 
+                                                   x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                                   y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         }
         htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
         if (input$highlightVulcano) {
           req(reactVulcanoHighlight())
-          final_plot <- plot_vulcano(reactVulcanoHighlight(), 
-                                     x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff),
-                                     show_labels_for = input$metabChoicesVulcano)
+          final_plot <- MetAlyzer:::plot_vulcano(reactVulcanoHighlight(), 
+                                                 x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                                 y_cutoff = as.numeric(input$plotVolcanoPValCutoff),
+                                                 show_labels_for = input$metabChoicesVulcano)
         } else {
-          final_plot <- plot_vulcano(reactLog2FCTbl(), 
-                                     x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+          final_plot <- MetAlyzer:::plot_vulcano(reactLog2FCTbl(), 
+                                                 x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                                 y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         }
         ggsave(filename = file, plot = final_plot, device = input$formatVulcano,
                dpi = 400, units = "cm", width = 38.0, height = 21.0)
@@ -1481,11 +1564,11 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       if (input$formatScatter == "html") {
-        htmlwidgets::saveWidget(plotly_scatter(reactLog2FCTbl())$Plot, file, selfcontained = TRUE)
+        htmlwidgets::saveWidget(MetAlyzer:::plotly_scatter(reactLog2FCTbl())$Plot, file, selfcontained = TRUE)
       } else {
         #### Make theme similar to vulcano plot for better visualization
         ggsave(filename = file, plot = MetAlyzer::plot_scatter(reactLog2FCTbl()),
-               device = input$formatScatter, dpi = 400, units = "cm", width = 32.0, height = 21.0)
+               device = input$formatScatter, dpi = 400, units = "cm", width = 38.0, height = 21.0)
       }
     }
   )
@@ -1497,17 +1580,7 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       if (input$formatNetwork == "html") {
-        final_plot <- plotly_network(
-          reactLog2FCTbl(),
-          values_col_name = input$networkValueColumn,
-          exclude_pathways = input$networkExcludePathways,
-          metabolite_node_size = input$networkMetaboliteNodeSize,
-          connection_width = input$networkConnectionWidth,
-          pathway_text_size = input$networkPathwayTextSize,
-          pathway_width = input$networkPathwayWidth,
-          plot_height = input$networkPlotHeight*100,
-          color_scale = input$networkColorScale
-        )$Plot
+        final_plot <- network_data()$Plot
         htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
         final_plot <- MetAlyzer::plot_network(reactLog2FCTbl(),
@@ -1516,7 +1589,7 @@ server <- function(input, output, session) {
                                               color_scale = input$networkColorScale
                                               )$Plot
         ggsave(filename = file, plot = final_plot, device = input$formatNetwork,
-               dpi = 400, units = "cm", width = 32.0, height = 21.0)
+               dpi = 400, units = "cm", width = 38.0, height = 21.0)
       }
     }
   )
@@ -1543,14 +1616,14 @@ server <- function(input, output, session) {
     )
     new_id <- showNotification(
       ui = notification_ui,
-      duration = 20,
+      duration = 10,
       closeButton = TRUE,
-      type = "error"
+      type = "default"
     )
     current_notification_id(new_id)
   })
 
-  # 2. Notification for the "Revert/default" button
+  # 2. Notification for the "Revert/Default" button
   observeEvent(input$revertProcessing, {
     if (!is.null(current_notification_id())) {
       removeNotification(current_notification_id())
@@ -1559,7 +1632,7 @@ server <- function(input, output, session) {
     new_id <- showNotification(
       "Processing undone. Parameters reverted to default.",
       duration = 5,
-      type = "message"
+      type = "warning"
     )
     current_notification_id(new_id)
   })
