@@ -136,7 +136,8 @@ ui <- fluidPage(
           ),
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            shinyBS::bsCollapse(
-                             open = c('Data distribution', 'Data completeness'), multiple = T,
+                             # Note that collapsed panel does not render output until it is expanded
+                             open = c('Data distribution', 'Data completeness', 'Quantification status'), multiple = T,
                              shinyBS::bsCollapsePanel('Sample metadata', style = 'primary',
                                                       DT::dataTableOutput('tblSmpMetadat') %>%
                                                         shinycssloaders::withSpinner(color="#56070C")),
@@ -405,6 +406,13 @@ ui <- fluidPage(
                                                  )
                                 )
                          )
+                       ),
+                       tags$br(),
+                       tags$br(),
+                       shinyBS::bsCollapse(
+                         open = 'Command History',
+                         shinyBS::bsCollapsePanel('Command History', style = 'warning',
+                                                  verbatimTextOutput('textCommands'))
                        )
       )
     )
@@ -439,6 +447,8 @@ server <- function(input, output, session) {
     # smpMetadatTblList = list(),
     metabAggreTblList = list()
   )
+  # Create reactive object for recording R commands executed to show users
+  reactCodeHistory <- reactiveVal()
   
   # Show fileInput only when example data is not used
   output$updateFileInput <- renderUI({
@@ -500,6 +510,15 @@ server <- function(input, output, session) {
     
     # Check box indicating if file was generated before 2023, because example file is
     updateCheckboxInput(session, 'ifUploadedFilePrior2023', value = T)
+    
+    # Record command executed
+    reactCodeHistory('# Initialize MetAlyzer SE object with example data')
+    reactCodeHistory(c(reactCodeHistory(),
+                       'MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_rawdata_extraction(), silent = TRUE)'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       '# Exclude "Metabolism Indicators"'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       'metabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = "Metabolism Indicators", drop_NA_concentration = FALSE)'))
   })
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
@@ -543,6 +562,15 @@ server <- function(input, output, session) {
       reactParamList$featValidStatus <- c()
       reactParamList$imputation <- F
       reactParamList$normalization <- 'None'
+      
+      # Record command executed
+      reactCodeHistory('# Initialize MetAlyzer SE object')
+      reactCodeHistory(c(reactCodeHistory(),
+                         'metabObj <- MetAlyzer::read_metidq(conc_file_path = "path_to_your_file", sheet = 1, silent = TRUE)'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         '# Exclude "Metabolism Indicators" if they exist'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         'metabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = "Metabolism Indicators", drop_NA_concentration = FALSE)'))
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -1163,6 +1191,12 @@ server <- function(input, output, session) {
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
     )
+  })
+  
+  # Log of commands executed
+  output$textCommands <- renderText({
+    req(reactMetabObj$metabObj)
+    paste0(reactCodeHistory(), collapse = '\n')
   })
   
   
