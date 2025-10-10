@@ -511,14 +511,21 @@ server <- function(input, output, session) {
     # Check box indicating if file was generated before 2023, because example file is
     updateCheckboxInput(session, 'ifUploadedFilePrior2023', value = T)
     
-    # Record command executed
-    reactCodeHistory('# Initialize MetAlyzer SE object with example data')
+    # Record commands executed
+    reactCodeHistory('######## Data Preparation ########')
     reactCodeHistory(c(reactCodeHistory(),
-                       'MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_rawdata_extraction(), silent = TRUE)'))
+                       '# Initialize MetAlyzer SE object with example data'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       'MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_rawdata_extraction())'))
     reactCodeHistory(c(reactCodeHistory(),
                        '# Exclude "Metabolism Indicators"'))
     reactCodeHistory(c(reactCodeHistory(),
-                       'metabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = "Metabolism Indicators", drop_NA_concentration = FALSE)'))
+                       'metabObj <- MetAlyzer::filter_metabolites(metalyzer_se = metabObj, drop_metabolites = "Metabolism Indicators")'))
+    reactCodeHistory(c(reactCodeHistory(), '\n'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       '# Visualize data distribution, missing pattern, and quantification quality using plotly::ggplotly()'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       '# Check source code about how data missingness and quantification status are summarized'))
   })
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
@@ -563,14 +570,21 @@ server <- function(input, output, session) {
       reactParamList$imputation <- F
       reactParamList$normalization <- 'None'
       
-      # Record command executed
-      reactCodeHistory('# Initialize MetAlyzer SE object')
+      # Record commands executed
+      reactCodeHistory('######## Data Preparation ########')
       reactCodeHistory(c(reactCodeHistory(),
-                         'metabObj <- MetAlyzer::read_metidq(conc_file_path = "path_to_your_file", sheet = 1, silent = TRUE)'))
+                         '# Initialize MetAlyzer SE object'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         'metabObj <- MetAlyzer::read_metidq(conc_file_path = "path_to_your_file")'))
       reactCodeHistory(c(reactCodeHistory(),
                          '# Exclude "Metabolism Indicators" if they exist'))
       reactCodeHistory(c(reactCodeHistory(),
-                         'metabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = "Metabolism Indicators", drop_NA_concentration = FALSE)'))
+                         'metabObj <- MetAlyzer::filter_metabolites(metalyzer_se = metabObj, drop_metabolites = "Metabolism Indicators")'))
+      reactCodeHistory(c(reactCodeHistory(), '\n'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         '# Visualize data distribution, missing pattern, and quantification quality using plotly::ggplotly()'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         '# Check source code about how data missingness and quantification status are summarized'))
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
@@ -719,6 +733,9 @@ server <- function(input, output, session) {
   doneNormalization <- reactiveVal(0)
   # Create reactive values to monitor if any parameter is changed
   ifParamChange <- reactiveVal(0)
+  # Create reactive values to monitor if filtering is conducted for recording commands executed
+  doneSmpFiltering <- reactiveVal(0)
+  doneFeatFiltering <- reactiveVal(0)
   
   # Rerun data processing if any parameter is changed, so that processing can follow
   # order from sample filtering, feature filtering, imputation, to normalization
@@ -736,6 +753,10 @@ server <- function(input, output, session) {
       reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
       doneImputation(0)
       doneNormalization(0)
+      doneSmpFiltering(0)
+      doneFeatFiltering(0)
+      # Remove record of 'Data Preprocessing' part if preprocessing is re-conducted
+      reactCodeHistory(reactCodeHistory()[seq(8)])
       
       reactParamList$smpFiltering <- c()
       reactParamList$featFiltering <- c()
@@ -789,6 +810,7 @@ server <- function(input, output, session) {
           }
         }
       }
+      doneSmpFiltering(1) #for command history
     }
     # Avoid app crash when no sample is left
     if (ncol(reactMetabObj$tmpMetabObj) == 0) {
@@ -837,6 +859,11 @@ server <- function(input, output, session) {
                                                                  min_percent_valid = featValidCutoff,
                                                                  valid_status = featValidStatus,
                                                                  per_group = NULL)
+      if (any(!is.null(rmSelectedFeats), featCompleteCutoff != 0,
+              featValidCutoff != 0 & !all(c('Valid', 'LOQ', 'LOD', 'Invalid') %in% featValidStatus))) {
+        doneFeatFiltering(1) #for command history
+      }
+      
       # Avoid app crash when no feature is left, e.g., min_percent_valid > 0 and valid_status == c()
       if (nrow(reactMetabObj$tmpMetabObj) == 0) {
         showModal(modalDialog(
@@ -937,6 +964,41 @@ server <- function(input, output, session) {
         # Return reactive ifParamChange to 0, so this chunk will run only if any
         # parameter is changed
         ifParamChange(0)
+        
+        # Record commands executed
+        if (any(doneSmpFiltering() != 0, doneFeatFiltering() != 0,
+                doneImputation() != 0, doneNormalization() != 0)) {
+          # Remove 'Differential Analysis' part if it is already recorded
+          if ('######## Differential Analysis ########' %in% reactCodeHistory()) {
+            reactCodeHistory(head(reactCodeHistory(), -10))
+          }
+          reactCodeHistory(c(reactCodeHistory(), '\n'))
+          reactCodeHistory(c(reactCodeHistory(), '######## Data Preprocessing ########'))
+          if (doneSmpFiltering() != 0) {
+            reactCodeHistory(c(reactCodeHistory(),
+                               '# Filter samples based on selected samples/sample groups'))
+            reactCodeHistory(c(reactCodeHistory(),
+                               'metabObj <- MetAlyzer::filter_meta_data(metalyzer_se = metabObj, ...)'))
+          }
+          if (doneFeatFiltering() != 0) {
+            reactCodeHistory(c(reactCodeHistory(),
+                               '# Filter metabolites based on selected metabolites/metabolic classes or specified parameters'))
+            reactCodeHistory(c(reactCodeHistory(),
+                               'metabObj <- MetAlyzer::filter_metabolites(metalyzer_se = metabObj, ...)'))
+          }
+          if (doneImputation() != 0) {
+            reactCodeHistory(c(reactCodeHistory(),
+                               '# Impute data using half-minimum'))
+            reactCodeHistory(c(reactCodeHistory(),
+                               'metabObj <- MetAlyzer:::data_imputation(metalyzer_se = metabObj)'))
+          }
+          if (doneNormalization() != 0) {
+            reactCodeHistory(c(reactCodeHistory(),
+                               '# Normalize data using selected method ("log2", "median", "TIC")'))
+            reactCodeHistory(c(reactCodeHistory(),
+                               'metabObj <- MetAlyzer:::data_normalization(metalyzer_se = metabObj, norm_method = "selected_method")'))
+          }
+        }
       } 
     } else {
       # Revert temporary MetAlyzer object to origin for redoing filtering
@@ -951,6 +1013,10 @@ server <- function(input, output, session) {
     doneImputation(0)
     doneNormalization(0)
     ifParamChange(0)
+    doneSmpFiltering(0)
+    doneFeatFiltering(0)
+    # Remove record of 'Data Preprocessing' part if preprocessing is re-conducted
+    reactCodeHistory(reactCodeHistory()[seq(8)])
     
     # Set parameters for feature filtering back to default
     # if ('Metabolism Indicators' %in% unlist(featChoices())) {
@@ -1059,6 +1125,29 @@ server <- function(input, output, session) {
                                           group = selectedChoiceGp,
                                           group_level = selectedChoices)
       reactLog2FCTbl(MetAlyzer:::log2FC(metabObj))
+      
+      # Record commands executed
+      # Avoid recording if differential analysis is re-conducted
+      if (!'######## Differential Analysis ########' %in% reactCodeHistory()) {
+        reactCodeHistory(c(reactCodeHistory(), '\n'))
+        reactCodeHistory(c(reactCodeHistory(), '######## Differential Analysis ########'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           '# Compare selected Group1 with Group2 stored in sample metadata variable'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           'metabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = metabObj, group = "sample_metadata_variable")'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           '# Make interactive vulcano plot with selected cutoffs'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           'MetAlyzer:::plotly_vulcano(MetAlyzer::log2FC(metabObj), ...)'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           '# Make interactive scatter plot'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           'MetAlyzer:::plotly_scatter(MetAlyzer::log2FC(metabObj))$Plot'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           '# Make interactive network diagram with specified parameters'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           'MetAlyzer:::plotly_network(MetAlyzer::log2FC(metabObj), ...)'))
+      }
       
       # Update the slider input, for custom inputs
       updateSliderInput(session, "plotVolcanoLog2FCCutoff",
