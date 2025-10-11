@@ -412,10 +412,15 @@ ui <- fluidPage(
                        ),
                        tags$br(),
                        tags$br(),
-                       shinyBS::bsCollapse(
-                         open = 'Command History',
-                         shinyBS::bsCollapsePanel('Command History', style = 'warning',
-                                                  verbatimTextOutput('textCommands'))
+                       fluidRow(
+                         column(width = 7, shinyBS::bsCollapse(
+                           open = 'Command History (Last Operation)',
+                           shinyBS::bsCollapsePanel('Command History (Last Operation)', style = 'warning',
+                                                    verbatimTextOutput('textCommands'),
+                                                    downloadButton('downloadSessionInfo', 'Download session info'),
+                                                    shinyBS::bsTooltip('downloadSessionInfo',
+                                                                       'Critical for scientific reporting (e.g., package versions).'))
+                         ))
                        )
       )
     )
@@ -1290,6 +1295,16 @@ server <- function(input, output, session) {
     req(reactMetabObj$metabObj)
     paste0(reactCodeHistory(), collapse = '\n')
   })
+  # Downloading of R session info
+  output$downloadSessionInfo <- downloadHandler(
+    filename = function() {
+      paste0("session_info_", Sys.Date(), '.txt')
+    },
+    content = function(file) {
+      rSessionInfo <- utils::capture.output(utils::sessionInfo())
+      writeLines(rSessionInfo, con = file)
+    }
+  )
   
   
   # Create reactive object for storing static overview plots for downloading
