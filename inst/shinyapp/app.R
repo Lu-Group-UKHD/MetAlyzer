@@ -137,10 +137,8 @@ ui <- fluidPage(
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            shinyBS::bsCollapse(
                              # Note that collapsed panel does not render output until it is expanded
-                             open = c('Data distribution', 'Data completeness', 'Quantification status'), multiple = T,
-                             shinyBS::bsCollapsePanel('Sample metadata', style = 'primary',
-                                                      DT::dataTableOutput('tblSmpMetadat') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C")),
+                             open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata'),
+                             multiple = T,
                              shinyBS::bsCollapsePanel('Data distribution', style = 'primary',
                                                       uiOutput('updateGpColsDatDist'),
                                                       plotly::plotlyOutput('plotDatDist') %>%
@@ -179,7 +177,12 @@ ui <- fluidPage(
                                                                                   selected = "html")),
                                                                column(width = 2, downloadButton("downloadQuanStatus",
                                                                                                 "Download")))
-                                                      )
+                                                      ),
+                             shinyBS::bsCollapsePanel('Sample metadata', style = 'primary',
+                                                      DT::dataTableOutput('tblSmpMetadat') %>%
+                                                      # Render table outside collapsed panel and display it (NOT WORKING)
+                                                      # uiOutput('uiTblSmpMetadat') %>%
+                                                        shinycssloaders::withSpinner(color="#56070C"))
                            )
           )
         )
@@ -1340,6 +1343,10 @@ server <- function(input, output, session) {
     DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
   })
+  # Render table outside collapsed panel and display it (NOT WORKING)
+  # output$uiTblSmpMetadat <- renderUI({
+  #   DT::dataTableOutput('tblSmpMetadat')
+  # })
   
   # Data completeness
   output$summDatComplete <- renderText({
