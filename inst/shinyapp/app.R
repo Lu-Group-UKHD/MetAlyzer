@@ -136,11 +136,26 @@ ui <- fluidPage(
           ),
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            shinyBS::bsCollapse(
+                             id = 'panelDatOverviewViz',
                              # Note that collapsed panel does not render output until it is expanded
                              open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata'),
                              multiple = T,
+                             shinyBS::bsCollapsePanel('Sample metadata', style = 'primary',
+                                                      DT::dataTableOutput('tblSmpMetadat') %>%
+                                                      # Render table outside collapsed panel and display it (NOT WORKING)
+                                                      # uiOutput('uiTblSmpMetadat') %>%
+                                                        shinycssloaders::withSpinner(color="#56070C")),
                              shinyBS::bsCollapsePanel('Data distribution', style = 'primary',
-                                                      uiOutput('updateGpColsDatDist'),
+                                                      fluidRow(
+                                                        style = 'display:flex; align-items: center;',
+                                                        column(width = 7, shinyBS::bsCollapse(
+                                                          id = 'hintDatDist',
+                                                          open = '💡Hint',
+                                                          shinyBS::bsCollapsePanel('💡Hint', style = 'success',
+                                                                                   textOutput('summDatDist', container = strong))
+                                                        )),
+                                                        column(width = 4, offset = 1, uiOutput('updateGpColsDatDist'))
+                                                      ),
                                                       plotly::plotlyOutput('plotDatDist') %>%
                                                         shinycssloaders::withSpinner(color="#56070C"),
                                                       fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
@@ -152,8 +167,16 @@ ui <- fluidPage(
                                                                                                 "Download")))
                                                       ),
                              shinyBS::bsCollapsePanel('Data completeness', style = 'primary',
-                                                      shinyBS::bsCollapsePanel('Hint', style = 'success',
-                                                                               textOutput('summDatComplete', container = strong)),
+                                                      fluidRow(
+                                                        column(width = 7,
+                                                               shinyBS::bsCollapse(
+                                                                 id = 'hintDatComplete',
+                                                                 open = '💡Hint',
+                                                                 shinyBS::bsCollapsePanel('💡Hint', style = 'success',
+                                                                                          textOutput('summDatComplete', container = strong))
+                                                               )
+                                                        )
+                                                      ),
                                                       plotly::plotlyOutput('plotDatComplete') %>%
                                                         shinycssloaders::withSpinner(color="#56070C"),
                                                       fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
@@ -166,8 +189,16 @@ ui <- fluidPage(
                                                       ),
                              shinyBS::bsCollapsePanel('Quantification status', style = 'primary',
                                                       #### Adjust tab size
-                                                      shinyBS::bsCollapsePanel('Hint', style = 'success',
-                                                                               textOutput('summQuanStatus', container = strong)),
+                                                      fluidRow(
+                                                        column(width = 7,
+                                                               shinyBS::bsCollapse(
+                                                                 id = 'hintQuanStatus',
+                                                                 open = '💡Hint',
+                                                                 shinyBS::bsCollapsePanel('💡Hint', style = 'success',
+                                                                                          textOutput('summQuanStatus', container = strong))
+                                                               )
+                                                        )
+                                                      ),
                                                       plotly::plotlyOutput('plotQuanStatus') %>%
                                                         shinycssloaders::withSpinner(color="#56070C"),
                                                       fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
@@ -177,12 +208,7 @@ ui <- fluidPage(
                                                                                   selected = "html")),
                                                                column(width = 2, downloadButton("downloadQuanStatus",
                                                                                                 "Download")))
-                                                      ),
-                             shinyBS::bsCollapsePanel('Sample metadata', style = 'primary',
-                                                      DT::dataTableOutput('tblSmpMetadat') %>%
-                                                      # Render table outside collapsed panel and display it (NOT WORKING)
-                                                      # uiOutput('uiTblSmpMetadat') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C"))
+                                                      )
                            )
           )
         )
@@ -414,6 +440,7 @@ ui <- fluidPage(
                        tags$br(),
                        fluidRow(
                          column(width = 7, shinyBS::bsCollapse(
+                           id = 'panelCommands',
                            open = 'Command History (Last Operation)',
                            shinyBS::bsCollapsePanel('Command History (Last Operation)', style = 'warning',
                                                     verbatimTextOutput('textCommands'),
@@ -457,6 +484,13 @@ server <- function(input, output, session) {
   )
   # Create reactive object for recording R commands executed to show users
   reactCodeHistory <- reactiveVal()
+  
+  # Close expanded panels (due to rendering) right after output is rendered 
+  observeEvent(reactMetabObj$oriMetabObj, ({
+    shinyBS::updateCollapse(session, 'hintDatDist', close = '💡Hint')
+    shinyBS::updateCollapse(session, 'hintDatComplete', close = '💡Hint')
+    shinyBS::updateCollapse(session, 'hintQuanStatus', close = '💡Hint')
+  }))
   
   # Show fileInput only when example data is not used
   output$updateFileInput <- renderUI({
@@ -1311,6 +1345,10 @@ server <- function(input, output, session) {
   reactOverviewPlots <- reactiveValues(datDist = NULL, datComplete = NULL, quanStatus = NULL)
   # Show data overviews
   # Data distribution
+  output$summDatDist <- renderText({
+    req(datOverviewPack()$metabAggreTbl)
+    'Is the dataset already log-transformed? If so, normalization should not be applied again.'
+  })
   output$updateGpColsDatDist <- renderUI({
     req(smpChoicePack()$smpChoiceList)
     smpChoiceList <- smpChoicePack()$smpChoiceList
@@ -1322,9 +1360,14 @@ server <- function(input, output, session) {
     } else {
       smpChoiceGps <- names(smpChoiceList)
     }
-    selectInput('gpColsDatDist', 'Color by:',
-                choices = c('None', smpChoiceGps),
-                selected = 'None', multiple = F)
+    # Make label on left side, rather than top
+    div(
+      style = "display: flex; align-items: center;",
+      tags$label("Color by:", style = "margin-right: 10px; margin-bottom: 15px;"),
+      selectInput('gpColsDatDist', NULL,
+                  choices = c('None', smpChoiceGps),
+                  selected = 'None', multiple = F)
+    )
   })
   output$plotDatDist <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl, input$gpColsDatDist)
@@ -1356,7 +1399,8 @@ server <- function(input, output, session) {
     req(datOverviewPack()$smpMetadatTbl)
     smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
     DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
-                  selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
+                  selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
+                  options = list(pageLength = 5))
   })
   # Render table outside collapsed panel and display it (NOT WORKING)
   # output$uiTblSmpMetadat <- renderUI({
