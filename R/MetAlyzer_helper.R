@@ -683,7 +683,7 @@ plotly_network <- function(Log2FCTab,
   
   nodes_joined <- dplyr::left_join(nodes_separated, Log2FCTab, by = c("Metabolites" = metabolite_col_name))
   
-  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_sep_df = nodes_joined, nodes_orig_df = nodes, q_value = q_value, stat_col_name = stat_col_name, c("log2FC", "pval", "qval"))
+  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_sep_df = nodes_joined, nodes_orig_df = nodes, q_value = q_value, stat_col_name = stat_col_name, c("log2FC", "pval", "qval", "tval"))
   
   ### --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
@@ -795,7 +795,8 @@ plotly_network <- function(Log2FCTab,
       hovertext = paste0("log2 Fold Change: ", round(nodes_original_processed$log2FC[i], 5),
                          "\nPathway: ", nodes_original_processed$Pathway[i],
                          "\nadj. p-value: ", round(nodes_original_processed$qval[i], 5),
-                         "\np-value: ", round(nodes_original_processed$pval[i], 5))
+                         "\np-value: ", round(nodes_original_processed$pval[i], 5),
+                         "\nt-value: ", round(nodes_original_processed$tval[i], 5))
     )
   }
   

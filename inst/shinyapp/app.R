@@ -357,7 +357,7 @@ ui <- fluidPage(
                                                     # Column Name Selector --- ADDED
                                                     div(style = "min-width: 150px; margin: 5px;",
                                                         selectInput("networkValueColumn", "Plotted Value",
-                                                                    choices = c("log2FC", "pval", "qval"),
+                                                                    choices = c("log2FC", "pval", "qval", "tval"),
                                                                     selected = "log2FC")
                                                     ),
                                                     #Download controls --- MOVED
