@@ -391,6 +391,7 @@ ui <- fluidPage(
                         selectInput("selectedNodesVulcano", "Select Node(s)", choices = "T14", selected="T14", multiple = TRUE),
                         plotly::plotlyOutput('plotVolcanoNodes') %>%
                           shinycssloaders::withSpinner(color="#56070C"),
+                        downloadButton("downloadNodesExcel", "Download Data as Excel")
                        )
                            
       )
@@ -1593,22 +1594,32 @@ server <- function(input, output, session) {
       color_scale = input$networkColorScale
     )
   })
-
-  output$plotNetwork <- plotly::renderPlotly({
-    # Access the pre-calculated plot from the reactive expression
-    req(network_data())
-    network_data()$Plot
+  ### --- Network Nodes ---
+  observeEvent(network_data(), {
+    node_table <- network_data()$Table
+    
+    node_choices <- unique(node_table$Label_nFeatures)
+    
+    updateSelectInput(session, 
+                      inputId = "selectedNodesVulcano",
+                      choices = node_choices,
+                      selected = if (!is.null(input$selectedNodesVulcano) && input$selectedNodesVulcano %in% node_choices) {
+                                  input$selectedNodesVulcano
+                                } else {
+                                  node_choices[1]
+                                }
+    )
   })
-  output$plotVolcanoNodes <- plotly::renderPlotly({
-    # Require both the network data and a selection from the user
+
+  selected_nodes_data <- reactive({
     req(network_data(), input$selectedNodesVulcano)
     
     # Access the pre-calculated table from the reactive expression
     Table_nodes <- network_data()$Table
-
-    # The rest of your data processing logic remains the same
-    nodes_selected2 <- Table_nodes %>%
-      dplyr::filter(.data$Label %in% input$selectedNodesVulcano) %>%
+    
+    # Filter and process the data based on user selection
+    Table_nodes %>%
+      dplyr::filter(.data$Label_nFeatures %in% input$selectedNodesVulcano) %>%
       tidyr::separate_rows(.data$Metabolites, .data$log2FC, .data$qval, .data$pval, .data$Class, sep = "\\s*;\\s*") %>%
       dplyr::mutate(
         log2FC = as.numeric(.data$log2FC),
@@ -1618,30 +1629,28 @@ server <- function(input, output, session) {
         Class = gsub("\"", "", .data$Class),
       ) %>%
       dplyr::filter(.data$Class != "NA") %>%
-      dplyr::mutate(Class = as.factor(Class))
-    
-    MetAlyzer:::plotly_vulcano(nodes_selected2)
+      dplyr::mutate(Class = as.factor(Class)) %>%
+      dplyr::select(-c(x, y, collapsed_count, Label_nFeatures, Shape))
   })
-  observeEvent(network_data(), {
-    # Get the table of nodes from our central reactive
-    node_table <- network_data()$Table
-    
-    # Extract the unique pathway labels to use as choices
-    node_choices <- unique(node_table$Label)
-    
-    # Update the selectInput on the UI side
-    # Assumes your selectInput has the id "selectedNodesVulcano"
-    updateSelectInput(session, 
-                      inputId = "selectedNodesVulcano",
-                      choices = node_choices,
-                      # Keep the current selection if it's still valid, otherwise pick the first one
-                      selected = if (!is.null(input$selectedNodesVulcano) && input$selectedNodesVulcano %in% node_choices) {
-                                  input$selectedNodesVulcano
-                                } else {
-                                  node_choices[1]
-                                }
-    )
+
+  output$plotNetwork <- plotly::renderPlotly({
+    # Access the pre-calculated plot from the reactive expression
+    req(network_data())
+    network_data()$Plot
   })
+  output$plotVolcanoNodes <- plotly::renderPlotly({
+    req(selected_nodes_data())
+    MetAlyzer:::plotly_vulcano(selected_nodes_data())
+  })
+
+  output$downloadNodesExcel <- downloadHandler(
+    filename = function() {
+      paste0("Volcano_Data_", input$selectedNodesVulcano, "_", Sys.Date(), ".xlsx")
+    },
+    content = function(file) {
+      writexl::write_xlsx(selected_nodes_data(), path = file)
+    }
+  )
 
   # Revert changed network plot style parameters back to default
   observeEvent(input$defaultNetworkPlotStyles, {

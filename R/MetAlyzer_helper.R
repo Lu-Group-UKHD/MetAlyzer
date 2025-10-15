@@ -691,12 +691,13 @@ plotly_network <- function(Log2FCTab,
   nodes_separated_shortend <- nodes_separated_processed %>%
     dplyr::filter(!is.na(values_col_name))
   
-  summary_others <- nodes_separated_shortend %>%
+  summary_all <- nodes_separated_shortend %>%
     dplyr::group_by(Label) %>%
+    dplyr::filter(.data$Class != "NA") %>%
     dplyr::summarise(
       collapsed_count = dplyr::n(),
       dplyr::across(
-        .cols = all_of(c("Pathway", "x", "y", "Shape")),
+        .cols = all_of(c("Pathway", "x", "y", "Shape", "node_log2FC", "node_pval", "node_qval", "node_tval")),
         .fns = ~ paste(unique(.), collapse = "; ")
       ),
       dplyr::across(
@@ -704,6 +705,9 @@ plotly_network <- function(Log2FCTab,
         .fns = ~ paste(., collapse = "; ")
       ),
       .groups = 'drop'
+    ) %>%
+    dplyr::mutate(
+      Label_nFeatures = paste0(Label, " -- ", collapsed_count, " feature(s)")
     )
   
   # --- The dataframe for plotting ---
@@ -812,5 +816,5 @@ plotly_network <- function(Log2FCTab,
       font = list(size = pathway_text_size, color = pathways$Color[i])
     )
   }
-  return(list("Plot" = p_network, "Table" = summary_others))
+  return(list("Plot" = p_network, "Table" = summary_all))
 }
