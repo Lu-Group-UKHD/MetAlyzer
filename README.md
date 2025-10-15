@@ -2,7 +2,7 @@ MetAlyzer
 ========
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/nilsmechtel/MetAlyzer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nilsmechtel/MetAlyzer/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/nilsmechtel/MetAlyzer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Lu-Group-UKHD/MetAlyzer/actions/workflows/R-CMD-check.yaml)
 [![license](https://img.shields.io/badge/license-GPL--3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![metacran downloads](https://cranlogs.r-pkg.org/badges/grand-total/MetAlyzer)](https://cran.r-project.org/package=MetAlyzer)
 <!-- badges: end -->
@@ -22,7 +22,7 @@ install.packages("MetAlyzer")
 For the latest version install from GitHub
 ```r
 library(devtools)
-install_github("nilsmechtel/MetAlyzer")
+install_github("Lu-Group-UKHD/MetAlyzer")
 ```
 
 ## Quickstart
