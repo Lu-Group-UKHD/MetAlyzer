@@ -76,7 +76,7 @@ knitr::include_graphics("images/biocrates_output.png")
 fpath <- MetAlyzer::load_demodata_biocrates()
 
 # Load the data into a SummarizedExperiment object
-metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = fpath,
+metalyzer_se <- MetAlyzer::read_metidq(fpath,
                                        silent = TRUE)
 
 # Display the object summary
@@ -143,7 +143,7 @@ We can directly use this dataframe as input to the to the ***MetAlyzer*** visual
 
 ##----- Create InputDF
 assay_matrix <- metalyzer_se %>%
-  assay() %>%         # Extract the "counts" assay
+  SummarizedExperiment::assay() %>%         # Extract the "counts" assay
   `colnames<-`(colnames(metalyzer_se))%>%
   t()%>%
   as.data.frame()
@@ -154,7 +154,7 @@ sample_info <- metalyzer_se %>%
   dplyr::rename("Conditions" = "Sample.Description")
 
 feature_info <- metalyzer_se %>%
-  rowData() %>%
+  SummarizedExperiment::rowData() %>%
   as.data.frame()
   
 ##----- Processing

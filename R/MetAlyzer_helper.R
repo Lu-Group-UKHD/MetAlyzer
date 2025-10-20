@@ -683,7 +683,7 @@ plotly_network <- function(Log2FCTab,
   
   nodes_joined <- dplyr::left_join(nodes_separated, Log2FCTab, by = c("Metabolites" = metabolite_col_name))
   
-  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_sep_df = nodes_joined, nodes_orig_df = nodes, q_value = q_value, stat_col_name = stat_col_name, c("log2FC", "pval", "qval"))
+  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_sep_df = nodes_joined, nodes_orig_df = nodes, q_value = q_value, stat_col_name = stat_col_name, c("log2FC", "pval", "qval", "tval"))
   
   ### --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
@@ -691,12 +691,13 @@ plotly_network <- function(Log2FCTab,
   nodes_separated_shortend <- nodes_separated_processed %>%
     dplyr::filter(!is.na(values_col_name))
   
-  summary_others <- nodes_separated_shortend %>%
+  summary_all <- nodes_separated_shortend %>%
     dplyr::group_by(Label) %>%
+    dplyr::filter(.data$Class != "NA") %>%
     dplyr::summarise(
       collapsed_count = dplyr::n(),
       dplyr::across(
-        .cols = all_of(c("Pathway", "x", "y", "Shape")),
+        .cols = all_of(c("Pathway", "x", "y", "Shape", "node_log2FC", "node_pval", "node_qval", "node_tval")),
         .fns = ~ paste(unique(.), collapse = "; ")
       ),
       dplyr::across(
@@ -704,6 +705,9 @@ plotly_network <- function(Log2FCTab,
         .fns = ~ paste(., collapse = "; ")
       ),
       .groups = 'drop'
+    ) %>%
+    dplyr::mutate(
+      Label_nFeatures = paste0(Label, " -- ", collapsed_count, " feature(s)")
     )
   
   # --- The dataframe for plotting ---
@@ -795,7 +799,8 @@ plotly_network <- function(Log2FCTab,
       hovertext = paste0("log2 Fold Change: ", round(nodes_original_processed$log2FC[i], 5),
                          "\nPathway: ", nodes_original_processed$Pathway[i],
                          "\nadj. p-value: ", round(nodes_original_processed$qval[i], 5),
-                         "\np-value: ", round(nodes_original_processed$pval[i], 5))
+                         "\np-value: ", round(nodes_original_processed$pval[i], 5),
+                         "\nt-value: ", round(nodes_original_processed$tval[i], 5))
     )
   }
   
@@ -811,5 +816,5 @@ plotly_network <- function(Log2FCTab,
       font = list(size = pathway_text_size, color = pathways$Color[i])
     )
   }
-  return(list("Plot" = p_network, "Table" = summary_others))
+  return(list("Plot" = p_network, "Table" = summary_all))
 }
