@@ -52,7 +52,7 @@ of the metabolites vector. If aggregated_data is not empty,
 metabolites and class will also be filtered here.
 }
 \examples{
-metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 
 drop_metabolites <- c("C0", "C2", "C3", "Metabolism Indicators",
   inplace = TRUE

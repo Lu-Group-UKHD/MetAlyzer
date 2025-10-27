@@ -7,7 +7,7 @@
 expand_aggregated_data(metalyzer_se, metadata_col)
 }
 \arguments{
-\item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.}
+\item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.}
 
 \item{metadata_col}{A vector of character(s) specifying the column in the sample
 metadata to add, accessible via `SummarizedExperiment::colData(metalyzer_se)`.}

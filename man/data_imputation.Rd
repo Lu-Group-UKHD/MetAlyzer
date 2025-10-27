@@ -7,7 +7,7 @@
 data_imputation(metalyzer_se)
 }
 \arguments{
-\item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_metidq()}}.}
+\item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.}
 }
 \value{
 An SE object with the imputed `Concentration` column in the aggregated

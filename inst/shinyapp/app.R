@@ -517,7 +517,7 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
-    metabObj <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_rawdata_extraction(), silent = T)
+    metabObj <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_rawdata_extraction(), silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
     metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                               drop_metabolites = 'Metabolism Indicators',
@@ -559,7 +559,7 @@ server <- function(input, output, session) {
     reactCodeHistory(c(reactCodeHistory(),
                        '# Initialize MetAlyzer SE object with example data'))
     reactCodeHistory(c(reactCodeHistory(),
-                       'MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_rawdata_extraction())'))
+                       'MetAlyzer::read_webidq(file_path = MetAlyzer::load_rawdata_extraction())'))
     reactCodeHistory(c(reactCodeHistory(),
                        '# Exclude "Metabolism Indicators"'))
     reactCodeHistory(c(reactCodeHistory(),
@@ -573,7 +573,7 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
     validUploadedFile <- try(
-      metabObj <- MetAlyzer::read_metidq(conc_file_path = input$uploadedFile$datapath,
+      metabObj <- MetAlyzer::read_webidq(file_path = input$uploadedFile$datapath,
                                          sheet = 1, silent = T),
       silent = T)
     if (!is(validUploadedFile, 'try-error')) {
@@ -618,7 +618,7 @@ server <- function(input, output, session) {
       reactCodeHistory(c(reactCodeHistory(),
                          '# Initialize MetAlyzer SE object'))
       reactCodeHistory(c(reactCodeHistory(),
-                         'metabObj <- MetAlyzer::read_metidq(conc_file_path = "path_to_your_file")'))
+                         'metabObj <- MetAlyzer::read_webidq(file_path = "path_to_your_file")'))
       reactCodeHistory(c(reactCodeHistory(),
                          '# Exclude "Metabolism Indicators" if they exist'))
       reactCodeHistory(c(reactCodeHistory(),
@@ -631,7 +631,7 @@ server <- function(input, output, session) {
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
-        tags$strong('Please check if the uploaded file is exported from MetIDQ Software.'),
+        tags$strong('Please check if the uploaded file is exported from webidq Software.'),
         checkboxInput("check1", "Is the file exported from WebIDQ?", value = FALSE),
         checkboxInput("check2", "Does the file contain the 'Class' cell?", value = FALSE),
         checkboxInput("check3", "Does the file contain the 'Sample Type' column?", value = FALSE),

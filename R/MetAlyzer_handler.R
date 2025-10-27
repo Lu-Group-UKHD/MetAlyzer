@@ -10,7 +10,7 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' MetAlyzer::summarize_conc_values(metalyzer_se)
 summarize_conc_values <- function(metalyzer_se) {
@@ -40,7 +40,7 @@ summarize_conc_values <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' MetAlyzer::summarize_quant_data(metalyzer_se)
 summarize_quant_data <- function(metalyzer_se) {
@@ -91,7 +91,7 @@ summarize_quant_data <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
 filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
@@ -155,7 +155,7 @@ filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' metalyzer_se <- MetAlyzer::update_meta_data(
 #'   metalyzer_se,
@@ -205,7 +205,7 @@ update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' metalyzer_se <- MetAlyzer::rename_meta_data(
 #'   metalyzer_se,
@@ -270,7 +270,7 @@ rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' drop_metabolites <- c("C0", "C2", "C3", "Metabolism Indicators",
 #'   inplace = TRUE
@@ -459,7 +459,7 @@ filter_metabolites <- function(metalyzer_se,
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' MetAlyzer::aggregated_data(metalyzer_se)
 aggregated_data <- function(metalyzer_se) {
@@ -481,7 +481,7 @@ aggregated_data <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #' 
 #' output_file <- file.path(tempdir(), "metabolomics_data.csv")
 #' MetAlyzer::export_conc_values(metalyzer_se,
@@ -519,7 +519,7 @@ export_conc_values <- function(metalyzer_se,
 #' @export
 #' 
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #' metalyzer_se@metadata$log2FC <- readRDS(MetAlyzer::toy_diffres())
 #' MetAlyzer::log2FC(metalyzer_se)
 log2FC <- function(metalyzer_se) {

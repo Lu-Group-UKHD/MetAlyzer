@@ -9,7 +9,7 @@ plotly_scatter(Log2FCTab)
 \arguments{
 \item{Log2FCTab}{A data frame containing the differential analysis results table
 accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
-output from \code{\link[MetAlyzer]{read_metidq()}} and has gone through `calc_log2FC()`.}
+output from \code{\link[MetAlyzer]{read_webidq()}} and has gone through `calc_log2FC()`.}
 }
 \value{
 A list containing a `plotly` (plot) and `ggplot` (legend) object.

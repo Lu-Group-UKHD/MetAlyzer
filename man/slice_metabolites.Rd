@@ -13,6 +13,8 @@ slice_metabolites(full_sheet, data_ranges)
 }
 \description{
 This function extracts metabolites with their corresponding
-metabolite class from .full_sheet into metabolites.
+metabolite class from .full_sheet into metabolites. It robustly finds the
+metabolite row by searching upwards from the "Class" row and skipping
+any known intermediate rows (e.g., "Synonym").
 }
 \keyword{internal}

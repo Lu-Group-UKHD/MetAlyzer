@@ -1,16 +1,12 @@
 #' @title Open file and read data
 #'
 #' @description This function creates a SummarizedExperiment (SE) from the given
-#' 'MetIDQ' output Excel sheet: metabolites (rowData), meta data (colData),
+#' 'webidq' output Excel sheet: metabolites (rowData), meta data (colData),
 #' concentration data (assay), quantification status(assay)
 #' The column "Sample Type" and the row "Class" are used as anchor cells in the
 #' Excel sheet and are therefore a requirement.
 #'
-#' @param conc_file_path A character string specifying the file path to the
-#'   Excel file containing concentration values.
-#' @param status_file_path An optional character string specifying the file path
-#'   to the Excel file containing quantification status as text. If provided,
-#'   the function operates in two-file mode. Defaults to NULL.
+#' @param file_path A character specifying the file path to the Excel file.
 #' @param sheet A numeric index specifying which sheet of the Excel file to use.
 #' @param status_list A list of HEX color codes for each quantification status.
 #' @param silent If TRUE, mute any print command.
@@ -19,19 +15,10 @@
 #' @export
 #'
 #' @examples
-#' # Single-file example
-#' se_single <- MetAlyzer::read_metidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
-#'
-#' # Two-file example
-#' # se_two <- MetAlyzer::read_metidq(
-#' #   conc_file_path = "path/to/concentrations.xlsx",
-#' #   status_file_path = "path/to/quant_status.xlsx"
-#' # )
-read_metidq <- function(
-    conc_file_path,
-    status_file_path = NULL,
+#' metalyzer_se <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())
+read_webidq <- function(
+    file_path,
     sheet = 1,
-    multiple_files = FALSE,
     status_list = list(
       "Valid" = c("#B9DE83", "#00CD66"),
       "LOQ" = c("#B2D1DC", "#7FB2C5", "#87CEEB"), # <LLOQ or > ULOQ
@@ -41,81 +28,58 @@ read_metidq <- function(
       "Incomplete" = c("#CBD2D7", "#FFCCCC")
     ),
     silent = FALSE) {
-  # --- Input Checks ---
-  if (!is.character(conc_file_path) || length(conc_file_path) != 1) {
-    stop("`conc_file_path` must be a single character string.", call. = FALSE)
+  # Input checks
+  if (!is.character(file_path) || length(file_path) != 1) {
+    stop("`file_path` must be a single character string.", call. = FALSE)
   }
-  if (!file.exists(conc_file_path)) {
-    stop("`conc_file_path` does not exist: ", conc_file_path, call. = FALSE)
-  }
-  if (!is.null(status_file_path)) {
-    if (!is.character(status_file_path) || length(status_file_path) != 1) {
-      stop("`status_file_path` must be a single character string.", call. = FALSE)
-    }
-    if (!file.exists(status_file_path)) {
-      stop("`status_file_path` does not exist: ", status_file_path, call. = FALSE)
-    }
+  if (!file.exists(file_path)) {
+    stop("`file_path` does not exist: ", file_path, call. = FALSE)
   }
   if (!((is.numeric(sheet) && length(sheet) == 1 && sheet > 0 && floor(sheet) == sheet) ||
         (is.character(sheet) && length(sheet) == 1))) {
-    stop("`sheet` must be a single positive integer or a sheet name.", call. = FALSE)
+    stop("`sheet` must be a single positive integer or a single sheet name (character string).", call. = FALSE)
   }
-  if (!is.list(status_list) || !all(sapply(status_list, is.character))) {
-    stop("`status_list` must be a list of character vectors (hex color codes).", call. = FALSE)
+  if (!is.list(status_list)) {
+    stop("`status_list` must be a list.", call. = FALSE)
+  }
+  if (length(status_list) > 0 && !all(sapply(status_list, function(x) is.character(x) && !any(is.na(x))))) {
+    stop("All elements in `status_list` must be character vectors of hex color codes.", call. = FALSE)
   }
   if (!is.logical(silent) || length(silent) != 1) {
     stop("`silent` must be a single logical value (TRUE or FALSE).", call. = FALSE)
+  }
+
+  # Rest of the function code would go here...
+  if (!silent) {
+    message("Input checks passed. Proceeding with reading webidq file.")
   }
   # Print MetAlyzer logo
   if (silent == FALSE) {
     metalyzer_ascii_logo()
   }
 
-  # Open the concentration file to get main structure, metadata, and concentrations
-  conc_starter_list <- list("file_path" = as.character(conc_file_path), "sheet" = sheet)
-  conc_sheet <- open_file(conc_starter_list)
-  data_ranges <- get_data_range(conc_sheet)
+  # Open webidq Excel sheet
+  starter_list <- list(
+    "file_path" = as.character(file_path),
+    "sheet" = as.numeric(sheet)
+  )
+  full_sheet <- open_file(starter_list)
+  data_ranges <- get_data_range(full_sheet)
 
-  metabolites <- slice_metabolites(conc_sheet, data_ranges)
-  meta_data <- slice_meta_data(conc_sheet, data_ranges)
-  conc_values <- slice_conc_values(conc_sheet, data_ranges, metabolites)
+  # Extract metabolites, meta data and concentration values
+  metabolites <- slice_metabolites(full_sheet, data_ranges)
+  meta_data <- slice_meta_data(full_sheet, data_ranges)
+  conc_values <- slice_conc_values(full_sheet, data_ranges, metabolites)
 
-  if (is.null(status_file_path)) {
-    # --- SINGLE-FILE MODE: Read quant status from colors ---
-    if (!silent) {
-      message("Operating in single-file mode. Reading quantification status from cell colors.")
-    }
-    quant_status <- read_quant_status(
-      starter_list = conc_starter_list,
-      sheet_dim = c(nrow(conc_sheet), ncol(conc_sheet)),
-      data_ranges = data_ranges,
-      metabolites = metabolites,
-      status_list = status_list,
-      silent = silent
-    )
-    metadata_paths <- list("file_path" = conc_file_path)
-
-  } else {
-    # --- TWO-FILE MODE: Read quant status from a separate file's text values ---
-    if (!silent) {
-      message("Operating in two-file mode. Reading quantification status from string values.")
-    }
-    status_starter_list <- list("file_path" = as.character(status_file_path), "sheet" = sheet)
-    status_sheet <- open_file(status_starter_list)
-    
-    quant_status <- slice_status_values(status_sheet, data_ranges, metabolites)
-    
-    read_statuses <- unique(as.vector(quant_status))
-    valid_statuses <- names(status_list)
-    if (!all(read_statuses %in% valid_statuses)) {
-      warning("Some values in the status file do not match the keys in `status_list`.")
-    }
-    
-    metadata_paths <- list(
-        "conc_file_path" = conc_file_path,
-        "status_file_path" = status_file_path
-    )
-  }
+  # Read quantification status
+  quant_status <- read_quant_status(
+    starter_list = starter_list,
+    sheet_dim = c(nrow(full_sheet), ncol(full_sheet)),
+    data_ranges = data_ranges,
+    metabolites = metabolites,
+    status_list = status_list,
+    silent = silent
+  )
 
   # Aggregate data and add it to the metadata of SE object
   aggregated_data <- aggregate_data(
@@ -132,7 +96,6 @@ read_metidq <- function(
   # assays: conc_values, quant_status
   # metadata: file_path, sheet, aggregated_data
 
-  # Assemble the SE object components
   rowData <- data.frame(
     "metabolic_classes" = names(metabolites),
     row.names = metabolites
@@ -143,17 +106,16 @@ read_metidq <- function(
     "quant_status" = t(quant_status)
   )
   metadata <- list(
-    "paths" = metadata_paths,
+    "file_path" = file_path,
     "sheet_index" = sheet,
     "status_list" = status_list,
     "aggregated_data" = aggregated_data
   )
-
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = assays,
     colData = colData,
     rowData = rowData,
-    metadata = metadata
+    metadata = metadata,
   )
 
   # Print summary of conc_values and quant_status
@@ -208,7 +170,7 @@ metalyzer_ascii_logo <- function() {
 
 #' @title Open Excel file
 #'
-#' @description This function opens the given MetIDQ output Excel file and reads the full
+#' @description This function opens the given webidq output Excel file and reads the full
 #' given sheet.
 #'
 #' @param starter_list contains the file path and the sheet index
@@ -279,22 +241,55 @@ get_data_range <- function(full_sheet) {
 #' @title Slice metabolites
 #'
 #' @description This function extracts metabolites with their corresponding
-#' metabolite class from .full_sheet into metabolites.
+#' metabolite class from .full_sheet into metabolites. It robustly finds the
+#' metabolite row by searching upwards from the "Class" row and skipping
+#' any known intermediate rows (e.g., "Synonym").
 #'
 #' @param full_sheet full_sheet
 #' @param data_ranges data_ranges
 #'
 #' @keywords internal
 slice_metabolites <- function(full_sheet, data_ranges) {
-  ## metabolites are a row above classes
+  # Add any other potential junk row headers to this vector.
+  junk_patterns <- c("^\\s*Synonym(s)?\\s*$") # Matches "Synonym" or "Synonyms"
+  current_row_idx <- data_ranges$class_row - 1
+
+  while (current_row_idx > 0) {
+    cell_to_check <- full_sheet[current_row_idx, data_ranges$class_col]
+    if (is.na(cell_to_check)) {
+      cell_to_check <- ""
+    }
+    is_junk <- any(sapply(junk_patterns, grepl, x = cell_to_check, ignore.case = TRUE))
+    if (is_junk) {
+      current_row_idx <- current_row_idx - 1
+    } else {
+      break
+    }
+  }
+  metabolite_row_idx <- current_row_idx
+  if (metabolite_row_idx <= 0) {
+    stop(paste(
+      "Could not find metabolite names row.",
+      "Searched upwards from 'Class' row (", data_ranges$class_row, ")",
+      "and found no valid row."
+    ), call. = FALSE)
+  }
   metabolites <- full_sheet[
-    data_ranges$class_row - 1,
+    metabolite_row_idx,
     data_ranges$data_cols
   ]
   classes <- full_sheet[
     data_ranges$class_row,
     data_ranges$data_cols
   ]
+  if (any(is.na(metabolites))) {
+    warning(paste0(
+      "NA values found in the identified metabolite names row (Row ",
+      metabolite_row_idx,
+      "). This may indicate an incorrect row was parsed."
+    ), call. = FALSE)
+  }
+
   names(metabolites) <- classes
   return(metabolites)
 }
@@ -319,29 +314,6 @@ slice_conc_values <- function(full_sheet, data_ranges, metabolites) {
   colnames(conc_values) <- metabolites
   conc_values[] <- lapply(conc_values[], as.numeric)
   return(conc_values)
-}
-
-#' @title Slice quantification status values
-#'
-#' @description This function slices quant status from .full_sheet into
-#' status_values.
-#'
-#' @param full_sheet A data frame or matrix representing the full Excel sheet
-#'   containing the status values.
-#' @param data_ranges A list containing the row and column indices for the data.
-#' @param metabolites A character vector of metabolite names to be used as the
-#'   column headers of the output data frame.
-#'
-#' @keywords internal
-slice_status_values <- function(full_sheet, data_ranges, metabolites) {
-  status_values <- full_sheet[
-    data_ranges$data_rows,
-    data_ranges$data_cols
-  ]
-  status_values <- as.data.frame(status_values)
-  colnames(status_values) <- metabolites
-  status_values[] <- lapply(status_values[], as.character)
-  return(status_values)
 }
 
 
@@ -545,5 +517,5 @@ aggregate_data <- function(
 #' @description This function was deprecated in version v2.0.0
 #' 
 MetAlyzer_dataset <- function(...) {
-  cat("This function was deprecated in v2.0.0, please use read_metidq()\n")
+  cat("This function was deprecated in v2.0.0, please use read_webidq()\n")
 }
