@@ -101,5 +101,6 @@ network$Plot
 ![Network](vignettes/images/network_demodata.png)
 
 ## Detailed instructions
-**For a comprehensive tutorial, please check out the [MetAlyzer Vignette](https://CRAN.R-project.org/package=MetAlyzer
+**For a comprehensive tutorial, please check out the MetAlyzer Vignettes**.\
+**Please also check out [MetAlyzer on CRAN](https://CRAN.R-project.org/package=MetAlyzer
 ).**
