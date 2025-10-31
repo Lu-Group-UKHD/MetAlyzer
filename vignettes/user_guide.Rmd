@@ -47,7 +47,7 @@ library(dplyr)
 
 ::: {style="text-align: justify"}
 The ***MetAlyzer*** R-package provides a robust toolkit for importing, handling, and analyzing metabolomics data generated 
-using either the Biocrates Quant500L™ or Quant500XL™ kit and the Biocrates MetIDQ™ software (BIOCRATES Life Sciences AG, Innsbruck, Austria). It structures the data into a 
+using either the Biocrates Quant500L™ or Quant500XL™ kit and the Biocrates WebIDQ™ software (BIOCRATES Life Sciences AG, Innsbruck, Austria). It structures the data into a 
 SummarizedExperiment (SE) [@Morgan2025SummarizedExperiment] object, facilitating integration with Bioconductor workflows and enabling downstream statistical 
 analysis and visualization. To aid in biological interpretation, ***MetAlyzer*** offers functions to generate key visualizations. 
 These include scatter plots with information about the metabolite classes as assigned by BIOCRATES Life Sciences AG and a network plot, which readily visualizes the whole 
@@ -57,16 +57,16 @@ helping to find pathway-level alterations and providing a systems perspective on
 :::
 
 # Loading and Exploring Data
-## Import data from MetIDQ™
+## Import data from WebIDQ™
 ::: {style="text-align: justify"}
-***MetAlyzer's*** primary entry point is the `MetAlyzer::read_metidq()` function, which reads MetIDQ™ .xlsx output files (Fig. 1).\
+***MetAlyzer's*** primary entry point is the `MetAlyzer::read_metidq()` function, which reads WebIDQ™ .xlsx output files (Fig. 1).\
 As the output files contain layered information, inform of concentration values and color-coded quantification status (e.g., "Valid", "LOD", "LOQ"), 
 it is a tedious task to reliably process this data computationally, as the mix of numerical values and status codes hinders direct machine readability by standard analysis tools.
 To conveniently read the data in we provide the function `MetAlyzer::read_metidq()`, structuring the data into a SummarizedExperiment (SE) object [@Morgan2025SummarizedExperiment] for easy downstream analysis.
 For further demonstration we'll use a demo dataset kindly provided by BIOCRATES Life Sciences AG, featuring metabolite measurements across two groups (MxP®Quant 500 kit). This dataset is included in the ***MetAlyzer*** R package as the example data.
 :::
 
-```{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates MetIDQ™.", out.width="90%", fig.align="center"}
+```{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates WebIDQ™.", out.width="90%", fig.align="center"}
 knitr::include_graphics("images/biocrates_output.png")
 ```
 
@@ -196,7 +196,7 @@ Some nodes, such as 'T14' which might group related species like 'T 14:0_32:2', 
 3.  **NA:** If no metabolites mapping to the node were measured or included in the dataset, the node value is NA (often represented as grey or uncolored, like some nodes in Figure X).\
 \
 This summarization approach provides a concise overview within the network, highlighting significant changes where present, while still providing context from measured data if significance is not reached.
-Due to the changing naming convention of Biocrates, we include old names in the excel file, which will show up as NA for later generated MetIDQ™ outputs (e.g. TG(14:0_32.2)), but this enables the analysis of older files as well. @ADD we need a date here, like from which year the exports work, and guidance how someone can export the required old names form MetIDQ as we know how that works
+Due to the changing naming convention of Biocrates, we include old names in the excel file, which will show up as NA for later generated WebIDQ™ outputs (e.g. TG(14:0_32.2)), but this enables the analysis of older files as well. @ADD we need a date here, like from which year the exports work, and guidance how someone can export the required old names form WebIDQ as we know how that works
 :::
 
 ```{r networkTable, message=FALSE, warning=FALSE}

@@ -7,9 +7,9 @@ MetAlyzer
 [![metacran downloads](https://cranlogs.r-pkg.org/badges/grand-total/MetAlyzer)](https://cran.r-project.org/package=MetAlyzer)
 <!-- badges: end -->
 
-**An R Package to read and analyze MetIDQ&trade; output**
+**An R Package to read and analyze WebIDQ&trade; output**
 
-The package provides methods to read output files from the MetIDQ&trade; software into R. Metabolomics data is read and reformatted into an S4 object for convenient data handling, statistics and downstream analysis.
+The package provides methods to read output files from the WebIDQ&trade; software into R. Metabolomics data is read and reformatted into an S4 object for convenient data handling, statistics and downstream analysis.
 
 ## Install
 
@@ -27,7 +27,7 @@ install_github("Lu-Group-UKHD/MetAlyzer")
 
 ## Quickstart
 
-The package takes metabolomic measurements and the quantification status (e.g. "Valid", "LOQ", "LOD") as ".xlsx" files generated from the MetIDQ&trade; software. Additionally, meta data for each sample can be provided for further analysis.
+The package takes metabolomic measurements and the quantification status (e.g. "Valid", "LOQ", "LOD") as ".xlsx" files generated from the WebIDQ&trade; software. Additionally, meta data for each sample can be provided for further analysis.
 
 This is an extract from one of the provided example data sets.
 ![Example_Data](vignettes/images/biocrates_output.png)
