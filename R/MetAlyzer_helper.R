@@ -165,20 +165,18 @@ glog2 <- function(x) {
 
 #' @title Normalization
 #' @description Normalize concentration values among samples using glog2 transformation,
-#' median normalization, total ion count (TIC) normalization, or variance stabilizing
-#' normalization (VSN) and update the `Concentration` column in the aggregated data
-#' in the input `SummarizedExperiment` (SE) object.
+#' median normalization, or total ion count (TIC) normalization and update the `Concentration`
+#' column in the aggregated data in the input `SummarizedExperiment` (SE) object.
 #'
 #' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.
 #' @param norm_method A character specifying the normalization method to use, which
-#' should be one of 'log2' (default), 'median', 'TIC', or 'VSN'.
+#' should be one of 'log2' (default), 'median', or 'TIC'.
 #' @returns An SE object with the normalized `Concentration` column in the aggregated
 #' data accessible via `metalyzer_se@metadata$aggregated_data`.
 #' 
 #' @importFrom dplyr select mutate left_join ungroup
 #' @importFrom tidyr pivot_wider pivot_longer
 #' @importFrom tibble as_tibble column_to_rownames
-#' @importFrom vsn vsnMatrix predict
 #' 
 #' @keywords internal
 data_normalization <- function(metalyzer_se, norm_method = 'log2') {
@@ -201,10 +199,6 @@ data_normalization <- function(metalyzer_se, norm_method = 'log2') {
       smp_conc/row_sums * median_rowSums
     }) %>%
       MetAlyzer:::glog2()
-  } else if (norm_method %in% 'VSN') {
-    # Do vsn normalization
-    fit <- vsn::vsnMatrix(data_mat)
-    norm_data <- vsn::predict(fit, data_mat)
   } else if (norm_method %in% 'median') {
     # Do median normalization that conducts median scaling on log2 transformed data
     # Use generalized log2 transformation to avoid -Inf
@@ -227,6 +221,12 @@ data_normalization <- function(metalyzer_se, norm_method = 'log2') {
     # Do log2 transformation
     norm_data <- MetAlyzer:::glog2(data_mat)
   }
+  #### Exclude vsn for now to avoid any issue as it is not being used
+  # else if (norm_method %in% 'VSN') {
+  #   # Do vsn normalization
+  #   fit <- vsn::vsnMatrix(data_mat)
+  #   norm_data <- vsn::predict(fit, data_mat)
+  # }
   # Convert matrix to aggregated long data
   aggregated_data <- tibble::as_tibble(norm_data, rownames = 'Metabolite') %>%
     tidyr::pivot_longer(cols = -'Metabolite',

@@ -387,12 +387,12 @@ ui <- fluidPage(
                              shinycssloaders::withSpinner(color="#56070C"),
                        ),
                        div(style = "width: 80%; margin: auto; margin-bottom: 200px;",
-                        tags$h3(strong('Node Vulcano plot'), style = "margin-top:1rem;"),
-                        selectInput("selectedNodesVulcano", "Select Node(s)", choices = "T14", selected="T14", multiple = TRUE),
-                        plotly::plotlyOutput('plotVolcanoNodes') %>%
-                          shinycssloaders::withSpinner(color="#56070C"),
-                        downloadButton("downloadNodesExcel", "Download Data as Excel")
-                       )
+                           tags$h3(strong('Node Stats'), style = "margin-top:1rem;"),
+                           selectInput("selectedNodesVulcano", "Select node(s) to view:",
+                                       choices = character(0), multiple = TRUE),
+                           plotly::plotlyOutput('plotVolcanoNodes') %>%
+                             shinycssloaders::withSpinner(color="#56070C"),
+                           downloadButton("downloadNodesExcel", "Download node stats as Excel"))
                            
       )
     ),
@@ -1594,23 +1594,26 @@ server <- function(input, output, session) {
       color_scale = input$networkColorScale
     )
   })
-  ### --- Network Nodes ---
-  observeEvent(network_data(), {
-    node_table <- network_data()$Table
-    
-    node_choices <- unique(node_table$Label_nFeatures)
-    
-    updateSelectInput(session, 
-                      inputId = "selectedNodesVulcano",
-                      choices = node_choices,
-                      selected = if (!is.null(input$selectedNodesVulcano) && input$selectedNodesVulcano %in% node_choices) {
-                                  input$selectedNodesVulcano
-                                } else {
-                                  node_choices[1]
-                                }
-    )
+  output$plotNetwork <- plotly::renderPlotly({
+    # Access the pre-calculated plot from the reactive expression
+    req(network_data())
+    network_data()$Plot
   })
-
+  
+  ### --- Network Nodes ---
+  # Update choices for node stats
+  observeEvent(reactLog2FCTbl(), {
+    node_table <- network_data()$Table
+    node_choices <- unique(node_table$Label_nFeatures)
+    if ('T14 -- 14 feature(s)' %in% node_choices) {
+      updateSelectInput(session, inputId = "selectedNodesVulcano",
+                        choices = node_choices, selected = 'T14 -- 14 feature(s)')
+    } else {
+      updateSelectInput(session, inputId = "selectedNodesVulcano",
+                        choices = node_choices, selected = node_choices[1])
+    }
+  })
+  # Prepare stats table for selected nodes to visualize and download
   selected_nodes_data <- reactive({
     req(network_data(), input$selectedNodesVulcano)
     
@@ -1632,17 +1635,14 @@ server <- function(input, output, session) {
       dplyr::mutate(Class = as.factor(Class)) %>%
       dplyr::select(-c(x, y, collapsed_count, Label_nFeatures, Shape))
   })
-
-  output$plotNetwork <- plotly::renderPlotly({
-    # Access the pre-calculated plot from the reactive expression
-    req(network_data())
-    network_data()$Plot
-  })
+  # Display stats of selected nodes via volcano plot
   output$plotVolcanoNodes <- plotly::renderPlotly({
     req(selected_nodes_data())
-    MetAlyzer:::plotly_vulcano(selected_nodes_data())
+    MetAlyzer:::plotly_vulcano(selected_nodes_data(),
+                               x_cutoff = input$plotVolcanoLog2FCCutoff,
+                               y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
   })
-
+  # Download stats table of selected nodes
   output$downloadNodesExcel <- downloadHandler(
     filename = function() {
       paste0("Volcano_Data_", input$selectedNodesVulcano, "_", Sys.Date(), ".xlsx")
