@@ -138,11 +138,12 @@ ui <- fluidPage(
                            shinyBS::bsCollapse(
                              id = 'panelDatOverviewViz',
                              # Note that collapsed panel does not render output until it is expanded
-                             open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata'),
+                             open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'),
                              multiple = T,
-                             shinyBS::bsCollapsePanel('Sample metadata', style = 'primary',
+                             shinyBS::bsCollapsePanel('Sample metadata (All)', style = 'primary',
                                                       DT::dataTableOutput('tblSmpMetadat') %>%
-                                                      # Render table outside collapsed panel and display it (NOT WORKING)
+                                                      #### Collapsed panel: Workaround (SHOULD WORK BUT NOT WORK)
+                                                      # Render table outside collapsed panel and display it
                                                       # uiOutput('uiTblSmpMetadat') %>%
                                                         shinycssloaders::withSpinner(color="#56070C")),
                              shinyBS::bsCollapsePanel('Data distribution', style = 'primary',
@@ -150,7 +151,6 @@ ui <- fluidPage(
                                                         style = 'display:flex; align-items: center;',
                                                         column(width = 7, shinyBS::bsCollapse(
                                                           id = 'hintDatDist',
-                                                          open = '💡Hint',
                                                           shinyBS::bsCollapsePanel('💡Hint', style = 'success',
                                                                                    textOutput('summDatDist', container = strong))
                                                         )),
@@ -171,7 +171,6 @@ ui <- fluidPage(
                                                         column(width = 7,
                                                                shinyBS::bsCollapse(
                                                                  id = 'hintDatComplete',
-                                                                 open = '💡Hint',
                                                                  shinyBS::bsCollapsePanel('💡Hint', style = 'success',
                                                                                           textOutput('summDatComplete', container = strong))
                                                                )
@@ -193,7 +192,6 @@ ui <- fluidPage(
                                                         column(width = 7,
                                                                shinyBS::bsCollapse(
                                                                  id = 'hintQuanStatus',
-                                                                 open = '💡Hint',
                                                                  shinyBS::bsCollapsePanel('💡Hint', style = 'success',
                                                                                           textOutput('summQuanStatus', container = strong))
                                                                )
@@ -215,11 +213,11 @@ ui <- fluidPage(
       )
     ), # TabPanel 1 End
     tabPanel(
-      'Log₂(FC)',
+      'Analysis',
       sidebarLayout(
         conditionalPanel(condition = "output.ifValidUploadedFile",
                          sidebarPanel(
-                           tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
+                           tags$h4('Differential Analysis', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
                              column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
                                                            choices = 'Not available', multiple = F)),
@@ -231,10 +229,10 @@ ui <- fluidPage(
                            ),
                            fluidRow(
                              style = "display: flex; align-items: center;",
-                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%')),
+                             column(width = 5, actionButton('computeLog2FC', 'Perform', width = '100%')),
                              column(width = 6, offset = 1,
                                     conditionalPanel(condition = "input.computeLog2FC > 0", # Check if the compute button has been clicked
-                                                     downloadButton('downloadLog2FC', 'Download log₂(FC) result', width = '100%')
+                                                     downloadButton('downloadLog2FC', 'Download analysis result table', width = '100%')
                                     )
                              ),
                            ),
@@ -261,9 +259,9 @@ ui <- fluidPage(
         ),
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
-                           div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
+                           div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%;margin-top:1rem;')),
           conditionalPanel(condition = "input.computeLog2FC",
-                           tags$h4(strong('Vulcano plot'), style = "margin-top:1rem;"),
+                           tags$h3(strong('Vulcano Plot'), style = "margin-top:1rem; color: steelblue;"),
                            plotly::plotlyOutput('plotVolcano') %>%
                              shinycssloaders::withSpinner(color="#56070C"),
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
@@ -272,7 +270,7 @@ ui <- fluidPage(
                                     column(width = 2, downloadButton("downloadVulcanoPlot", "Download vulcano plot"))
                            ),
                            tags$br(),
-                           tags$h4(strong('Scatter plot'), style = "margin-top:1rem;"),
+                           tags$h3(strong('Scatter Plot'), style = "margin-top:1rem; color: steelblue;"),
                            fluidRow(
                              column(width = 9, style = "z-index:2;", plotly::plotlyOutput('plotScatter') %>%
                                       shinycssloaders::withSpinner(color="#56070C")),
@@ -397,14 +395,15 @@ ui <- fluidPage(
       )
     ),
     tabPanel(
-      'Log',
+      'History',
       conditionalPanel(condition = "output.ifValidUploadedFile",
+                       style = 'margin-left: 5mm;',
                        fluidRow(
                          column(width = 7, HTML('<br>
-                                                <h3 style="margin-left: 2%;">Processing History</h3>
-                                                <h5 style="margin-left: 2%;">This section logs processing
+                                                <h3 style = "font-weight: bold; color: steelblue;">Processing History</h3>
+                                                <h5>This section logs processing
                                                 parameters used in different trials (every time you hit Process button).</h5>
-                                                <h5 style="margin-left: 2%;"><strong>Instructions:</strong> Click on a row to
+                                                <h5><strong>Instructions:</strong> Click on a row to
                                                 view the processed data at the specific point.</h5>
                                                 <br>')),
                          column(width = 2, div(style = "width: 60%; margin-top: 30%;",
@@ -420,6 +419,8 @@ ui <- fluidPage(
                                 ),
                                 conditionalPanel(condition = "typeof input.tblParamLog_rows_selected !== 'undefined' && input.tblParamLog_rows_selected.length > 0",
                                                  shinyBS::bsCollapse(
+                                                   id = 'panelTrialLog',
+                                                   open = c('Features Removed', 'Data distribution', 'Data completeness', 'Quantification status'),
                                                    multiple = T,
                                                    shinyBS::bsCollapsePanel('Features Removed', style = 'info',
                                                                             textOutput('textRmFeatsLog') %>%
@@ -440,15 +441,12 @@ ui <- fluidPage(
                        tags$br(),
                        tags$br(),
                        fluidRow(
-                         column(width = 7, shinyBS::bsCollapse(
-                           id = 'panelCommands',
-                           open = 'Command History (Last Operation)',
-                           shinyBS::bsCollapsePanel('Command History (Last Operation)', style = 'warning',
-                                                    verbatimTextOutput('textCommands'),
-                                                    downloadButton('downloadSessionInfo', 'Download session info'),
-                                                    shinyBS::bsTooltip('downloadSessionInfo',
-                                                                       'Critical for scientific reporting (e.g., package versions).'))
-                         ))
+                         column(width = 7,
+                                tags$h3(strong('Command History (Last Operation)'), style = 'color: steelblue;'),
+                                verbatimTextOutput('textCommands'),
+                                downloadButton('downloadSessionInfo', 'Download session info'),
+                                shinyBS::bsTooltip('downloadSessionInfo',
+                                                   'Critical for scientific reporting (e.g., package versions).'))
                        )
       )
     )
@@ -458,6 +456,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   # Create reactive objects for storing up-to-date data
   reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL, tmpMetabObj = NULL)
+  reactOriSmpMetadatTbl <- reactiveVal()
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
   # Create reactive parameter list for detecting any parameter change by users,
@@ -486,12 +485,6 @@ server <- function(input, output, session) {
   # Create reactive object for recording R commands executed to show users
   reactCodeHistory <- reactiveVal()
   
-  # Close expanded panels (due to rendering) right after output is rendered 
-  observeEvent(reactMetabObj$oriMetabObj, ({
-    shinyBS::updateCollapse(session, 'hintDatDist', close = '💡Hint')
-    shinyBS::updateCollapse(session, 'hintDatComplete', close = '💡Hint')
-    shinyBS::updateCollapse(session, 'hintQuanStatus', close = '💡Hint')
-  }))
   
   # Show fileInput only when example data is not used
   output$updateFileInput <- renderUI({
@@ -517,6 +510,11 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
+    #### Collapsed panel: Workaround
+    # Expand all panels to render outputs
+    # shinyBS::updateCollapse(session, 'panelDatOverviewViz',
+    #                         open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'))
+    
     metabObj <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_rawdata_extraction(), silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
     metabObj <- MetAlyzer::filter_metabolites(metabObj,
@@ -533,12 +531,25 @@ server <- function(input, output, session) {
     })
     outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
     
+    # Prepare static sample metadata table 
+    smpMetadatTbl <- colData(reactMetabObj$oriMetabObj) %>%
+      tibble::as_tibble(rownames = 'ID') %>%
+      dplyr::mutate(ID = paste0('Smp', ID))
+    # Use original column names whose spaces are not replaced with '.'
+    colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$oriMetabObj)))
+    reactOriSmpMetadatTbl(smpMetadatTbl)
+    
     # Set parameters back to default
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
     updateSliderInput(session, 'featValidCutoffFiltering', value = 0)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
     updateMaterialSwitch(session, 'imputation', value = T)
     updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
+    doneImputation(0)
+    doneNormalization(0)
+    ifParamChange(0)
+    doneSmpFiltering(0)
+    doneFeatFiltering(0)
     
     updateSelectInput(session, 'featIdChoicesExport', selected = character(0))
     
@@ -572,6 +583,11 @@ server <- function(input, output, session) {
   })
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
+    #### Collapsed panel: Workaround
+    # Expand all panels to render outputs
+    # shinyBS::updateCollapse(session, 'panelDatOverviewViz',
+    #                         open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'))
+    
     validUploadedFile <- try(
       metabObj <- MetAlyzer::read_webidq(file_path = input$uploadedFile$datapath,
                                          sheet = 1, silent = T),
@@ -594,12 +610,25 @@ server <- function(input, output, session) {
       })
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
       
+      # Prepare static sample metadata table 
+      smpMetadatTbl <- colData(reactMetabObj$oriMetabObj) %>%
+        tibble::as_tibble(rownames = 'ID') %>%
+        dplyr::mutate(ID = paste0('Smp', ID))
+      # Use original column names whose spaces are not replaced with '.'
+      colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$oriMetabObj)))
+      reactOriSmpMetadatTbl(smpMetadatTbl)
+      
       # Set parameters back to default
       updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
       updateSliderInput(session, 'featValidCutoffFiltering', value = 0)
       updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
       updateMaterialSwitch(session, 'imputation', value = T)
       updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
+      doneImputation(0)
+      doneNormalization(0)
+      ifParamChange(0)
+      doneSmpFiltering(0)
+      doneFeatFiltering(0)
       
       updateCheckboxInput(session, 'ifUploadedFilePrior2023', value = F)
       updateSelectInput(session, 'featIdChoicesExport', selected = character(0))
@@ -642,6 +671,11 @@ server <- function(input, output, session) {
       ))
       reactMetabObj$metabObj <- NULL
     }
+  })
+  #### Collapsed panel: Workaround
+  # Close expanded panels (due to rendering) right after output is rendered
+  observeEvent(reactOriSmpMetadatTbl(), {
+    shinyBS::updateCollapse(session, 'panelDatOverviewViz', close = 'Sample metadata (All)')
   })
   
   # Retrieve abundance data and sample metadata and compute feature completeness
@@ -1197,7 +1231,7 @@ server <- function(input, output, session) {
                         max = floor(max(na.omit(reactLog2FCTbl()$log2FC))))
     } else {
       showModal(modalDialog(
-        title = 'Log₂(FC) computation failed...',
+        title = 'Differential analysis failed...',
         'Please select two different sample groups.',
         easyClose = T,
         footer = NULL
@@ -1255,6 +1289,11 @@ server <- function(input, output, session) {
     clickedRow <- input$tblParamLog_rows_selected
     # Because of reversed parameter log table
     sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
+  })
+  # Expand all panels each time trial (row) is clicked, so that output can be rendered
+  observeEvent(clickedRowIdx(), {
+    shinyBS::updateCollapse(session, id = 'panelTrialLog',
+                            open = c('Features Removed', 'Data distribution', 'Data completeness', 'Quantification status'))
   })
   
   # Log of all removed features
@@ -1350,6 +1389,9 @@ server <- function(input, output, session) {
     req(datOverviewPack()$metabAggreTbl)
     'Is the dataset already log-transformed? If so, normalization should not be applied again.'
   })
+  #### Collapsed panel: Workaround for light rendering
+  # Need it to render output when panel is collapsed
+  outputOptions(output, 'summDatDist', suspendWhenHidden = F)
   output$updateGpColsDatDist <- renderUI({
     req(smpChoicePack()$smpChoiceList)
     smpChoiceList <- smpChoicePack()$smpChoiceList
@@ -1397,13 +1439,22 @@ server <- function(input, output, session) {
   
   # Sample metadata
   output$tblSmpMetadat <- DT::renderDataTable({
-    req(datOverviewPack()$smpMetadatTbl)
-    smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
-    DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
+    # Static
+    req(reactOriSmpMetadatTbl())
+    DT::datatable(reactOriSmpMetadatTbl(), rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
                   options = list(pageLength = 5))
+    
+    # Reactive
+    # req(datOverviewPack()$smpMetadatTbl)
+    # smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
+    # DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
+    #               selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
+    #               options = list(pageLength = 5))
   })
-  # Render table outside collapsed panel and display it (NOT WORKING)
+  outputOptions(output, 'tblSmpMetadat', suspendWhenHidden = F)
+  #### Collapsed panel: Workaround (SHOULD WORK BUT NOT WORK)
+  # Render table outside collapsed panel and display it
   # output$uiTblSmpMetadat <- renderUI({
   #   DT::dataTableOutput('tblSmpMetadat')
   # })
@@ -1416,6 +1467,9 @@ server <- function(input, output, session) {
           'metabolites fail to fulfil the 80% rule, the recommended filtering threshold.',
           'Besides, is there any sample with high level of missingness?')
   })
+  #### Collapsed panel: Workaround for light rendering
+  # Need it to render output when panel is collapsed
+  outputOptions(output, 'summDatComplete', suspendWhenHidden = F)
   output$plotDatComplete <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
     smpCompleteCountTbl <- datOverviewPack()$metabAggreTbl %>%
@@ -1446,6 +1500,9 @@ server <- function(input, output, session) {
           'metabolites have fewer than 50% valid quantifications (Valid, LOQ) and',
           'could be filtered out. Besides, is there any sample containing just few valid quantifications?')
   })
+  #### Collapsed panel: Workaround for light rendering
+  # Need it to render output when panel is collapsed
+  outputOptions(output, 'summQuanStatus', suspendWhenHidden = F)
   output$plotQuanStatus <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
     smpStatusCountTbl <- datOverviewPack()$metabAggreTbl %>%
@@ -1507,10 +1564,10 @@ server <- function(input, output, session) {
   # Visualize log2(FC)
   # Give sign before log2(FC) calculation
   output$textLog2FC <- renderText({
-    'Please calculate Log₂(FC) first.'
+    'Please perform differential analysis first.'
   })
   output$textLog2FC_2 <- renderText({
-    'Please calculate Log₂(FC) first.'
+    'Please perform differential analysis first.'
   })
   
   # Update choices for metabolite highlighting
