@@ -24,116 +24,8 @@ th <- theme_bw(base_size = 15) +
         legend.text = element_text(size = 15))
 ```
 
-Load biocrates-exported data
-```{r}
-# Load biocrates-exported data
-metabObj <- MetAlyzer::read_metidq('./inst/extdata/Metalyzer_demodataset_biocratesMxPQuant500XL_2025-04.xlsx',
-                                   sheet = 1, silent = T)
-# Remove metabolism indicators
-# metabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = 'Metabolism Indicators',
-#                                           drop_NA_concentration = F)
-```
-
-Make plots for data distribution and missing patterns of UNPROCESSED data, which will be included in Figure 2A&B
-```{r message=F}
-# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
-metabAggreTbl <- metadata(metabObj)$aggregated_data %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(ID = paste0('Smp', ID))
-smpMetadatTbl <- colData(metabObj) %>%
-  tibble::as_tibble(rownames = 'ID') %>%
-  dplyr::mutate(ID = paste0('Smp', ID))
-# Use original column names whose spaces are not replaced with '.'
-colnames(smpMetadatTbl) <- c('ID', colnames(colData(metabObj)))
-# Prepare ID levels for displaying samples in order
-idLevels <- rownames(colData(metabObj))
-metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
-  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
-
-# Compute completeness level of each feature for doing filtering
-featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
-  # 0 is true zero in biocrates data
-  dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% NA ~ 1),
-                Miss = dplyr::case_when(Concentration %in% NA ~ 1)) %>%
-  dplyr::group_by(Metabolite) %>%
-  dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
-  dplyr::mutate(TotalCount = ncol(metabObj),
-                CompleteRatio = ObsCount / TotalCount)
-
-# Visualize data
-# Distribution
-dist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=`Sample Description`)) +
-  geom_boxplot(alpha = 1) +
-  scale_fill_brewer(palette = 'Set1') +
-  scale_y_log10() +
-  labs(x = 'Sample', y = 'Metabolite abundance') +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
-        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
-        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
-
-# Missingness
-smpCompleteCountTbl <- dplyr::mutate(metabAggreTbl,
-                                     Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed',
-                                                                     Concentration %in% NA ~ 'Missing')) %>%
-  dplyr::group_by(ID, Completeness) %>%
-  dplyr::summarise(Count = dplyr::n()) %>%
-  dplyr::ungroup()
-miss <- ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
-  geom_col(position = 'stack') +
-  scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
-  labs(x = 'Sample') +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
-        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
-        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
-```
-
-Preprocess data: 80% rule, half-minimum, and log2-transformation were performed.\
-**Supplementary Figure 1**
-```{r message=F}
-# Preprocess data
-# Feature filtering based on 80% rule
-rmMissFeats <- featCompleteLvTbl$Metabolite[featCompleteLvTbl$CompleteRatio < 0.8]
-processMetabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = rmMissFeats)
-# Half-minimum imputation
-processMetabObj <- MetAlyzer:::data_imputation(processMetabObj)
-# Log2-transformation
-processMetabObj <- MetAlyzer:::data_normalization(processMetabObj, norm_method = 'log2')
-
-#### The following chunk is basically the same as the previous. ####
-# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
-metabAggreTbl <- metadata(processMetabObj)$aggregated_data %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(ID = paste0('Smp', ID))
-smpMetadatTbl <- colData(processMetabObj) %>%
-  tibble::as_tibble(rownames = 'ID') %>%
-  dplyr::mutate(ID = paste0('Smp', ID))
-# Use original column names whose spaces are not replaced with '.'
-colnames(smpMetadatTbl) <- c('ID', colnames(colData(processMetabObj)))
-# Prepare ID levels for displaying samples in order
-idLevels <- rownames(colData(processMetabObj))
-metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
-  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
-
-# Visualize data
-# Distribution
-processDist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=`Sample Description`)) +
-  geom_boxplot(alpha = 1) +
-  scale_fill_brewer(palette = 'Set1') +
-  labs(x = 'Sample', y = 'Metabolite abundance') +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
-        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
-        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
-processDist
-# Save plot
-# ggsave(filename = 'path_to_save', dpi = 600, units = 'cm', width = 38, height = 12)
-```
-
-Do differential analysis and visualize results via volcano, scatter, and network plots\
-Customize themes of MetAlyzer::plot_scatter and MetAlyzer::plot_network (e.g., font size)\
-Note that these two functions were modified from older but functional version (just run chunk below).
+Customize themes of MetAlyzer::plot_scatter and MetAlyzer::plot_network (e.g., font size) for better visualization\
+Note that these two functions were modified from older but functional version (just run chunk below to get functions).
 ```{r, include=F}
 local_plot_scatter <- function(log2fc_df,
                                show_labels_for = NULL,
@@ -843,6 +735,116 @@ calculate_conditional_mean <- function(metric_vec, qval_vec, q_thresh) {
 }
 ```
 
+# Demo dataset from Biocrates
+
+Load biocrates-exported data
+```{r}
+# Load biocrates-exported data
+metabObj <- MetAlyzer::read_webidq('./inst/extdata/Metalyzer_demodataset_biocratesMxPQuant500XL_2025-04.xlsx',
+                                   sheet = 1, silent = T)
+# Remove metabolism indicators
+# metabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = 'Metabolism Indicators',
+#                                           drop_NA_concentration = F)
+```
+
+Make plots for data distribution and missing patterns of UNPROCESSED data, which were included in Figure 2A&B
+```{r message=F}
+# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
+metabAggreTbl <- metadata(metabObj)$aggregated_data %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+smpMetadatTbl <- colData(metabObj) %>%
+  tibble::as_tibble(rownames = 'ID') %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+# Use original column names whose spaces are not replaced with '.'
+colnames(smpMetadatTbl) <- c('ID', colnames(colData(metabObj)))
+# Prepare ID levels for displaying samples in order
+idLevels <- rownames(colData(metabObj))
+metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
+  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
+
+# Compute completeness level of each feature for doing filtering
+featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
+  # 0 is true zero in biocrates data
+  dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% NA ~ 1),
+                Miss = dplyr::case_when(Concentration %in% NA ~ 1)) %>%
+  dplyr::group_by(Metabolite) %>%
+  dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
+  dplyr::mutate(TotalCount = ncol(metabObj),
+                CompleteRatio = ObsCount / TotalCount)
+
+# Visualize data
+# Distribution
+dist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=`Sample Description`)) +
+  geom_boxplot(alpha = 1) +
+  scale_fill_brewer(palette = 'Set1') +
+  scale_y_log10() +
+  labs(x = 'Sample', y = 'Metabolite abundance') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Missingness
+smpCompleteCountTbl <- dplyr::mutate(metabAggreTbl,
+                                     Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed',
+                                                                     Concentration %in% NA ~ 'Missing')) %>%
+  dplyr::group_by(ID, Completeness) %>%
+  dplyr::summarise(Count = dplyr::n()) %>%
+  dplyr::ungroup()
+miss <- ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
+  geom_col(position = 'stack') +
+  scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
+  labs(x = 'Sample') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+```
+
+Preprocess data: 80% rule, half-minimum, and log2-transformation were performed.\
+**Supplementary Figure 1**
+```{r message=F}
+# Preprocess data
+# Feature filtering based on 80% rule
+rmMissFeats <- featCompleteLvTbl$Metabolite[featCompleteLvTbl$CompleteRatio < 0.8]
+processMetabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = rmMissFeats)
+# Half-minimum imputation
+processMetabObj <- MetAlyzer:::data_imputation(processMetabObj)
+# Log2-transformation
+processMetabObj <- MetAlyzer:::data_normalization(processMetabObj, norm_method = 'log2')
+
+#### The following chunk is basically the same as the previous. ####
+# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
+metabAggreTbl <- metadata(processMetabObj)$aggregated_data %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+smpMetadatTbl <- colData(processMetabObj) %>%
+  tibble::as_tibble(rownames = 'ID') %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+# Use original column names whose spaces are not replaced with '.'
+colnames(smpMetadatTbl) <- c('ID', colnames(colData(processMetabObj)))
+# Prepare ID levels for displaying samples in order
+idLevels <- rownames(colData(processMetabObj))
+metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
+  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
+
+# Visualize data
+# Distribution
+processDist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=`Sample Description`)) +
+  geom_boxplot(alpha = 1) +
+  scale_fill_brewer(palette = 'Set1') +
+  labs(x = 'Sample', y = 'Metabolite abundance') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+processDist
+# Save plot
+# ggsave(filename = 'path_to_save', device = 'png', dpi = 600, units = 'cm', width = 38, height = 12)
+```
+
+Do differential analysis and visualize results via volcano, scatter, and network plots\
 **Figure 2A-D**
 ```{r fig.height=20}
 # Compute log2(FC)
@@ -867,7 +869,7 @@ topRow <- cowplot::plot_grid(dist, miss, cols = 2, labels = 'AUTO', label_size =
 demoRes_ABCD <- cowplot::plot_grid(topRow, vulcano, scatter, ncol = 1, rel_heights = c(3, 5, 5),
                                    labels = c('', 'C', 'D'), label_size = 22, hjust = 0, vjust = 1.1)
 demoRes_ABCD
-# ggsave(filename = 'path_to_save', plot = demoRes_ABCD, dpi = 600, units = 'cm', width = 38, height = 52)
+# ggsave(filename = 'path_to_save', plot = demoRes_ABCD, device = 'png', dpi = 600, units = 'cm', width = 38, height = 52)
 ```
 
 **Figure 2E**
@@ -883,7 +885,7 @@ spsUtil::quiet({
 # Add label
 demoRes_E <- cowplot::plot_grid(network_p, labels = 'E', label_size = 22, hjust = 0, vjust = 1.1)
 demoRes_E
-# ggsave(filename = 'path_to_save', plot = demoRes_E, dpi = 600, units = 'cm', width = 38, height = 32)
+# ggsave(filename = 'path_to_save', plot = demoRes_E, device = 'png', dpi = 600, units = 'cm', width = 38, height = 32)
 ```
 
 **Supplementary Figure 2**
@@ -976,5 +978,156 @@ vulcano_DAGs <- plot_vulcano(log2FC(processMetabObj), x_cutoff = 1, y_cutoff = 0
 suppl_hilightVulcano <- cowplot::plot_grid(vulcano_TAGs, vulcano_DAGs, ncol = 1, labels = c('A', 'B'),
                                            label_size = 22, hjust = 0, vjust = 1.1)
 suppl_hilightVulcano
-# ggsave(filename = 'path_to_save', plot = suppl_hilightVulcano, dpi = 600, units = 'cm', width = 38, height = 40)
+# ggsave(filename = 'path_to_save', plot = suppl_hilightVulcano, device = 'png', dpi = 600, units = 'cm', width = 38, height = 40)
+```
+
+
+
+
+# Lung datasets from Gegner et al., 2024
+
+Load biocrates-exported data
+```{r}
+# Load biocrates-exported data
+metabObj <- MetAlyzer::read_webidq('./inst/extdata/2025-10-30_SmartCare_004-TP_008_009-AK.xlsx',
+                                   sheet = 1, silent = T)
+```
+
+Make plots for data distribution and missing patterns of UNPROCESSED data, which were included in Supplementary Figure 3A&B
+```{r message=F}
+# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
+metabAggreTbl <- metadata(metabObj)$aggregated_data %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+smpMetadatTbl <- colData(metabObj) %>%
+  tibble::as_tibble(rownames = 'ID') %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+# Use original column names whose spaces are not replaced with '.'
+colnames(smpMetadatTbl) <- c('ID', colnames(colData(metabObj)))
+# Prepare ID levels for displaying samples in order
+idLevels <- c(rownames(colData(metabObj))[colData(metabObj)$Group %in% 'Tumor'],
+              rownames(colData(metabObj))[colData(metabObj)$Group %in% 'Non-Tumor'])
+metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
+  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)),
+                Group = factor(Group, levels = c('Tumor', 'Non-Tumor')))
+
+# Compute completeness level of each feature for doing filtering
+featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
+  # 0 is true zero in biocrates data
+  dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% NA ~ 1),
+                Miss = dplyr::case_when(Concentration %in% NA ~ 1)) %>%
+  dplyr::group_by(Metabolite) %>%
+  dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
+  dplyr::mutate(TotalCount = ncol(metabObj),
+                CompleteRatio = ObsCount / TotalCount)
+
+# Visualize data
+# Distribution
+dist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=Group)) +
+  geom_boxplot(alpha = 1) +
+  scale_fill_brewer(palette = 'Set1') +
+  scale_y_log10() +
+  labs(x = 'Sample', y = 'Metabolite abundance') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Missingness
+smpCompleteCountTbl <- dplyr::mutate(metabAggreTbl,
+                                     Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed',
+                                                                     Concentration %in% NA ~ 'Missing')) %>%
+  dplyr::group_by(ID, Completeness) %>%
+  dplyr::summarise(Count = dplyr::n()) %>%
+  dplyr::ungroup()
+miss <- ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
+  geom_col(position = 'stack') +
+  scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
+  labs(x = 'Sample') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+```
+
+Preprocess data: Half-minimum and log2-transformation were performed.
+```{r message=F}
+# Preprocess data
+# Half-minimum imputation
+processMetabObj <- MetAlyzer:::data_imputation(metabObj)
+# Log2-transformation
+processMetabObj <- MetAlyzer:::data_normalization(processMetabObj, norm_method = 'log2')
+
+#### The following chunk is basically the same as the previous. ####
+# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
+metabAggreTbl <- metadata(processMetabObj)$aggregated_data %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+smpMetadatTbl <- colData(processMetabObj) %>%
+  tibble::as_tibble(rownames = 'ID') %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+# Use original column names whose spaces are not replaced with '.'
+colnames(smpMetadatTbl) <- c('ID', colnames(colData(processMetabObj)))
+# Prepare ID levels for displaying samples in order
+idLevels <- c(rownames(colData(processMetabObj))[colData(processMetabObj)$Group %in% 'Tumor'],
+              rownames(colData(processMetabObj))[colData(processMetabObj)$Group %in% 'Non-Tumor'])
+metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
+  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)),
+                Group = factor(Group, levels = c('Tumor', 'Non-Tumor')))
+
+# Visualize data
+# Distribution
+# processDist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=Group)) +
+#   geom_boxplot(alpha = 1) +
+#   scale_fill_brewer(palette = 'Set1') +
+#   labs(x = 'Sample', y = 'Metabolite abundance') +
+#   theme_bw() +
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+#         axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+#         legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+# processDist
+```
+
+Do differential analysis and visualize results via volcano, scatter, and network plots\
+**Supplementary Figure 3A-D**
+```{r fig.height=20}
+# Compute log2(FC)
+processMetabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = processMetabObj,
+                                           group = 'Group',
+                                           group_level = c('Tumor', 'Non-Tumor'))
+
+# Volcano plot
+vulcano <- MetAlyzer:::plot_vulcano(log2FC(processMetabObj), x_cutoff = 1, y_cutoff = 0.05) +
+  theme(axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Scatter plot
+scatter <- local_plot_scatter(log2FC(processMetabObj)) +
+  scale_y_continuous(breaks = c(seq(-4, 2, 1))) +
+  theme(axis.title = element_text(face = 'bold', size = 16), axis.text.y = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Make figure2
+topRow <- cowplot::plot_grid(dist, miss, cols = 2, labels = 'AUTO', label_size = 22,
+                             hjust = 0, vjust = 1.1)
+demoRes_ABCD <- cowplot::plot_grid(topRow, vulcano, scatter, ncol = 1, rel_heights = c(3, 5, 5),
+                                   labels = c('', 'C', 'D'), label_size = 22, hjust = 0, vjust = 1.1)
+demoRes_ABCD
+# ggsave(filename = 'path_to_save', plot = demoRes_ABCD, device = 'png', dpi = 600, units = 'cm', width = 38, height = 52)
+```
+
+**Supplementary Figure 3E**
+```{r fig.height=8}
+# Network diagram
+spsUtil::quiet({
+  network <- local_plot_network(log2FC(processMetabObj), metabolite_text_size = 3.5,
+                                connection_width = 1.8, pathway_text_size = 6, pathway_width = 5)
+  network_p <- network$Plot +
+    scale_fill_viridis(name = 'Log2(FC)') +
+    theme(legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+})
+# Add label
+demoRes_E <- cowplot::plot_grid(network_p, labels = 'E', label_size = 22, hjust = 0, vjust = 1.1)
+demoRes_E
+# ggsave(filename = 'path_to_save', plot = demoRes_E, device = 'png', dpi = 600, units = 'cm', width = 38, height = 32)
 ```
