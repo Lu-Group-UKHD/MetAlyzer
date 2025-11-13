@@ -59,10 +59,10 @@ helping to find pathway-level alterations and providing a systems perspective on
 # Loading and Exploring Data
 ## Import data from WebIDQ™
 ::: {style="text-align: justify"}
-***MetAlyzer's*** primary entry point is the `MetAlyzer::read_metidq()` function, which reads WebIDQ™ .xlsx output files (Fig. 1).\
+***MetAlyzer's*** primary entry point is the `MetAlyzer::read_webidq()` function, which reads WebIDQ™ .xlsx output files (Fig. 1).\
 As the output files contain layered information, inform of concentration values and color-coded quantification status (e.g., "Valid", "LOD", "LOQ"), 
 it is a tedious task to reliably process this data computationally, as the mix of numerical values and status codes hinders direct machine readability by standard analysis tools.
-To conveniently read the data in we provide the function `MetAlyzer::read_metidq()`, structuring the data into a SummarizedExperiment (SE) object [@Morgan2025SummarizedExperiment] for easy downstream analysis.
+To conveniently read the data in we provide the function `MetAlyzer::read_webidq()`, structuring the data into a SummarizedExperiment (SE) object [@Morgan2025SummarizedExperiment] for easy downstream analysis.
 For further demonstration we'll use a demo dataset kindly provided by BIOCRATES Life Sciences AG, featuring metabolite measurements across two groups (MxP®Quant 500 kit). This dataset is included in the ***MetAlyzer*** R package as the example data.
 :::
 
@@ -76,7 +76,7 @@ knitr::include_graphics("images/biocrates_output.png")
 fpath <- MetAlyzer::load_demodata_biocrates()
 
 # Load the data into a SummarizedExperiment object
-metalyzer_se <- MetAlyzer::read_metidq(fpath,
+metalyzer_se <- MetAlyzer::read_webidq(fpath,
                                        silent = TRUE)
 
 # Display the object summary

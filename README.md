@@ -34,7 +34,7 @@ This is an extract from one of the provided example data sets.
 
 #### Create MetAlyzer object:
 ```r
-> metalyzer_se <- MetAlyzer_dataset(file_path = load_demodata_biocrates())
+> metalyzer_se <- MetAlyzer::read_webidq(file_path = load_demodata_biocrates())
 
 
  _____ ______   _______  _________  ________  ___           ___    ___ ________  _______   ________

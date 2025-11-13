@@ -10,7 +10,7 @@ data_normalization(metalyzer_se, norm_method = "log2")
 \item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.}
 
 \item{norm_method}{A character specifying the normalization method to use, which
-should be one of 'log2' (default), 'median', 'TIC', or 'VSN'.}
+should be one of 'log2' (default), 'median', or 'TIC'.}
 }
 \value{
 An SE object with the normalized `Concentration` column in the aggregated
@@ -18,9 +18,8 @@ data accessible via `metalyzer_se@metadata$aggregated_data`.
 }
 \description{
 Normalize concentration values among samples using glog2 transformation,
-median normalization, total ion count (TIC) normalization, or variance stabilizing
-normalization (VSN) and update the `Concentration` column in the aggregated data
-in the input `SummarizedExperiment` (SE) object.
+median normalization, or total ion count (TIC) normalization and update the `Concentration`
+column in the aggregated data in the input `SummarizedExperiment` (SE) object.
 }
 \keyword{2,}
 \keyword{:}

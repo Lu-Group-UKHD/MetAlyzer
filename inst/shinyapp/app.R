@@ -41,9 +41,8 @@ ui <- fluidPage(
           uiOutput('updateFileInput'),
           div(textOutput('textFileInput'), style = 'color:IndianRed;font-weight:bold;font-size:110%'),
           checkboxInput('exampleFile',
-                        HTML('Explore app with <b>example dataset</b>: <a href = "https://doi.org/10.3389/fmolb.2022.961448">[Gegner et al. 2022]</a>'), 
+                        HTML('Explore app with example dataset from <b>Biocrates</b>'), 
                         value = FALSE),
-          shinyBS::bsTooltip('exampleFile', 'Discover the full range of functions with this diverse tissue dataset.'),
           # Show data processing options only after file is uploaded
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
@@ -515,7 +514,7 @@ server <- function(input, output, session) {
     # shinyBS::updateCollapse(session, 'panelDatOverviewViz',
     #                         open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'))
     
-    metabObj <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_rawdata_extraction(), silent = T)
+    metabObj <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates(), silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
     metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                               drop_metabolites = 'Metabolism Indicators',
@@ -570,7 +569,7 @@ server <- function(input, output, session) {
     reactCodeHistory(c(reactCodeHistory(),
                        '# Initialize MetAlyzer SE object with example data'))
     reactCodeHistory(c(reactCodeHistory(),
-                       'MetAlyzer::read_webidq(file_path = MetAlyzer::load_rawdata_extraction())'))
+                       'MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())'))
     reactCodeHistory(c(reactCodeHistory(),
                        '# Exclude "Metabolism Indicators"'))
     reactCodeHistory(c(reactCodeHistory(),
@@ -1904,11 +1903,9 @@ server <- function(input, output, session) {
             <br><br>
             You can find a guide to set up the application locally on your machine here:
             <br>
-            link
+            <a href='https://github.com/Lu-Group-UKHD/MetAlyzer/blob/main/vignettes/shiny_app.Rmd'>Github</a>
             <br>
-            or in the tutorial video at timpoint xx:xx:
-            <br>
-            link"),
+            or in the tutorial video."),
         # Replace the old footer with this new one
         footer = tags$button(
           "I Understand and Accept",
