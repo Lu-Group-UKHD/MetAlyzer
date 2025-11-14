@@ -241,6 +241,29 @@ data_normalization <- function(metalyzer_se, norm_method = 'log2') {
   return(metalyzer_se)
 }
 
+
+#' @title Get sample labels from metadata
+#' @description Extracts sample labels for plotting.
+#' Looks for columns "Sample ID", "Sample Identification", or "Identification"
+#' (case-insensitive, ignoring punctuation). Falls back to ID column if not found.
+#'
+#' @param smpMetadatTbl A data frame with an 'ID' column and optional label column.
+#' @return Character vector of sample labels, same length as nrow(smpMetadatTbl).
+#'
+#' @keywords internal
+get_sample_labels <- function(smpMetadatTbl) {
+  norm <- function(x) gsub("[^a-z0-9]", "", tolower(x))
+  norm_cols <- sapply(colnames(smpMetadatTbl), norm, USE.NAMES = FALSE)
+  match_idx <- which(grepl("sample.*id|identif", norm_cols))
+  
+  if (length(match_idx) > 0) {
+    labels <- as.character(smpMetadatTbl[[match_idx[1]]])
+    labels[is.na(labels) | labels == ""] <- as.character(smpMetadatTbl$ID[is.na(labels) | labels == ""])
+    return(labels)
+  }
+  as.character(smpMetadatTbl$ID)
+}
+
 #' @title Differential analysis
 #' @description Perform differential analysis and add the results table to the input
 #' `SummarizedExperiment` (SE) object. The analysis is conducted using the \pkg{limma}

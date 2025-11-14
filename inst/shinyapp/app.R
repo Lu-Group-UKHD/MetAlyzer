@@ -690,10 +690,13 @@ server <- function(input, output, session) {
       dplyr::mutate(ID = paste0('Smp', ID))
     # Use original column names whose spaces are not replaced with '.'
     colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$metabObj)))
+    # Add sample labels (prefer Sample ID / Identification column if available)
+    metabAggreTbl$SampleLabel <- rep(MetAlyzer::get_sample_labels(smpMetadatTbl), nrow(metabAggreTbl) / nrow(smpMetadatTbl))
     # Prepare ID levels for displaying samples in order
     idLevels <- rownames(colData(reactMetabObj$metabObj))
     metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
-      dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
+      dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)),
+                    SampleLabel = factor(SampleLabel, levels = unique(SampleLabel[match(paste0('Smp', idLevels), ID)])))
     
     # Compute completeness level of each feature for doing filtering
     featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
@@ -1415,10 +1418,10 @@ server <- function(input, output, session) {
     req(datOverviewPack()$metabAggreTbl, input$gpColsDatDist)
     metabAggreTbl <- datOverviewPack()$metabAggreTbl
     if (input$gpColsDatDist == 'None') {
-      g <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration)) +
+      g <- ggplot(metabAggreTbl, aes(x=SampleLabel, y=Concentration)) +
         geom_boxplot()
     } else {
-      g <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=.data[[input$gpColsDatDist]])) +
+      g <- ggplot(metabAggreTbl, aes(x=SampleLabel, y=Concentration, fill=.data[[input$gpColsDatDist]])) +
         geom_boxplot(alpha = 1) +
         scale_fill_brewer(palette = 'Set1')
     }
@@ -1474,10 +1477,10 @@ server <- function(input, output, session) {
     smpCompleteCountTbl <- datOverviewPack()$metabAggreTbl %>%
       dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed', #c(0, NA)
                                                     Concentration %in% NA ~ 'Missing')) %>% #c(0, NA)
-      dplyr::group_by(ID, Completeness) %>%
+      dplyr::group_by(SampleLabel, Completeness) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
-    g <- ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
+    g <- ggplot(smpCompleteCountTbl, aes(x=SampleLabel, y=Count, fill=Completeness)) +
       geom_col(position = 'stack') +
       scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
       labs(x = 'Sample') +
@@ -1505,11 +1508,11 @@ server <- function(input, output, session) {
   output$plotQuanStatus <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
     smpStatusCountTbl <- datOverviewPack()$metabAggreTbl %>%
-      dplyr::group_by(ID, Status) %>%
+      dplyr::group_by(SampleLabel, Status) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
     status2Color <- c('Valid'='#33a02c', 'LOQ'='#1f78b4', 'LOD'='#ff7f00', 'Invalid'='#e31a1c')
-    g <- ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
+    g <- ggplot(smpStatusCountTbl, aes(x = SampleLabel, y = Count, fill = Status)) +
         geom_col(position = "stack") +
         scale_fill_manual(values = status2Color) +
         labs(x = "Sample") +
