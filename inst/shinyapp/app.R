@@ -41,7 +41,7 @@ ui <- fluidPage(
           uiOutput('updateFileInput'),
           div(textOutput('textFileInput'), style = 'color:IndianRed;font-weight:bold;font-size:110%'),
           checkboxInput('exampleFile',
-                        HTML('Explore app with example dataset from <b>Biocrates</b>'), 
+                        HTML('Explore app with example dataset provided by <b>Biocrates</b>'), 
                         value = FALSE),
           # Show data processing options only after file is uploaded
           conditionalPanel(condition = "output.ifValidUploadedFile",
@@ -690,8 +690,8 @@ server <- function(input, output, session) {
       dplyr::mutate(ID = paste0('Smp', ID))
     # Use original column names whose spaces are not replaced with '.'
     colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$metabObj)))
-    # Add sample labels (prefer Sample ID / Identification column if available)
-    metabAggreTbl$SampleLabel <- rep(MetAlyzer::get_sample_labels(smpMetadatTbl), nrow(metabAggreTbl) / nrow(smpMetadatTbl))
+    # Add sample labels (prefer Sample ID / Identification column if available) #### Error-prone, better use dplyr::left_join()
+    metabAggreTbl$SampleLabel <- rep(MetAlyzer:::get_sample_labels(smpMetadatTbl), nrow(metabAggreTbl) / nrow(smpMetadatTbl))
     # Prepare ID levels for displaying samples in order
     idLevels <- rownames(colData(reactMetabObj$metabObj))
     metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
@@ -1418,7 +1418,7 @@ server <- function(input, output, session) {
     req(datOverviewPack()$metabAggreTbl, input$gpColsDatDist)
     metabAggreTbl <- datOverviewPack()$metabAggreTbl
     if (input$gpColsDatDist == 'None') {
-      g <- ggplot(metabAggreTbl, aes(x=SampleLabel, y=Concentration)) +
+      g <- ggplot(metabAggreTbl, aes(x=SampleLabel, y=Concentration)) + #### ID -> SampleLabel
         geom_boxplot()
     } else {
       g <- ggplot(metabAggreTbl, aes(x=SampleLabel, y=Concentration, fill=.data[[input$gpColsDatDist]])) +

@@ -261,7 +261,7 @@ get_sample_labels <- function(smpMetadatTbl) {
     labels[is.na(labels) | labels == ""] <- as.character(smpMetadatTbl$ID[is.na(labels) | labels == ""])
     return(labels)
   }
-  as.character(smpMetadatTbl$ID)
+  return(as.character(smpMetadatTbl$ID))
 }
 
 #' @title Differential analysis
