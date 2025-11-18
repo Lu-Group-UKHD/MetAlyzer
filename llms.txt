@@ -28,7 +28,7 @@ The package takes metabolomic measurements and the quantification status
 software. Additionally, meta data for each sample can be provided for
 further analysis.
 
-This is an extract from one of the provided example data sets.
+This is an extract from one of the provided example data sets.  
 ![Example_Data](articles/images/biocrates_output.png)
 
 #### Create MetAlyzer object:
@@ -100,14 +100,12 @@ network <- MetAlyzer::plot_network(
 network$Plot
 ```
 
-![Network](articles/images/network_demodata.png)
-
-Network
+![](articles/images/network_demodata.png)
 
 ## Detailed instructions
 
-**For a comprehensive tutorial, please check out the MetAlyzer
-Vignettes**.  
+**For a comprehensive tutorial, please check out the MetAlyzer Vignettes
+on our [GitHub pages](https://lu-group-ukhd.github.io/MetAlyzer/)**.  
 **Please also check out [MetAlyzer on
 CRAN](https://CRAN.R-project.org/package=MetAlyzer).**
 
