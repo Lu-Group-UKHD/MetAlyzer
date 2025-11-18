@@ -13,7 +13,7 @@ summarize_conc_values(metalyzer_se)
 This function prints quantiles and NAs of raw data.
 }
 \examples{
-metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 
 MetAlyzer::summarize_conc_values(metalyzer_se)
 }

@@ -2,14 +2,14 @@ MetAlyzer
 ========
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/nilsmechtel/MetAlyzer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nilsmechtel/MetAlyzer/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/nilsmechtel/MetAlyzer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Lu-Group-UKHD/MetAlyzer/actions/workflows/R-CMD-check.yaml)
 [![license](https://img.shields.io/badge/license-GPL--3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![metacran downloads](https://cranlogs.r-pkg.org/badges/grand-total/MetAlyzer)](https://cran.r-project.org/package=MetAlyzer)
 <!-- badges: end -->
 
-**An R Package to read and analyze MetIDQ&trade; output**
+**An R Package to read and analyze WebIDQ&trade; output**
 
-The package provides methods to read output files from the MetIDQ&trade; software into R. Metabolomics data is read and reformatted into an S4 object for convenient data handling, statistics and downstream analysis.
+The package provides methods to read output files from the WebIDQ&trade; software into R. Metabolomics data is read and reformatted into an S4 object for convenient data handling, statistics and downstream analysis.
 
 ## Install
 
@@ -22,19 +22,19 @@ install.packages("MetAlyzer")
 For the latest version install from GitHub
 ```r
 library(devtools)
-install_github("nilsmechtel/MetAlyzer")
+install_github("Lu-Group-UKHD/MetAlyzer")
 ```
 
 ## Quickstart
 
-The package takes metabolomic measurements and the quantification status (e.g. "Valid", "LOQ", "LOD") as ".xlsx" files generated from the MetIDQ&trade; software. Additionally, meta data for each sample can be provided for further analysis.
+The package takes metabolomic measurements and the quantification status (e.g. "Valid", "LOQ", "LOD") as ".xlsx" files generated from the WebIDQ&trade; software. Additionally, meta data for each sample can be provided for further analysis.
 
 This is an extract from one of the provided example data sets.
 ![Example_Data](vignettes/images/biocrates_output.png)
 
 #### Create MetAlyzer object:
 ```r
-> metalyzer_se <- MetAlyzer_dataset(file_path = load_demodata_biocrates())
+> metalyzer_se <- MetAlyzer::read_webidq(file_path = load_demodata_biocrates())
 
 
  _____ ______   _______  _________  ________  ___           ___    ___ ________  _______   ________
@@ -101,5 +101,6 @@ network$Plot
 ![Network](vignettes/images/network_demodata.png)
 
 ## Detailed instructions
-**For a comprehensive tutorial, please check out the [MetAlyzer Vignette](https://CRAN.R-project.org/package=MetAlyzer
+**For a comprehensive tutorial, please check out the MetAlyzer Vignettes**.\
+**Please also check out [MetAlyzer on CRAN](https://CRAN.R-project.org/package=MetAlyzer
 ).**

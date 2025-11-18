@@ -13,12 +13,23 @@ library(htmlwidgets)
 library(svglite)
 library(writexl)
 library(bslib)
-source("utils.R")
 library(viridis)
 library(viridisLite)
 library(gridExtra)
 
 ui <- fluidPage(
+  # Define notification styles for 'Process' and 'Revert/Default' buttons
+  tags$head(
+    tags$style(HTML("
+      .shiny-notification {
+        width: 300px;
+        position: fixed;
+        top: 15px;
+        right: 15px;
+        opacity: 1;
+      }
+    "))
+  ),
   titlePanel('Biocrates Metabolomics Analysis'),
   tabsetPanel(
     type = 'tabs',
@@ -30,9 +41,8 @@ ui <- fluidPage(
           uiOutput('updateFileInput'),
           div(textOutput('textFileInput'), style = 'color:IndianRed;font-weight:bold;font-size:110%'),
           checkboxInput('exampleFile',
-                        HTML('Explore app with <b>example dataset</b>: <a href = "https://doi.org/10.3389/fmolb.2022.961448">[Gegner et al. 2022]</a>'), 
+                        HTML('Explore app with example dataset provided by <b>Biocrates</b>'), 
                         value = FALSE),
-          shinyBS::bsTooltip('exampleFile', 'Discover the full range of functions with this diverse tissue dataset.'),
           # Show data processing options only after file is uploaded
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            tags$h4('Data Processing', style = 'color:steelblue;font-weight:bold'),
@@ -47,23 +57,23 @@ ui <- fluidPage(
                                            choices = character(0), multiple = T),
                                fluidRow(
                                  column(width = 8, sliderInput('featCompleteCutoffFiltering',
-                                                               'Select % of observed values each metabolite should have:',
+                                                               'Select % of quantified values per metabolite:',
                                                                min = 0, max = 100, value = 80))
                                ),
                                fluidRow(
                                  column(width = 8, sliderInput('featValidCutoffFiltering',
-                                                               'Select % of valid values each metabolite should have:',
-                                                               min = 0, max = 100, value = 50)),
+                                                               'Select % of valid quantifications per metabolite:',
+                                                               min = 0, max = 100, value = 0)),
                                  column(width = 3, offset = 1,
                                         checkboxGroupInput('featValidStatusFiltering', 'Validity',
                                                            choices = c('Valid', 'LOQ', 'LOD', 'Invalid'),
                                                            selected = c('Valid', 'LOQ'))),
                                  shinyBS::bsTooltip('featCompleteCutoffFiltering',
-                                                    'Metabolites with observed values below this cutoff are removed.'),
+                                                    'Metabolites with quantification rates below this cutoff are removed.'),
                                  shinyBS::bsTooltip('featValidCutoffFiltering',
-                                                    'Metabolites with valid values below this cutoff are removed.'),
+                                                    'Metabolites with valid quantifications below this cutoff are removed.'),
                                  shinyBS::bsTooltip('featValidStatusFiltering',
-                                                    'The selected is considered valid for filtering.')
+                                                    'The selected is considered valid quantification for filtering.')
                                )
                              ),
                              shinyBS::bsCollapsePanel(
@@ -125,36 +135,88 @@ ui <- fluidPage(
           ),
           conditionalPanel(condition = "output.ifValidUploadedFile",
                            shinyBS::bsCollapse(
-                             open = c('Data distribution', 'Data completeness'), multiple = T,
-                             shinyBS::bsCollapsePanel('Sample metadata', style = 'primary',
+                             id = 'panelDatOverviewViz',
+                             # Note that collapsed panel does not render output until it is expanded
+                             open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'),
+                             multiple = T,
+                             shinyBS::bsCollapsePanel('Sample metadata (All)', style = 'primary',
                                                       DT::dataTableOutput('tblSmpMetadat') %>%
+                                                      #### Collapsed panel: Workaround (SHOULD WORK BUT NOT WORK)
+                                                      # Render table outside collapsed panel and display it
+                                                      # uiOutput('uiTblSmpMetadat') %>%
                                                         shinycssloaders::withSpinner(color="#56070C")),
                              shinyBS::bsCollapsePanel('Data distribution', style = 'primary',
-                                                      uiOutput('updateGpColsDatDist'),
+                                                      fluidRow(
+                                                        style = 'display:flex; align-items: center;',
+                                                        column(width = 7, shinyBS::bsCollapse(
+                                                          id = 'hintDatDist',
+                                                          shinyBS::bsCollapsePanel('💡Hint', style = 'success',
+                                                                                   textOutput('summDatDist', container = strong))
+                                                        )),
+                                                        column(width = 4, offset = 1, uiOutput('updateGpColsDatDist'))
+                                                      ),
                                                       plotly::plotlyOutput('plotDatDist') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C")),
+                                                        shinycssloaders::withSpinner(color="#56070C"),
+                                                      fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
+                                                               column(width = 2,
+                                                                      selectInput("formatDatDist", label = NULL,
+                                                                                  choices = c("html", "png", "pdf", "svg"),
+                                                                                  selected = "html")),
+                                                               column(width = 2, downloadButton("downloadDatDist",
+                                                                                                "Download")))
+                                                      ),
                              shinyBS::bsCollapsePanel('Data completeness', style = 'primary',
-                                                      shinyBS::bsCollapsePanel('Hint', style = 'success',
-                                                                               textOutput('summDatComplete', container = strong)),
+                                                      fluidRow(
+                                                        column(width = 7,
+                                                               shinyBS::bsCollapse(
+                                                                 id = 'hintDatComplete',
+                                                                 shinyBS::bsCollapsePanel('💡Hint', style = 'success',
+                                                                                          textOutput('summDatComplete', container = strong))
+                                                               )
+                                                        )
+                                                      ),
                                                       plotly::plotlyOutput('plotDatComplete') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C")),
+                                                        shinycssloaders::withSpinner(color="#56070C"),
+                                                      fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
+                                                               column(width = 2,
+                                                                      selectInput("formatDatComplete", label = NULL,
+                                                                                  choices = c("html", "png", "pdf", "svg"),
+                                                                                  selected = "html")),
+                                                               column(width = 2, downloadButton("downloadDatComplete",
+                                                                                                "Download")))
+                                                      ),
                              shinyBS::bsCollapsePanel('Quantification status', style = 'primary',
                                                       #### Adjust tab size
-                                                      shinyBS::bsCollapsePanel('Hint', style = 'success',
-                                                                               textOutput('summQuanStatus', container = strong)),
+                                                      fluidRow(
+                                                        column(width = 7,
+                                                               shinyBS::bsCollapse(
+                                                                 id = 'hintQuanStatus',
+                                                                 shinyBS::bsCollapsePanel('💡Hint', style = 'success',
+                                                                                          textOutput('summQuanStatus', container = strong))
+                                                               )
+                                                        )
+                                                      ),
                                                       plotly::plotlyOutput('plotQuanStatus') %>%
-                                                        shinycssloaders::withSpinner(color="#56070C"))
+                                                        shinycssloaders::withSpinner(color="#56070C"),
+                                                      fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
+                                                               column(width = 2,
+                                                                      selectInput("formatQuanStatus", label = NULL,
+                                                                                  choices = c("html", "png", "pdf", "svg"),
+                                                                                  selected = "html")),
+                                                               column(width = 2, downloadButton("downloadQuanStatus",
+                                                                                                "Download")))
+                                                      )
                            )
           )
         )
       )
     ), # TabPanel 1 End
     tabPanel(
-      'Log₂(FC)',
+      'Analysis',
       sidebarLayout(
         conditionalPanel(condition = "output.ifValidUploadedFile",
                          sidebarPanel(
-                           tags$h4('Log₂(FC) Calculation', style = 'color:steelblue;font-weight:bold'),
+                           tags$h4('Differential Analysis', style = 'color:steelblue;font-weight:bold'),
                            fluidRow(
                              column(width = 5, selectInput('smpChoiceGpsLog2FC', 'Compare between:',
                                                            choices = 'Not available', multiple = F)),
@@ -166,15 +228,13 @@ ui <- fluidPage(
                            ),
                            fluidRow(
                              style = "display: flex; align-items: center;",
-                             column(width = 5, actionButton('computeLog2FC', 'Compute', width = '100%')),
-                             conditionalPanel(
-                               condition = "input.computeLog2FC > 0", # Check if the compute button has been clicked
-                               fluidRow(
-                                 column(width = 5, downloadButton('downloadLog2FC', 'Download log2FC Table', width = '100%'))
-                               ),
+                             column(width = 5, actionButton('computeLog2FC', 'Perform', width = '100%')),
+                             column(width = 6, offset = 1,
+                                    conditionalPanel(condition = "input.computeLog2FC > 0", # Check if the compute button has been clicked
+                                                     downloadButton('downloadLog2FC', 'Download analysis result table', width = '100%')
+                                    )
                              ),
                            ),
-                           
                            tags$br(),
                            tags$h4('Vulcano Plot', style = 'color:steelblue;font-weight:bold'), #Log₂(FC) Visualization
                            #### Highlighting in scatter plot is to be fixed 
@@ -190,7 +250,7 @@ ui <- fluidPage(
                            fluidRow(
                              column(width = 6, sliderInput('plotVolcanoLog2FCCutoff', 'Log₂(FC)',
                                                            min = 0, max = 10, value = 1, step = 0.1, ticks = F)),
-                             column(width = 6, selectInput('plotVolcanoPValCutoff', 'P-value',
+                             column(width = 6, selectInput('plotVolcanoPValCutoff', 'q-value',
                                                            choices = c('0.0001', '0.001', '0.01', '0.05', '0.1'), #to avoid scientific notation
                                                            multiple = F, selected = 0.05))
                            )
@@ -198,19 +258,18 @@ ui <- fluidPage(
         ),
         mainPanel(
           conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
-                           div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%')),
+                           div(textOutput('textLog2FC'), style = 'color:IndianRed;font-weight:bold;font-size:110%;margin-top:1rem;')),
           conditionalPanel(condition = "input.computeLog2FC",
-                           tags$h4(strong('Vulcano plot'), style = "margin-top:1rem;"),
+                           tags$h3(strong('Vulcano Plot'), style = "margin-top:1rem; color: steelblue;"),
                            plotly::plotlyOutput('plotVolcano') %>%
                              shinycssloaders::withSpinner(color="#56070C"),
-                           #### Provide option of downloading static plot?
                            fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
                                     column(width = 2, 
                                            selectInput("formatVulcano", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
                                     column(width = 2, downloadButton("downloadVulcanoPlot", "Download vulcano plot"))
                            ),
                            tags$br(),
-                           tags$h4(strong('Scatter plot'), style = "margin-top:1rem;"),
+                           tags$h3(strong('Scatter Plot'), style = "margin-top:1rem; color: steelblue;"),
                            fluidRow(
                              column(width = 9, style = "z-index:2;", plotly::plotlyOutput('plotScatter') %>%
                                       shinycssloaders::withSpinner(color="#56070C")),
@@ -228,60 +287,92 @@ ui <- fluidPage(
       )
     ), # TabPanel 2 End
     tabPanel(
-      #### Add title to scale, i.e., log2(FC)?
       'Network',
       # Lower network plot a bit
       tags$br(),
       conditionalPanel(condition = "input.computeLog2FC",
                        shinyBS::bsCollapse(open = "",
-                                           shinyBS::bsCollapsePanel("Advanced Styles",
-                                                                    div(style = "display: flex;
-                                                                        flex-wrap: wrap;
-                                                                        justify-content: center;
-                                                                        align-items: center;
-                                                                        margin-bottom: 20px;
-                                                                        width: 80%;
-                                                                        margin-left: auto;
-                                                                        margin-right: auto",
-                                                                        # Plot Height Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkPlotHeight", 
-                                                                                        "Plot Height [100px]", 
-                                                                                        min = 4, max = 20, 
-                                                                                        value = 10, step = 1)
-                                                                        ),
-                                                                        # Metabolite Node Size Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkMetaboliteNodeSize", 
-                                                                                        "Metabolite Node Size", 
-                                                                                        min = 5, max = 50, 
-                                                                                        value = 11, step = 1)
-                                                                        ),
-                                                                        # Connection Width Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkConnectionWidth", 
-                                                                                        "Connection Width", 
-                                                                                        min = 0.5, max = 5, 
-                                                                                        value = 1.25, step = 0.25)
-                                                                        ),
-                                                                        # Pathway Text Size Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkPathwayTextSize", 
-                                                                                        "Pathway Text Size", 
-                                                                                        min = 10, max = 50, 
-                                                                                        value = 20, step = 1)
-                                                                        ),
-                                                                        # Pathway Width Slider
-                                                                        div(style = "flex: 1; min-width: 150px; margin: 5px;",
-                                                                            sliderInput("networkPathwayWidth", 
-                                                                                        "Pathway Width", 
-                                                                                        min = 5, max = 30, 
-                                                                                        value = 10, step = 1)
-                                                                        ),
-                                                                        actionButton('defaultNetworkPlotStyles', 'Default', width = '6%'),
-                                                                        shinyBS::bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
-                                                                    )
-                                           )
+                        shinyBS::bsCollapsePanel("Advanced Options",
+                                                div(style = "display: grid;
+                                                              grid-template-columns: repeat(5, 1fr);
+                                                              gap: 15px;
+                                                              align-items: center;
+                                                              width: 80%;
+                                                              margin: 0 auto 20px;",
+                                                    # Plot Height Slider
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkPlotHeight", 
+                                                                    "Plot Height [100px]", 
+                                                                    min = 4, max = 20, 
+                                                                    value = 10, step = 1)
+                                                    ),
+                                                    # Metabolite Node Size Slider
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkMetaboliteNodeSize", 
+                                                                    "Metabolite Node Size", 
+                                                                    min = 5, max = 50, 
+                                                                    value = 11, step = 1)
+                                                    ),
+                                                    # Connection Width Slider
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkConnectionWidth", 
+                                                                    "Connection Width", 
+                                                                    min = 0.5, max = 5, 
+                                                                    value = 1.25, step = 0.25)
+                                                    ),
+                                                    # Pathway Text Size Slider
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkPathwayTextSize", 
+                                                                    "Pathway Text Size", 
+                                                                    min = 10, max = 50, 
+                                                                    value = 20, step = 1)
+                                                    ),
+                                                    # Pathway Width Slider
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        sliderInput("networkPathwayWidth", 
+                                                                    "Pathway Width", 
+                                                                    min = 5, max = 30, 
+                                                                    value = 10, step = 1)
+                                                    ),
+                                                    # Color Scale Selector --- ADDED
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        selectInput("networkColorScale", "Color Scale",
+                                                                    choices = c("Viridis", "Plasma", "Magma", "Inferno", 
+                                                                                "Cividis", "Rocket", "Mako", "Turbo"),
+                                                                    selected = "Viridis")
+                                                    ),
+                                                    # Exclude Pathways Selector --- ADDED
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        selectInput("networkExcludePathways", "Exclude Pathways",
+                                                                    choices = c("Bile Acids", "Eicosanoid Synthesis", "Hormones", 
+                                                                                "Beta Oxidation", "Choline/Betaine metabolism", 
+                                                                                "Lysine Metabolism", "Poly Amines", "Urea Cycle", 
+                                                                                "TCA Cycle", "Glutamate Metabolism", 
+                                                                                "Monoamine Metabolism", "Indole/Tryptophane Metabolism"),
+                                                                    multiple = TRUE)
+                                                    ),
+                                                    # Column Name Selector --- ADDED
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                        selectInput("networkValueColumn", "Plotted Value",
+                                                                    choices = c("log2FC", "pval", "qval", "tval"),
+                                                                    selected = "log2FC")
+                                                    ),
+                                                    #Download controls --- MOVED
+                                                    div(style = "min-width: 150px;",
+                                                        selectInput("formatNetwork", label = "Format", choices = c("html", "png", "pdf", "svg"), selected = "html", width = '100%')
+                                                    ),
+                                                    div(style = "min-width: 150px;",
+                                                        downloadButton("downloadNetworkPlot", "Download", style = "width: 100%; margin-top: 5px;")
+                                                    ),
+                                                    #Default Settings --- MOVED
+                                                    div(style = "min-width: 150px; margin: 5px;"),
+                                                    div(style = "min-width: 150px; margin: 5px;"),
+                                                    div(style = "min-width: 150px; margin: 5px;",
+                                                      actionButton('defaultNetworkPlotStyles', 'Default', width = '100%'),
+                                                      shinyBS::bsTooltip('defaultNetworkPlotStyles', 'The changed plot style parameters revert to default.')
+                                                    ),
+                                                )
+                        )
                        )
       ),
       conditionalPanel(condition = "output.ifValidUploadedFile & input.computeLog2FC == 0",
@@ -291,23 +382,27 @@ ui <- fluidPage(
                            # Use the height value from the slider to control the plot's height
                            plotly::plotlyOutput('plotNetwork', height = "auto") %>%
                              shinycssloaders::withSpinner(color="#56070C"),
-                           fluidRow(style="display:flex; justify-content:center; margin-top:50px; margin-bottom:1rem;",
-                                    column(width = 2, 
-                                           selectInput("formatNetwork", label = NULL, choices = c("html", "png", "pdf", "svg"), selected = "html")),
-                                    column(width = 2, downloadButton("downloadNetworkPlot", "Download Network plot"))
-                           )
-                       )
+                       ),
+                       div(style = "width: 80%; margin: auto; margin-bottom: 200px;",
+                           tags$h3(strong('Node Stats'), style = "margin-top:1rem;"),
+                           selectInput("selectedNodesVulcano", "Select node(s) to view:",
+                                       choices = character(0), multiple = TRUE),
+                           plotly::plotlyOutput('plotVolcanoNodes') %>%
+                             shinycssloaders::withSpinner(color="#56070C"),
+                           downloadButton("downloadNodesExcel", "Download node stats as Excel"))
+                           
       )
     ),
     tabPanel(
-      'Log',
+      'History',
       conditionalPanel(condition = "output.ifValidUploadedFile",
+                       style = 'margin-left: 5mm;',
                        fluidRow(
                          column(width = 7, HTML('<br>
-                                                <h3 style="margin-left: 2%;">Processing History</h3>
-                                                <h5 style="margin-left: 2%;">This section logs processing
+                                                <h3 style = "font-weight: bold; color: steelblue;">Processing History</h3>
+                                                <h5>This section logs processing
                                                 parameters used in different trials (every time you hit Process button).</h5>
-                                                <h5 style="margin-left: 2%;"><strong>Instructions:</strong> Click on a row to
+                                                <h5><strong>Instructions:</strong> Click on a row to
                                                 view the processed data at the specific point.</h5>
                                                 <br>')),
                          column(width = 2, div(style = "width: 60%; margin-top: 30%;",
@@ -323,6 +418,8 @@ ui <- fluidPage(
                                 ),
                                 conditionalPanel(condition = "typeof input.tblParamLog_rows_selected !== 'undefined' && input.tblParamLog_rows_selected.length > 0",
                                                  shinyBS::bsCollapse(
+                                                   id = 'panelTrialLog',
+                                                   open = c('Features Removed', 'Data distribution', 'Data completeness', 'Quantification status'),
                                                    multiple = T,
                                                    shinyBS::bsCollapsePanel('Features Removed', style = 'info',
                                                                             textOutput('textRmFeatsLog') %>%
@@ -339,6 +436,16 @@ ui <- fluidPage(
                                                  )
                                 )
                          )
+                       ),
+                       tags$br(),
+                       tags$br(),
+                       fluidRow(
+                         column(width = 7,
+                                tags$h3(strong('Command History (Last Operation)'), style = 'color: steelblue;'),
+                                verbatimTextOutput('textCommands'),
+                                downloadButton('downloadSessionInfo', 'Download session info'),
+                                shinyBS::bsTooltip('downloadSessionInfo',
+                                                   'Critical for scientific reporting (e.g., package versions).'))
                        )
       )
     )
@@ -348,6 +455,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   # Create reactive objects for storing up-to-date data
   reactMetabObj <- reactiveValues(metabObj = NULL, oriMetabObj = NULL, tmpMetabObj = NULL)
+  reactOriSmpMetadatTbl <- reactiveVal()
   reactLog2FCTbl <- reactiveVal()
   reactVulcanoHighlight <- reactiveVal()
   # Create reactive parameter list for detecting any parameter change by users,
@@ -373,6 +481,9 @@ server <- function(input, output, session) {
     # smpMetadatTblList = list(),
     metabAggreTblList = list()
   )
+  # Create reactive object for recording R commands executed to show users
+  reactCodeHistory <- reactiveVal()
+  
   
   # Show fileInput only when example data is not used
   output$updateFileInput <- renderUI({
@@ -398,7 +509,12 @@ server <- function(input, output, session) {
   # Initialize MetAlyzer SE object with example data
   observeEvent(input$exampleFile, {
     req(input$exampleFile)
-    metabObj <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_rawdata_extraction(), silent = T)
+    #### Collapsed panel: Workaround
+    # Expand all panels to render outputs
+    # shinyBS::updateCollapse(session, 'panelDatOverviewViz',
+    #                         open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'))
+    
+    metabObj <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates(), silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
     metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                               drop_metabolites = 'Metabolism Indicators',
@@ -414,12 +530,25 @@ server <- function(input, output, session) {
     })
     outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
     
+    # Prepare static sample metadata table 
+    smpMetadatTbl <- colData(reactMetabObj$oriMetabObj) %>%
+      tibble::as_tibble(rownames = 'ID') %>%
+      dplyr::mutate(ID = paste0('Smp', ID))
+    # Use original column names whose spaces are not replaced with '.'
+    colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$oriMetabObj)))
+    reactOriSmpMetadatTbl(smpMetadatTbl)
+    
     # Set parameters back to default
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
-    updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+    updateSliderInput(session, 'featValidCutoffFiltering', value = 0)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
     updateMaterialSwitch(session, 'imputation', value = T)
     updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
+    doneImputation(0)
+    doneNormalization(0)
+    ifParamChange(0)
+    doneSmpFiltering(0)
+    doneFeatFiltering(0)
     
     updateSelectInput(session, 'featIdChoicesExport', selected = character(0))
     
@@ -434,11 +563,32 @@ server <- function(input, output, session) {
     
     # Check box indicating if file was generated before 2023, because example file is
     updateCheckboxInput(session, 'ifUploadedFilePrior2023', value = T)
+    
+    # Record commands executed
+    reactCodeHistory('######## Data Preparation ########')
+    reactCodeHistory(c(reactCodeHistory(),
+                       '# Initialize MetAlyzer SE object with example data'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       'MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       '# Exclude "Metabolism Indicators"'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       'metabObj <- MetAlyzer::filter_metabolites(metalyzer_se = metabObj, drop_metabolites = "Metabolism Indicators")'))
+    reactCodeHistory(c(reactCodeHistory(), '\n'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       '# Visualize data distribution, missing pattern, and quantification quality using plotly::ggplotly()'))
+    reactCodeHistory(c(reactCodeHistory(),
+                       '# Check source code about how data missingness and quantification status are summarized'))
   })
   # Initialize MetAlyzer SE object with uploaded data
   observeEvent(input$uploadedFile, {
+    #### Collapsed panel: Workaround
+    # Expand all panels to render outputs
+    # shinyBS::updateCollapse(session, 'panelDatOverviewViz',
+    #                         open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'))
+    
     validUploadedFile <- try(
-      metabObj <- MetAlyzer::read_metidq(file_path = input$uploadedFile$datapath,
+      metabObj <- MetAlyzer::read_webidq(file_path = input$uploadedFile$datapath,
                                          sheet = 1, silent = T),
       silent = T)
     if (!is(validUploadedFile, 'try-error')) {
@@ -459,12 +609,25 @@ server <- function(input, output, session) {
       })
       outputOptions(output, 'ifValidUploadedFile', suspendWhenHidden = F)
       
+      # Prepare static sample metadata table 
+      smpMetadatTbl <- colData(reactMetabObj$oriMetabObj) %>%
+        tibble::as_tibble(rownames = 'ID') %>%
+        dplyr::mutate(ID = paste0('Smp', ID))
+      # Use original column names whose spaces are not replaced with '.'
+      colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$oriMetabObj)))
+      reactOriSmpMetadatTbl(smpMetadatTbl)
+      
       # Set parameters back to default
       updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
-      updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+      updateSliderInput(session, 'featValidCutoffFiltering', value = 0)
       updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
       updateMaterialSwitch(session, 'imputation', value = T)
       updateSelectInput(session, 'normalization', selected = 'Log2 transformation')
+      doneImputation(0)
+      doneNormalization(0)
+      ifParamChange(0)
+      doneSmpFiltering(0)
+      doneFeatFiltering(0)
       
       updateCheckboxInput(session, 'ifUploadedFilePrior2023', value = F)
       updateSelectInput(session, 'featIdChoicesExport', selected = character(0))
@@ -477,11 +640,27 @@ server <- function(input, output, session) {
       reactParamList$featValidStatus <- c()
       reactParamList$imputation <- F
       reactParamList$normalization <- 'None'
+      
+      # Record commands executed
+      reactCodeHistory('######## Data Preparation ########')
+      reactCodeHistory(c(reactCodeHistory(),
+                         '# Initialize MetAlyzer SE object'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         'metabObj <- MetAlyzer::read_webidq(file_path = "path_to_your_file")'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         '# Exclude "Metabolism Indicators" if they exist'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         'metabObj <- MetAlyzer::filter_metabolites(metalyzer_se = metabObj, drop_metabolites = "Metabolism Indicators")'))
+      reactCodeHistory(c(reactCodeHistory(), '\n'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         '# Visualize data distribution, missing pattern, and quantification quality using plotly::ggplotly()'))
+      reactCodeHistory(c(reactCodeHistory(),
+                         '# Check source code about how data missingness and quantification status are summarized'))
     } else {
       showModal(modalDialog(
         title = 'Uploaded file reading failed...',
-        tags$strong('Please check if the uploaded file is exported from MetIDQ Software.'),
-        checkboxInput("check1", "Is the file exported from MetIDQ?", value = FALSE),
+        tags$strong('Please check if the uploaded file is exported from webidq Software.'),
+        checkboxInput("check1", "Is the file exported from WebIDQ?", value = FALSE),
         checkboxInput("check2", "Does the file contain the 'Class' cell?", value = FALSE),
         checkboxInput("check3", "Does the file contain the 'Sample Type' column?", value = FALSE),
         checkboxInput("check4", "The Sample Type column contains the value 'Sample'? (only for rows with samples)", value = FALSE),
@@ -491,6 +670,11 @@ server <- function(input, output, session) {
       ))
       reactMetabObj$metabObj <- NULL
     }
+  })
+  #### Collapsed panel: Workaround
+  # Close expanded panels (due to rendering) right after output is rendered
+  observeEvent(reactOriSmpMetadatTbl(), {
+    shinyBS::updateCollapse(session, 'panelDatOverviewViz', close = 'Sample metadata (All)')
   })
   
   # Retrieve abundance data and sample metadata and compute feature completeness
@@ -506,10 +690,13 @@ server <- function(input, output, session) {
       dplyr::mutate(ID = paste0('Smp', ID))
     # Use original column names whose spaces are not replaced with '.'
     colnames(smpMetadatTbl) <- c('ID', colnames(colData(reactMetabObj$metabObj)))
+    # Add sample labels (prefer Sample ID / Identification column if available) #### Error-prone, better use dplyr::left_join()
+    metabAggreTbl$SampleLabel <- rep(MetAlyzer:::get_sample_labels(smpMetadatTbl), nrow(metabAggreTbl) / nrow(smpMetadatTbl))
     # Prepare ID levels for displaying samples in order
     idLevels <- rownames(colData(reactMetabObj$metabObj))
     metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
-      dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
+      dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)),
+                    SampleLabel = factor(SampleLabel, levels = unique(SampleLabel[match(paste0('Smp', idLevels), ID)])))
     
     # Compute completeness level of each feature for doing filtering
     featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
@@ -625,6 +812,9 @@ server <- function(input, output, session) {
   doneNormalization <- reactiveVal(0)
   # Create reactive values to monitor if any parameter is changed
   ifParamChange <- reactiveVal(0)
+  # Create reactive values to monitor if filtering is conducted for recording commands executed
+  doneSmpFiltering <- reactiveVal(0)
+  doneFeatFiltering <- reactiveVal(0)
   
   # Rerun data processing if any parameter is changed, so that processing can follow
   # order from sample filtering, feature filtering, imputation, to normalization
@@ -642,6 +832,10 @@ server <- function(input, output, session) {
       reactMetabObj$tmpMetabObj <- reactMetabObj$oriMetabObj
       doneImputation(0)
       doneNormalization(0)
+      doneSmpFiltering(0)
+      doneFeatFiltering(0)
+      # Remove record of 'Data Preprocessing' part if preprocessing is re-conducted
+      reactCodeHistory(reactCodeHistory()[seq(8)])
       
       reactParamList$smpFiltering <- c()
       reactParamList$featFiltering <- c()
@@ -695,6 +889,7 @@ server <- function(input, output, session) {
           }
         }
       }
+      doneSmpFiltering(1) #for command history
     }
     # Avoid app crash when no sample is left
     if (ncol(reactMetabObj$tmpMetabObj) == 0) {
@@ -743,6 +938,11 @@ server <- function(input, output, session) {
                                                                  min_percent_valid = featValidCutoff,
                                                                  valid_status = featValidStatus,
                                                                  per_group = NULL)
+      if (any(!is.null(rmSelectedFeats), featCompleteCutoff != 0,
+              featValidCutoff != 0 & !all(c('Valid', 'LOQ', 'LOD', 'Invalid') %in% featValidStatus))) {
+        doneFeatFiltering(1) #for command history
+      }
+      
       # Avoid app crash when no feature is left, e.g., min_percent_valid > 0 and valid_status == c()
       if (nrow(reactMetabObj$tmpMetabObj) == 0) {
         showModal(modalDialog(
@@ -760,18 +960,21 @@ server <- function(input, output, session) {
     # Skip imputation and normalization if no sample or feature was left after filtering
     if (all(ncol(reactMetabObj$tmpMetabObj) != 0, nrow(reactMetabObj$tmpMetabObj) != 0)) {
       if (all(input$imputation, doneImputation() == 0)) {
-        reactMetabObj$tmpMetabObj <- data_imputation(reactMetabObj$tmpMetabObj)
+        reactMetabObj$tmpMetabObj <- MetAlyzer:::data_imputation(reactMetabObj$tmpMetabObj)
         doneImputation(1)
       }
       if (doneNormalization() == 0) {
         if (input$normalization == 'Total ion count (TIC) normalization') {
-          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'TIC')
+          reactMetabObj$tmpMetabObj <- MetAlyzer:::data_normalization(reactMetabObj$tmpMetabObj,
+                                                                      norm_method = 'TIC')
           doneNormalization(1)
         } else if (input$normalization == 'Median normalization') {
-          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'median')
+          reactMetabObj$tmpMetabObj <- MetAlyzer:::data_normalization(reactMetabObj$tmpMetabObj,
+                                                                      norm_method = 'median')
           doneNormalization(1)
         } else if (input$normalization == 'Log2 transformation') {
-          reactMetabObj$tmpMetabObj <- data_normalization(reactMetabObj$tmpMetabObj, norm_method = 'log2')
+          reactMetabObj$tmpMetabObj <- MetAlyzer:::data_normalization(reactMetabObj$tmpMetabObj,
+                                                                      norm_method = 'log2')
           doneNormalization(1)
         }
       }
@@ -840,6 +1043,41 @@ server <- function(input, output, session) {
         # Return reactive ifParamChange to 0, so this chunk will run only if any
         # parameter is changed
         ifParamChange(0)
+        
+        # Record commands executed
+        if (any(doneSmpFiltering() != 0, doneFeatFiltering() != 0,
+                doneImputation() != 0, doneNormalization() != 0)) {
+          # Remove 'Differential Analysis' part if it is already recorded
+          if ('######## Differential Analysis ########' %in% reactCodeHistory()) {
+            reactCodeHistory(head(reactCodeHistory(), -10))
+          }
+          reactCodeHistory(c(reactCodeHistory(), '\n'))
+          reactCodeHistory(c(reactCodeHistory(), '######## Data Preprocessing ########'))
+          if (doneSmpFiltering() != 0) {
+            reactCodeHistory(c(reactCodeHistory(),
+                               '# Filter samples based on selected samples/sample groups'))
+            reactCodeHistory(c(reactCodeHistory(),
+                               'metabObj <- MetAlyzer::filter_meta_data(metalyzer_se = metabObj, ...)'))
+          }
+          if (doneFeatFiltering() != 0) {
+            reactCodeHistory(c(reactCodeHistory(),
+                               '# Filter metabolites based on selected metabolites/metabolic classes or specified parameters'))
+            reactCodeHistory(c(reactCodeHistory(),
+                               'metabObj <- MetAlyzer::filter_metabolites(metalyzer_se = metabObj, ...)'))
+          }
+          if (doneImputation() != 0) {
+            reactCodeHistory(c(reactCodeHistory(),
+                               '# Impute data using half-minimum'))
+            reactCodeHistory(c(reactCodeHistory(),
+                               'metabObj <- MetAlyzer:::data_imputation(metalyzer_se = metabObj)'))
+          }
+          if (doneNormalization() != 0) {
+            reactCodeHistory(c(reactCodeHistory(),
+                               '# Normalize data using selected method ("log2", "median", "TIC")'))
+            reactCodeHistory(c(reactCodeHistory(),
+                               'metabObj <- MetAlyzer:::data_normalization(metalyzer_se = metabObj, norm_method = "selected_method")'))
+          }
+        }
       } 
     } else {
       # Revert temporary MetAlyzer object to origin for redoing filtering
@@ -854,6 +1092,10 @@ server <- function(input, output, session) {
     doneImputation(0)
     doneNormalization(0)
     ifParamChange(0)
+    doneSmpFiltering(0)
+    doneFeatFiltering(0)
+    # Remove record of 'Data Preprocessing' part if preprocessing is re-conducted
+    reactCodeHistory(reactCodeHistory()[seq(8)])
     
     # Set parameters for feature filtering back to default
     # if ('Metabolism Indicators' %in% unlist(featChoices())) {
@@ -863,7 +1105,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'featChoicesFiltering', choices = featChoices())
     # }
     updateSliderInput(session, 'featCompleteCutoffFiltering', value = 80)
-    updateSliderInput(session, 'featValidCutoffFiltering', value = 50)
+    updateSliderInput(session, 'featValidCutoffFiltering', value = 0)
     updateCheckboxGroupInput(session, 'featValidStatusFiltering', selected = c('Valid', 'LOQ'))
     # Set parameters for sample filtering back to default
     # Make choices lists so that sole choice in certain choice group can be shown
@@ -947,7 +1189,7 @@ server <- function(input, output, session) {
       # Do log2 transformation on data for 'calc_log2FC' if normalization was not performed
       if (doneNormalization() == 0) {
         oriConc <- metadata(metabObj)$aggregated_data$Concentration
-        metadata(metabObj)$aggregated_data$Concentration <- glog2(oriConc)
+        metadata(metabObj)$aggregated_data$Concentration <- MetAlyzer:::glog2(oriConc)
       }
       # Extract samples of interest
       selectedChoiceGp <- input$smpChoiceGpsLog2FC
@@ -958,16 +1200,40 @@ server <- function(input, output, session) {
         metabObj <- MetAlyzer::filter_meta_data(metabObj, is.na(.data[[selectedChoiceGp]]) |
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
-      metabObj <- calc_log2FC(metalyzer_se = metabObj,
-                              categorical = selectedChoiceGp)
+      metabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = metabObj,
+                                          group = selectedChoiceGp,
+                                          group_level = selectedChoices)
       reactLog2FCTbl(MetAlyzer:::log2FC(metabObj))
+      
+      # Record commands executed
+      # Avoid recording if differential analysis is re-conducted
+      if (!'######## Differential Analysis ########' %in% reactCodeHistory()) {
+        reactCodeHistory(c(reactCodeHistory(), '\n'))
+        reactCodeHistory(c(reactCodeHistory(), '######## Differential Analysis ########'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           '# Compare selected Group1 with Group2 stored in sample metadata variable'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           'metabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = metabObj, group = "sample_metadata_variable")'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           '# Make interactive vulcano plot with selected cutoffs'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           'MetAlyzer:::plotly_vulcano(MetAlyzer::log2FC(metabObj), ...)'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           '# Make interactive scatter plot'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           'MetAlyzer:::plotly_scatter(MetAlyzer::log2FC(metabObj))$Plot'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           '# Make interactive network diagram with specified parameters'))
+        reactCodeHistory(c(reactCodeHistory(),
+                           'MetAlyzer:::plotly_network(MetAlyzer::log2FC(metabObj), ...)'))
+      }
       
       # Update the slider input, for custom inputs
       updateSliderInput(session, "plotVolcanoLog2FCCutoff",
                         max = floor(max(na.omit(reactLog2FCTbl()$log2FC))))
     } else {
       showModal(modalDialog(
-        title = 'Log₂(FC) computation failed...',
+        title = 'Differential analysis failed...',
         'Please select two different sample groups.',
         easyClose = T,
         footer = NULL
@@ -1025,6 +1291,11 @@ server <- function(input, output, session) {
     clickedRow <- input$tblParamLog_rows_selected
     # Because of reversed parameter log table
     sort(reactAnalysisLog$paramLogTbl$idx, decreasing = T)[clickedRow]
+  })
+  # Expand all panels each time trial (row) is clicked, so that output can be rendered
+  observeEvent(clickedRowIdx(), {
+    shinyBS::updateCollapse(session, id = 'panelTrialLog',
+                            open = c('Features Removed', 'Data distribution', 'Data completeness', 'Quantification status'))
   })
   
   # Log of all removed features
@@ -1095,9 +1366,34 @@ server <- function(input, output, session) {
     )
   })
   
+  # Log of commands executed
+  output$textCommands <- renderText({
+    req(reactMetabObj$metabObj)
+    paste0(reactCodeHistory(), collapse = '\n')
+  })
+  # Downloading of R session info
+  output$downloadSessionInfo <- downloadHandler(
+    filename = function() {
+      paste0("session_info_", Sys.Date(), '.txt')
+    },
+    content = function(file) {
+      rSessionInfo <- utils::capture.output(utils::sessionInfo())
+      writeLines(rSessionInfo, con = file)
+    }
+  )
   
+  
+  # Create reactive object for storing static overview plots for downloading
+  reactOverviewPlots <- reactiveValues(datDist = NULL, datComplete = NULL, quanStatus = NULL)
   # Show data overviews
   # Data distribution
+  output$summDatDist <- renderText({
+    req(datOverviewPack()$metabAggreTbl)
+    'Is the dataset already log-transformed? If so, normalization should not be applied again.'
+  })
+  #### Collapsed panel: Workaround for light rendering
+  # Need it to render output when panel is collapsed
+  outputOptions(output, 'summDatDist', suspendWhenHidden = F)
   output$updateGpColsDatDist <- renderUI({
     req(smpChoicePack()$smpChoiceList)
     smpChoiceList <- smpChoicePack()$smpChoiceList
@@ -1109,18 +1405,23 @@ server <- function(input, output, session) {
     } else {
       smpChoiceGps <- names(smpChoiceList)
     }
-    selectInput('gpColsDatDist', 'Color by:',
-                choices = c('None', smpChoiceGps),
-                selected = 'None', multiple = F)
+    # Make label on left side, rather than top
+    div(
+      style = "display: flex; align-items: center;",
+      tags$label("Color by:", style = "margin-right: 10px; margin-bottom: 15px;"),
+      selectInput('gpColsDatDist', NULL,
+                  choices = c('None', smpChoiceGps),
+                  selected = 'None', multiple = F)
+    )
   })
   output$plotDatDist <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl, input$gpColsDatDist)
     metabAggreTbl <- datOverviewPack()$metabAggreTbl
     if (input$gpColsDatDist == 'None') {
-      g <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration)) +
+      g <- ggplot(metabAggreTbl, aes(x=SampleLabel, y=Concentration)) + #### ID -> SampleLabel
         geom_boxplot()
     } else {
-      g <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=.data[[input$gpColsDatDist]])) +
+      g <- ggplot(metabAggreTbl, aes(x=SampleLabel, y=Concentration, fill=.data[[input$gpColsDatDist]])) +
         geom_boxplot(alpha = 1) +
         scale_fill_brewer(palette = 'Set1')
     }
@@ -1132,41 +1433,63 @@ server <- function(input, output, session) {
     if (doneNormalization() == 0) {
       g <- g + scale_y_log10()
     }
+    # Update reactive object
+    reactOverviewPlots$datDist <- g
+    
     ggplotly(g)
   })
   
   # Sample metadata
   output$tblSmpMetadat <- DT::renderDataTable({
-    req(datOverviewPack()$smpMetadatTbl)
-    smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
-    DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
-                  selection = list(mode = 'single', target = 'row'), style = 'bootstrap')
+    # Static
+    req(reactOriSmpMetadatTbl())
+    DT::datatable(reactOriSmpMetadatTbl(), rownames = F, filter = list(position = 'top', clear = T, plain = F),
+                  selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
+                  options = list(pageLength = 5))
+    
+    # Reactive
+    # req(datOverviewPack()$smpMetadatTbl)
+    # smpMetadatTbl <- datOverviewPack()$smpMetadatTbl
+    # DT::datatable(smpMetadatTbl, rownames = F, filter = list(position = 'top', clear = T, plain = F),
+    #               selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
+    #               options = list(pageLength = 5))
   })
+  outputOptions(output, 'tblSmpMetadat', suspendWhenHidden = F)
+  #### Collapsed panel: Workaround (SHOULD WORK BUT NOT WORK)
+  # Render table outside collapsed panel and display it
+  # output$uiTblSmpMetadat <- renderUI({
+  #   DT::dataTableOutput('tblSmpMetadat')
+  # })
   
   # Data completeness
   output$summDatComplete <- renderText({
     req(datOverviewPack()$featCompleteLvTbl)
     featCompleteLevels <- datOverviewPack()$featCompleteLvTbl$CompleteRatio
     paste(sum(featCompleteLevels < 0.8), 'out of', nrow(reactMetabObj$metabObj),
-          'metabolites fail to fulfil 80% rule, which is recommended filtering out.',
+          'metabolites fail to fulfil the 80% rule, the recommended filtering threshold.',
           'Besides, is there any sample with high level of missingness?')
   })
+  #### Collapsed panel: Workaround for light rendering
+  # Need it to render output when panel is collapsed
+  outputOptions(output, 'summDatComplete', suspendWhenHidden = F)
   output$plotDatComplete <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
     smpCompleteCountTbl <- datOverviewPack()$metabAggreTbl %>%
       dplyr::mutate(Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed', #c(0, NA)
                                                     Concentration %in% NA ~ 'Missing')) %>% #c(0, NA)
-      dplyr::group_by(ID, Completeness) %>%
+      dplyr::group_by(SampleLabel, Completeness) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
-    ggplotly(
-      ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
-        geom_col(position = 'stack') +
-        scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
-        labs(x = 'Sample') +
-        theme_bw() +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-    )
+    g <- ggplot(smpCompleteCountTbl, aes(x=SampleLabel, y=Count, fill=Completeness)) +
+      geom_col(position = 'stack') +
+      scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
+      labs(x = 'Sample') +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    # Update reactive object
+    reactOverviewPlots$datComplete <- g
+    
+    ggplotly(g)
   })
   
   # Quantification status
@@ -1176,25 +1499,28 @@ server <- function(input, output, session) {
       dplyr::mutate(TotalValidCount = ValidCount + LOQCount,
                     ValidRatio = TotalValidCount / TotalCount)
     paste(sum(featStatusValid$ValidRatio < 0.5), 'out of', nrow(reactMetabObj$metabObj),
-          'metabolites have less than 50% measurements with valid status (Valid, LOQ),',
-          'which is recommended filtering out. Besides, is there any sample containing few valid values?')
+          'metabolites have fewer than 50% valid quantifications (Valid, LOQ) and',
+          'could be filtered out. Besides, is there any sample containing just few valid quantifications?')
   })
+  #### Collapsed panel: Workaround for light rendering
+  # Need it to render output when panel is collapsed
+  outputOptions(output, 'summQuanStatus', suspendWhenHidden = F)
   output$plotQuanStatus <- plotly::renderPlotly({
     req(datOverviewPack()$metabAggreTbl)
     smpStatusCountTbl <- datOverviewPack()$metabAggreTbl %>%
-      dplyr::group_by(ID, Status) %>%
+      dplyr::group_by(SampleLabel, Status) %>%
       dplyr::summarise(Count = dplyr::n()) %>%
       dplyr::ungroup()
-
     status2Color <- c('Valid'='#33a02c', 'LOQ'='#1f78b4', 'LOD'='#ff7f00', 'Invalid'='#e31a1c')
-    
-    g <- ggplot(smpStatusCountTbl, aes(x = ID, y = Count, fill = Status)) +
+    g <- ggplot(smpStatusCountTbl, aes(x = SampleLabel, y = Count, fill = Status)) +
         geom_col(position = "stack") +
         scale_fill_manual(values = status2Color) +
         labs(x = "Sample") +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
-        
+    # Update reactive object
+    reactOverviewPlots$quanStatus <- g    
+    
     plotly::ggplotly(g)
 })
   
@@ -1226,34 +1552,24 @@ server <- function(input, output, session) {
       write.csv(exportfeatIdTbl, file)
     }
   )
-  
+  # Export differential analysis result table
   output$downloadLog2FC <- downloadHandler(
     filename = function() {
-      paste0("Log2FC_values_", Sys.Date(), ".xlsx") 
+      paste0("Log2FC_results_", Sys.Date(), ".xlsx") 
     },
-    
     content = function(file) {
       data_to_export <- reactLog2FCTbl()
-      
-      if (is.null(data_to_export) || nrow(data_to_export) == 0) {
-        shiny::showNotification("Please compute the log2FC values first.", type = "warning")
-
-        if(is.null(data_to_export)) data_to_export <- data.frame()
-      }
-      
       writexl::write_xlsx(data_to_export, path = file)
     }
   )
-
-
   
   # Visualize log2(FC)
   # Give sign before log2(FC) calculation
   output$textLog2FC <- renderText({
-    'Please calculate Log₂(FC) first.'
+    'Please perform differential analysis first.'
   })
   output$textLog2FC_2 <- renderText({
-    'Please calculate Log₂(FC) first.'
+    'Please perform differential analysis first.'
   })
   
   # Update choices for metabolite highlighting
@@ -1280,13 +1596,13 @@ server <- function(input, output, session) {
   output$plotVolcano <- plotly::renderPlotly({
     req(reactLog2FCTbl())
     if (!input$highlightVulcano) {
-      plotly_vulcano(reactLog2FCTbl(),
-                     x_cutoff = input$plotVolcanoLog2FCCutoff,
-                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+      MetAlyzer:::plotly_vulcano(reactLog2FCTbl(),
+                                 x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                 y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
     } else {
-      plotly_vulcano(reactVulcanoHighlight(),
-                     x_cutoff = input$plotVolcanoLog2FCCutoff,
-                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+      MetAlyzer:::plotly_vulcano(reactVulcanoHighlight(),
+                                 x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                 y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
     }
   })
   
@@ -1294,16 +1610,16 @@ server <- function(input, output, session) {
   output$plotScatter <- plotly::renderPlotly({
     req(reactLog2FCTbl())
     # if (!input$highlightVulcano) {
-    #   plot <- plotly_scatter(reactLog2FCTbl())
+    #   plot <- MetAlyzer:::plotly_scatter(reactLog2FCTbl())
     # } else {
-    #   plot <- plotly_scatter(reactVulcanoHighlight())
+    #   plot <- MetAlyzer:::plotly_scatter(reactVulcanoHighlight())
     # }
-    plot <- plotly_scatter(reactLog2FCTbl())
+    plot <- MetAlyzer:::plotly_scatter(reactLog2FCTbl())
     hide_legend(plot$Plot)
   })
   output$plotScatterLegend <- renderImage({
     req(reactLog2FCTbl()) 
-    plot <- plotly_scatter(reactLog2FCTbl())
+    plot <- MetAlyzer:::plotly_scatter(reactLog2FCTbl())
     legend <- plot$Legend
     # A temp file to save the output.
     # This file will be removed later by renderImage
@@ -1320,18 +1636,81 @@ server <- function(input, output, session) {
   }, deleteFile = TRUE)
   
   # Network plot
-  output$plotNetwork <- plotly::renderPlotly({
+  network_data <- reactive({
+    # Ensure the base data is available before proceeding
     req(reactLog2FCTbl())
-    # Use the height value for plot layout
-    plotly_network(
-      reactLog2FCTbl(), 
+
+    # Call the expensive function just one time
+    MetAlyzer:::plotly_network(
+      reactLog2FCTbl(),
+      values_col_name = input$networkValueColumn,
+      exclude_pathways = input$networkExcludePathways,
       metabolite_node_size = input$networkMetaboliteNodeSize,
       connection_width = input$networkConnectionWidth,
       pathway_text_size = input$networkPathwayTextSize,
       pathway_width = input$networkPathwayWidth,
-      plot_height = input$networkPlotHeight*100
+      plot_height = input$networkPlotHeight*100,
+      color_scale = input$networkColorScale
     )
   })
+  output$plotNetwork <- plotly::renderPlotly({
+    # Access the pre-calculated plot from the reactive expression
+    req(network_data())
+    network_data()$Plot
+  })
+  
+  ### --- Network Nodes ---
+  # Update choices for node stats
+  observeEvent(reactLog2FCTbl(), {
+    node_table <- network_data()$Table
+    node_choices <- unique(node_table$Label_nFeatures)
+    if ('T14 -- 14 feature(s)' %in% node_choices) {
+      updateSelectInput(session, inputId = "selectedNodesVulcano",
+                        choices = node_choices, selected = 'T14 -- 14 feature(s)')
+    } else {
+      updateSelectInput(session, inputId = "selectedNodesVulcano",
+                        choices = node_choices, selected = node_choices[1])
+    }
+  })
+  # Prepare stats table for selected nodes to visualize and download
+  selected_nodes_data <- reactive({
+    req(network_data(), input$selectedNodesVulcano)
+    
+    # Access the pre-calculated table from the reactive expression
+    Table_nodes <- network_data()$Table
+    
+    # Filter and process the data based on user selection
+    Table_nodes %>%
+      dplyr::filter(.data$Label_nFeatures %in% input$selectedNodesVulcano) %>%
+      tidyr::separate_rows(.data$Metabolites, .data$log2FC, .data$qval, .data$pval, .data$Class, sep = "\\s*;\\s*") %>%
+      dplyr::mutate(
+        log2FC = as.numeric(.data$log2FC),
+        qval = as.numeric(.data$qval),
+        pval = as.numeric(.data$pval),
+        Metabolite = Metabolites,
+        Class = gsub("\"", "", .data$Class),
+      ) %>%
+      dplyr::filter(.data$Class != "NA") %>%
+      dplyr::mutate(Class = as.factor(Class)) %>%
+      dplyr::select(-c(x, y, collapsed_count, Label_nFeatures, Shape))
+  })
+  # Display stats of selected nodes via volcano plot
+  output$plotVolcanoNodes <- plotly::renderPlotly({
+    req(selected_nodes_data())
+    MetAlyzer:::plotly_vulcano(selected_nodes_data(),
+                               x_cutoff = input$plotVolcanoLog2FCCutoff,
+                               y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+  })
+  # Download stats table of selected nodes
+  output$downloadNodesExcel <- downloadHandler(
+    filename = function() {
+      paste0("Volcano_Data_", input$selectedNodesVulcano, "_", Sys.Date(), ".xlsx")
+    },
+    content = function(file) {
+      writexl::write_xlsx(selected_nodes_data(), path = file)
+    }
+  )
+
   # Revert changed network plot style parameters back to default
   observeEvent(input$defaultNetworkPlotStyles, {
     updateSliderInput(session, 'networkPlotHeight', value = 10)
@@ -1339,78 +1718,208 @@ server <- function(input, output, session) {
     updateSliderInput(session, 'networkConnectionWidth', value = 1.25)
     updateSliderInput(session, 'networkPathwayTextSize', value = 20)
     updateSliderInput(session, 'networkPathwayWidth', value = 10)
+    updateSelectInput(session, 'networkValueColumn', selected = "log2FC")
+    updateSelectInput(session, 'networkExcludePathways', selected = character(0))
+    updateSelectInput(session, "networkColorScale", selected = "Viridis")
+    updateSelectInput(session, "formatNetwork", selected = "html")
   })
   
-  # Download the log2(FC) visuals as html
+  
+  # Download data overview
+  # Data distribution
+  output$downloadDatDist <- downloadHandler(
+    filename = function() {
+      paste0("data_distribution_", Sys.Date(), '.', input$formatDatDist)
+    },
+    content = function(file) {
+      if (input$formatDatDist == "html") {
+        final_plot <- ggplotly(reactOverviewPlots$datDist)
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
+      } else {
+        final_plot <- reactOverviewPlots$datDist
+        ggsave(filename = file, plot = final_plot, device = input$formatDatDist,
+               dpi = 400, units = "cm", width = 32.0, height = 21.0)
+      }
+    }
+  )
+  
+  # Missing pattern
+  output$downloadDatComplete <- downloadHandler(
+    filename = function() {
+      paste0("missing_pattern_", Sys.Date(), '.', input$formatDatComplete)
+    },
+    content = function(file) {
+      if (input$formatDatComplete == "html") {
+        final_plot <- ggplotly(reactOverviewPlots$datComplete)
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
+      } else {
+        final_plot <- reactOverviewPlots$datComplete
+        ggsave(filename = file, plot = final_plot, device = input$formatDatComplete,
+               dpi = 400, units = "cm", width = 32.0, height = 21.0)
+      }
+    }
+  )
+  
+  # Quantification status
+  output$downloadQuanStatus <- downloadHandler(
+    filename = function() {
+      paste0("quant_status_", Sys.Date(), '.', input$formatQuanStatus)
+    },
+    content = function(file) {
+      if (input$formatQuanStatus == "html") {
+        final_plot <- ggplotly(reactOverviewPlots$quanStatus)
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
+      } else {
+        final_plot <- reactOverviewPlots$quanStatus
+        ggsave(filename = file, plot = final_plot, device = input$formatQuanStatus,
+               dpi = 400, units = "cm", width = 32.0, height = 21.0)
+      }
+    }
+  )
+  
+  # Download log2(FC) visuals
+  # Vulcano plot
   output$downloadVulcanoPlot <- downloadHandler(
     filename = function() {
-      paste0("vulcano_plot.", input$formatVulcano)
+      paste0("vulcano_plot_", Sys.Date(), '.', input$formatVulcano)
     },
     content = function(file) {
       if (input$formatVulcano == "html") {
         if (input$highlightVulcano) {
           req(reactVulcanoHighlight())
-          final_plot <- plotly_vulcano(reactVulcanoHighlight(), 
-                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+          final_plot <- MetAlyzer:::plotly_vulcano(reactVulcanoHighlight(), 
+                                                   x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                                   y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         } else {
-          final_plot <- plotly_vulcano(reactLog2FCTbl(), 
-                                       x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                       y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+          final_plot <- MetAlyzer:::plotly_vulcano(reactLog2FCTbl(), 
+                                                   x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                                   y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         }
         htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
         if (input$highlightVulcano) {
           req(reactVulcanoHighlight())
-          final_plot <- plot_vulcano(reactVulcanoHighlight(), 
-                                     x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff),
-                                     show_labels_for = input$metabChoicesVulcano)
+          final_plot <- MetAlyzer:::plot_vulcano(reactVulcanoHighlight(), 
+                                                 x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                                 y_cutoff = as.numeric(input$plotVolcanoPValCutoff),
+                                                 show_labels_for = input$metabChoicesVulcano)
         } else {
-          final_plot <- plot_vulcano(reactLog2FCTbl(), 
-                                     x_cutoff = input$plotVolcanoLog2FCCutoff,
-                                     y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
+          final_plot <- MetAlyzer:::plot_vulcano(reactLog2FCTbl(), 
+                                                 x_cutoff = input$plotVolcanoLog2FCCutoff,
+                                                 y_cutoff = as.numeric(input$plotVolcanoPValCutoff))
         }
-        ggsave(filename = file, plot = final_plot, device = input$formatVulcano, dpi = 300)
+        ggsave(filename = file, plot = final_plot, device = input$formatVulcano,
+               dpi = 400, units = "cm", width = 38.0, height = 21.0)
       }
     }
   )
+  
+  # Scatter plot
   output$downloadScatterPlot <- downloadHandler(
     filename = function() {
-      paste0("scatter_plot.", input$formatScatter)
+      paste0("scatter_plot_", Sys.Date(), '.', input$formatScatter)
     },
     content = function(file) {
-      
       if (input$formatScatter == "html") {
-        htmlwidgets::saveWidget(plotly_scatter(reactLog2FCTbl())$Plot, file, selfcontained = TRUE)
+        htmlwidgets::saveWidget(MetAlyzer:::plotly_scatter(reactLog2FCTbl())$Plot, file, selfcontained = TRUE)
       } else {
-        ggsave(filename = file, plot = MetAlyzer::plot_scatter(reactLog2FCTbl()), device = input$formatScatter, dpi = 300, units = "cm", width = 32.0, height = 21.0)
+        #### Make theme similar to vulcano plot for better visualization
+        ggsave(filename = file, plot = MetAlyzer::plot_scatter(reactLog2FCTbl()),
+               device = input$formatScatter, dpi = 400, units = "cm", width = 38.0, height = 21.0)
       }
     }
   )
+  
+  # Network diagram
   output$downloadNetworkPlot <- downloadHandler(
     filename = function() {
-      paste0("network_plot.", input$formatNetwork)
+      paste0("network_plot_", Sys.Date(), '.', input$formatNetwork)
     },
     content = function(file) {
       if (input$formatNetwork == "html") {
-        final_plot <- plotly_network(
-          reactLog2FCTbl(), 
-          metabolite_node_size = input$networkMetaboliteNodeSize,
-          connection_width = input$networkConnectionWidth,
-          pathway_text_size = input$networkPathwayTextSize,
-          pathway_width = input$networkPathwayWidth,
-          plot_height = input$networkPlotHeight * 100
-        )
+        final_plot <- network_data()$Plot
         htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
       } else {
-        final_plot <- MetAlyzer::plot_network(
-          reactLog2FCTbl()
-        )
-        ggsave(filename = file, plot = final_plot, device = input$formatNetwork, dpi = 300, units = "cm", width = 32.0, height = 21.0)
+        final_plot <- MetAlyzer::plot_network(reactLog2FCTbl(),
+                                              values_col_name = input$networkValueColumn,
+                                              exclude_pathways = input$networkExcludePathways,
+                                              color_scale = input$networkColorScale
+                                              )$Plot
+        ggsave(filename = file, plot = final_plot, device = input$formatNetwork,
+               dpi = 400, units = "cm", width = 38.0, height = 21.0)
       }
     }
   )
+
+  ### --- Notifications ---
+  current_notification_id <- reactiveVal(NULL)
+  `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+
+  # 1. Notification for the "Process" button
+  observeEvent(input$updateProcessing, {
+    if (!is.null(current_notification_id())) {
+      removeNotification(current_notification_id())
+    }
+    notification_ui <- div(
+      tags$ul(
+        style = "padding-left: 20px; font-size: 0.9em;",
+        tags$li(tags$b("Removed Samples: "), paste(input$smpChoicesFiltering, collapse = ", ") %||% "None"),
+        tags$li(tags$b("Removed Metabolites: "), paste(input$featChoicesFiltering, collapse = ", ") %||% "None"),
+        tags$li(tags$b("% Quantified Cutoff: "), input$featCompleteCutoffFiltering),
+        tags$li(tags$b("% Valid Cutoff: "), input$featValidCutoffFiltering),
+        tags$li(tags$b("Imputation: "), ifelse(input$imputation, "Half-minimum", "None")),
+        tags$li(tags$b("Normalization: "), input$normalization)
+      )
+    )
+    new_id <- showNotification(
+      ui = notification_ui,
+      duration = 10,
+      closeButton = TRUE,
+      type = "default"
+    )
+    current_notification_id(new_id)
+  })
+
+  # 2. Notification for the "Revert/Default" button
+  observeEvent(input$revertProcessing, {
+    if (!is.null(current_notification_id())) {
+      removeNotification(current_notification_id())
+    }
+    
+    new_id <- showNotification(
+      "Processing undone. Parameters reverted to default.",
+      duration = 5,
+      type = "warning"
+    )
+    current_notification_id(new_id)
+  })
+
+  # Disclaimer for Uploading Data
+  #if (Sys.getenv("SHINY_PORT") != "") {
+  
+    showModal(modalDialog(
+        title = tags$b("Data Privacy Disclaimer", style = "color: #d9534f;"),
+        HTML("Please ensure that all uploaded data is <b>fully anonymized</b> and contains no sensitive patient information.
+            This application is hosted on a shared server (shinyapps.io), and we cannot guarantee the privacy of identifiable data.
+            <br><br>
+            By proceeding, you confirm that your are aware of this and proceed at your own risk.
+            <br><br>
+            You can find a guide to set up the application locally on your machine here:
+            <br>
+            <a href='https://github.com/Lu-Group-UKHD/MetAlyzer/blob/main/vignettes/shiny_app.Rmd'>Github</a>
+            <br>
+            or in the tutorial video."),
+        # Replace the old footer with this new one
+        footer = tags$button(
+          "I Understand and Accept",
+          type = "button",
+          class = "btn btn-primary", # This class makes the button blue
+          `data-dismiss` = "modal"  # This ensures the button closes the pop-up
+        ),
+        easyClose = FALSE
+    ))
+  
+  #}
 }
 
 shinyApp(ui = ui, server = server)

@@ -33,7 +33,7 @@ install.packages("devtools")
 
 
 ```{r, eval=FALSE}
-devtools::install_github("nilsmechtel/MetAlyzer")
+devtools::install_github("Lu-Group-UKHD/MetAlyzer")
 ```
 
 

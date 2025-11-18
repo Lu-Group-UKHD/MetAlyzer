@@ -1,7 +1,7 @@
 #https://pkgdown.r-lib.org/articles/customise.html
 template:
   bootstrap: 5
-  bootswatch: journal #https://bootswatch.com/ has different themes you can use #solar, journal
+  bootswatch: flatly #https://bootswatch.com/ has different themes you can use #solar, journal
 
 navbar:
   bg: primary #If you want a different style you can check on bootstrap, e.g. for bootswatch: flatly = https://bootswatch.com/flatly/
@@ -14,9 +14,9 @@ navbar:
       text: Tutorials
       icon: fa-code-simple # icons can be found here: https://fontawesome.com/icons?d=gallery
       menu:
-      - text: User Guide
+      - text: R-package User Guide
         href: articles/user_guide.html
-      - text: Shiny App Guide
+      - text: Shiny App Installation Guide
         href: articles/shiny_app.html
     #customize intro:
     reference:
@@ -26,6 +26,7 @@ navbar:
     #Customize github:
     github:
       icon: "fa-brands fa-github"
+      aria-label: "GitHub repository"
       href: https://github.com/Lu-Group-UKHD/MetAlyzer
 
 home:

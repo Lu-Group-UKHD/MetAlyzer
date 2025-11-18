@@ -1,0 +1,1133 @@
+---
+title: 'MetAlyzer: Paper Figures'
+output: html_document
+---
+
+Description: This script is to reproduce figures in MetAlyzer paper.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+```
+
+Load libraries
+```{r, message = F}
+library(MetAlyzer)
+library('SummarizedExperiment')
+library('tidyverse')
+
+# Set plot theme
+th <- theme_bw(base_size = 15) +
+  theme(axis.title = element_text(face = 'bold'),
+        axis.text = element_text(face = 'bold'),
+        axis.ticks = element_line(linewidth = 0.8),
+        legend.text = element_text(size = 15))
+```
+
+Customize themes of MetAlyzer::plot_scatter and MetAlyzer::plot_network (e.g., font size) for better visualization\
+Note that these two functions were modified from older but functional version (just run chunk below to get functions).
+```{r, include=F}
+local_plot_scatter <- function(log2fc_df,
+                               show_labels_for = NULL,
+                               values_col_name = "log2FC",
+                               stat_col_name = "qval",
+                               show_p_value = TRUE,
+                               signif_colors = c("#5F5F5F" = 1,
+                                                 "#FEBF6E" = 0.1,
+                                                 "#EE5C42" = 0.05,
+                                                 "#8B1A1A" = 0.01),
+                               save_as = NULL,
+                               folder_name = format(Sys.Date(), "%Y-%m-%d"),
+                               folder_path = NULL,
+                               file_name = "network",
+                               format = "pdf",
+                               width = 29.7,
+                               height = 21.0,
+                               units = "cm",
+                               overwrite = FALSE) {
+  ### Checks
+  if (!(values_col_name %in% colnames(log2fc_df))) {
+    stop(paste0("Column '", values_col_name, "' is missing. Please select one of: ", paste(colnames(log2fc_df), collapse = ", ")))
+  }
+
+  if (!(stat_col_name %in% colnames(log2fc_df))) {
+    stop(paste0("Column '", stat_col_name, "' is missing. Please select one of: ", paste(colnames(log2fc_df), collapse = ", ")))
+  }
+
+  if (!is.numeric(log2fc_df[[values_col_name]])) {
+    stop(paste0("Column '", values_col_name, "' must contain numerical values."))
+  }
+
+  if (!is.numeric(log2fc_df[[stat_col_name]])) {
+    stop(paste0("Column '", stat_col_name, "' must contain numerical values."))
+  }
+  
+  ## Background: Load polarity data
+  polarity_file <- MetAlyzer:::polarity()
+
+  polarity_df <- utils::read.csv(polarity_file) %>%
+    dplyr::select(.data$Class,
+           .data$Polarity) %>%
+    dplyr::mutate(Class = factor(.data$Class),
+           Polarity = factor(.data$Polarity, levels = c('LC', 'FIA'))) %>%
+    dplyr::arrange(.data$Polarity)
+
+  ## Background: Set class colors
+
+  class_colors <- MetAlyzer:::metalyzer_colors()
+
+  names(class_colors) <- levels(polarity_df$Class)
+
+  ## Background: Define LC and FIA classes with color
+  lc_polarity_df <- filter(polarity_df,
+                           .data$Polarity == 'LC',
+                           .data$Class %in% log2fc_df$Class)
+  lc_colors <- class_colors[which(names(class_colors) %in% lc_polarity_df$Class)]
+  fia_polarity_df <- filter(polarity_df,
+                            .data$Polarity == 'FIA',
+                            .data$Class %in% log2fc_df$Class)
+  fia_colors <- class_colors[which(names(class_colors) %in% fia_polarity_df$Class)]
+
+  ## Data: Replace NAs
+  # log2fc_df[[values_col_name]][is.na(log2fc_df[[values_col_name]])] <- 0
+  # log2fc_df[[stat_col_name]][is.na(log2fc_df[[stat_col_name]])] <- 1
+
+  ## Data: Add color to data based on significance
+  if (isTRUE(show_p_value)) {
+    log2fc_df$signif_color <- sapply(log2fc_df[[stat_col_name]], function(q_val) {
+      for (t in signif_colors) {
+          if (q_val <= t) {
+            color <- names(signif_colors)[which(signif_colors == t)]
+          }
+        }
+        return(color)
+    })
+  } else {
+    signif_color <- c("black")
+    log2fc_df$signif_color  <- "black"
+  }
+
+  ## Data: Add pseudo x-value to data as a order of metabolites
+  ordered_classes <- c(names(lc_colors), names(fia_colors))
+  p_data <- lapply(ordered_classes, function(class) {
+    log2fc_df %>%
+      filter(.data$Class == class) %>%
+      bind_rows(data.frame(Class = rep(NA, 5)))
+  }) %>%
+    bind_rows()
+  p_data <- bind_rows(data.frame(Class = rep(NA, 5)), p_data)
+  p_data$x <- seq(nrow(p_data))
+  p_data <- filter(p_data, !is.na(.data$Class))
+
+  #### MODIFIED PART ####
+  ## Data: Determine labels
+  # if (!is.null(show_labels_for)) {
+  #   found_metabolites <- show_labels_for[show_labels_for %in% p_data$Metabolite]
+  #   found_classes <- show_labels_for[show_labels_for %in% p_data$Class]
+  # 
+  #   not_found <- setdiff(show_labels_for, c(found_metabolites, found_classes))
+  # 
+  #   if (length(not_found) > 0) {
+  #     print(paste("Warning: The following values were not found in the dataset:", paste(not_found, collapse = ", ")))
+  #   }
+  # 
+  #   # Only assign labels to the ones in show_labels_for
+  #   p_data$labels[p_data$Metabolite %in% show_labels_for] <- p_data$Metabolite
+  #   p_data$labels[p_data$Class %in% show_labels_for] <- p_data$Metabolite
+  # }
+  # 
+  # labels <- sapply(p_data$Metabolite, function(m) {
+  #   m <- as.character(m)
+  #   label <- ifelse(m %in% p_data$labels, m, "")
+  #   return(label)
+  # })
+
+  ## Legend: Significance color
+  if(isTRUE(show_p_value)) {
+    signif_colors <- sort(signif_colors, decreasing = TRUE)
+    signif_labels <- list()
+    for (i in seq_along(signif_colors)) {
+      t <- signif_colors[i]
+      names(t) <- NULL
+      if (i < length(signif_colors)) {
+        t2 <- signif_colors[i+1]
+        names(t2) <- NULL
+        label <- bquote(.(t) ~ "\u2265 q >" ~ .(t2))
+      } else {
+        label <- bquote(.(t) ~ "\u2265 q")
+      }
+      signif_labels[[i]] <- label
+    }
+  } else {
+    signif_labels <- list()
+  }
+  
+
+  ## Legend: Manage breaks and values for background rects
+  len_diff <- length(lc_colors) - length(fia_colors)
+  if (len_diff != 0) {
+    blank_names <- sapply(1:abs(len_diff), function(i) {
+      paste(rep(' ', i), collapse = '')
+    })
+    extension <- rep("white", abs(len_diff))
+    names(extension) <- blank_names
+    if (len_diff > 0) {
+      # more classes from lc than fia
+      # -> extend fia colors
+      fia_colors <- c(fia_colors, extension)
+    } else if (len_diff < 0) {
+      # more classes from fia than lc
+      # -> extend lc colors
+      lc_colors <- c(lc_colors, extension)
+    }
+  }
+  breaks <- c('LC:', names(lc_colors), 'FIA:', names(fia_colors))
+  values <- c('white', lc_colors, 'white', fia_colors)
+  names(values) <- NULL
+
+  ## Background: Create data for background rects
+  rects_df <- p_data %>%
+    group_by(.data$Class) %>%
+    summarise(Start = min(.data$x)-1,
+              End = max(.data$x)+1,
+              Color = class_colors[unique(.data$Class)])
+  rects_df$Class <- factor(rects_df$Class, levels = breaks)
+
+  ## Background: Determine border line between last LC and first FIA class
+  lc_fia_border <- p_data %>%
+    filter(.data$Class %in% names(lc_colors)) %>%
+    select(.data$x) %>%
+    max()
+
+  # Create y-axis limits for the rectangles
+  ylims <- c(min(log2fc_df[[values_col_name]]) - 0.5, max(log2fc_df[[values_col_name]]) + 0.5) #### MODIFIED PART ####
+  
+  ## Plot graph
+  scatter <- ggplot(p_data, aes(x = .data$x, y = .data[[values_col_name]])) + #### MODIFIED PART ####
+    geom_rect(data = rects_df,
+              inherit.aes = FALSE,
+              aes(xmin = .data$Start, xmax = .data$End,
+                  ymin = ylims[1], ymax = ylims[2],
+                  fill = .data$Class),
+              show.legend = TRUE,
+              alpha = 0.4) +
+    geom_vline(xintercept = 0, color = 'black') + #### MODIFIED PART ####
+    geom_vline(xintercept = lc_fia_border + 3, linewidth = 1, color = 'black', #### MODIFIED PART ####
+               linetype = "dotted") +
+    geom_hline(yintercept = 0, color = 'black') + #### MODIFIED PART ####
+    geom_point(aes(color = .data$signif_color), size = 4) + #### MODIFIED PART ####
+    scale_color_manual(paste0('Adjusted p-value (BH)'), #### MODIFIED PART ####
+                       labels = signif_labels,
+                       values = names(signif_colors),
+                       guide = guide_legend(order = 1)) +
+    scale_fill_manual('Class', #### MODIFIED PART ####
+                      breaks = breaks,
+                      values = values,
+                      drop = FALSE,
+                      guide = guide_legend(override.aes = list(alpha = 0.5),
+                                           order = 2, ncol = 2)) +
+    theme(#### MODIFIED PART ####
+          # axis.title = element_text(face = 'bold', size = 11),
+          axis.text.x = element_blank(),
+          # axis.text.y = element_text(face = 'bold', size = 16),
+          axis.ticks.x = element_blank(),
+          axis.ticks.y = element_line(linewidth = 0.5),
+          # legend.title = element_text(size = 22),
+          # legend.text = element_text(size = 20),
+          panel.grid.major.x = element_blank(),
+          panel.grid.major.y = element_line('#ECECEC'),
+          panel.grid.minor.x = element_blank(),
+          panel.grid.minor.y = element_line('#ECECEC'),
+          panel.background = element_blank()) +
+    labs(x = 'Metabolite', y = 'Log2(FC)') #### MODIFIED PART ####
+    # geom_label_repel(size = 2, color = 'black',
+    #                 box.padding = 0.6,
+    #                 point.padding = 0,
+    #                 min.segment.length = 0,
+    #                 max.overlaps = Inf,
+    #                 force = 10)
+  
+  #### MODIFIED PART ####
+  # save_plot(scatter,
+  #         folder_name = folder_name,
+  #         folder_path = folder_path,
+  #         file_name = file_name,
+  #         width = width,
+  #         height = height,
+  #         units = units,
+  #         format = save_as,
+  #         overwrite = overwrite)
+
+  return(scatter)
+}
+
+
+
+
+local_plot_network <- function(log2fc_df,
+                               q_value = 0.05,
+                               metabolite_col_name = "Metabolite",
+                               values_col_name = "log2FC",
+                               stat_col_name = "qval",
+                               metabolite_text_size = 3,
+                               connection_width = 0.75,
+                               pathway_text_size = 6,
+                               pathway_width = 3,
+                               exclude_pathways = NULL,
+                               color_scale = "viridis",
+                               gradient_colors = NULL,
+                               save_as = NULL,
+                               folder_name = format(Sys.Date(), "%Y-%m-%d"),
+                               folder_path = NULL,
+                               file_name = "network",
+                               format = "pdf",
+                               width = 29.7,
+                               height = 21.0,
+                               units = "cm",
+                               overwrite = FALSE) {
+  ### Checks
+  if (!(metabolite_col_name %in% colnames(log2fc_df))) {
+    stop(paste0("Column '", metabolite_col_name, "' is missing. Please select one of: ", paste(colnames(log2fc_df), collapse = ", ")))
+  }
+
+  if (!(values_col_name %in% colnames(log2fc_df))) {
+    stop(paste0("Column '", values_col_name, "' is missing. Please select one of: ", paste(colnames(log2fc_df), collapse = ", ")))
+  }
+
+  if (!(stat_col_name %in% colnames(log2fc_df))) {
+    stop(paste0("Column '", stat_col_name, "' is missing. Please select one of: ", paste(colnames(log2fc_df), collapse = ", ")))
+  }
+
+  if (!is.numeric(log2fc_df[[values_col_name]])) {
+    stop(paste0("Column '", values_col_name, "' must contain numerical values."))
+  }
+
+  if (!is.numeric(log2fc_df[[stat_col_name]])) {
+    stop(paste0("Column '", stat_col_name, "' must contain numerical values."))
+  }
+  
+  network_file <- MetAlyzer::pathway()
+
+  ### Read in Excel file
+  pathways <- read_pathways(network_file)
+  nodes <- read_nodes(network_file, pathways)
+  edges <- read_edges(network_file, nodes, pathways)
+  
+  nodes <- dplyr::filter(nodes, !Pathway %in% exclude_pathways)
+  
+  nodes_separated <- tidyr::separate_rows(nodes, Metabolites, sep = "\\s*;\\s*")
+  
+  nodes_joined <- dplyr::left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col_name))
+
+  updated_nodes_list <- calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, values_col_name, stat_col_name)
+
+  # --- Create the dataframe for excel export ---
+  nodes_separated_processed <- updated_nodes_list$nodes_separated
+
+  nodes_separated_shortend <- nodes_separated_processed %>%
+    dplyr::filter(!is.na(values_col_name)) %>%  
+    dplyr::select(c("Metabolites", "Pathway", "Label", "node_values", "node_stat", all_of(values_col_name), all_of(stat_col_name)))  
+  
+  summary_log2fc <- nodes_separated_shortend %>%
+    dplyr::group_by(Label) %>%
+    dplyr::summarise(
+      values_collapsed = paste(.data[[values_col_name]], collapse = "; "),
+      stat_collapsed = paste(.data[[stat_col_name]], collapse = "; "),
+      .groups = 'drop'
+    )
+
+  cols_to_summarise_unique <- setdiff(names(nodes_separated_shortend), c("Label", values_col_name, stat_col_name))
+
+  summary_others <- nodes_separated_shortend %>%
+    dplyr::group_by(Label) %>%
+    dplyr::summarise(
+      collapsed_count = dplyr::n(),
+      dplyr::across(
+        .cols = all_of(cols_to_summarise_unique), # Use the identified columns
+        .fns = ~ paste(unique(.), collapse = "; ")
+      ),
+      .groups = 'drop'
+    )
+
+  nodes_collapsed <- left_join(summary_others, summary_log2fc, by = "Label") %>%
+    rename(values = values_collapsed, stat = stat_collapsed,) %>%
+    mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
+    
+  # --- The dataframe for plotting ---
+  nodes_original_processed <- updated_nodes_list$nodes
+
+  ## Draw network
+
+  # Create a plot of the network using ggplot2 and ggrepel
+  network <- ggplot()
+  for (radius in unique(edges$Radius)) {
+    rad_edges <- filter(edges, .data$Radius == radius)
+    pathway_edges <- filter(rad_edges, !is.na(.data$Color))
+
+    network <- network +
+      # Add the round area behind the edges
+      geom_curve(
+        data = pathway_edges,
+        aes(
+          x = .data$x_start,
+          y = .data$y_start,
+          xend = .data$x_end,
+          yend = .data$y_end,
+          color = .data$Color
+        ),
+        linewidth = pathway_width,
+        alpha = 0.3,
+        curvature = radius,
+        show.legend = FALSE
+      ) +
+      # Or add the edges as curved lines
+      geom_curve(
+        data = rad_edges,
+        aes(
+          x = nodes[.data$Node1, "x"],
+          y = nodes[.data$Node1, "y"],
+          xend = nodes[.data$Node2, "x"],
+          yend = nodes[.data$Node2, "y"]
+        ),
+        color = "grey",
+        linewidth = connection_width,
+        curvature = radius
+      )
+  }
+  network <- network +
+    # Add labels at the position of the nodes
+    geom_label(
+      data = nodes_original_processed,
+      aes(
+        x = .data$x,
+        y = .data$y,
+        label = .data$Label,
+        fill = .data[[values_col_name]]
+      ),
+      size = metabolite_text_size,
+      color = "white",
+      fontface = 'bold' #### MODIFIED PART ####
+    ) +
+    switch(color_scale,
+           "gradient" = if (!is.null(gradient_colors) && length(gradient_colors) %in% c(2, 3)) {
+             if (length(gradient_colors) == 2) {
+               scale_fill_gradient(low = gradient_colors[1], high = gradient_colors[2], name = values_col_name)
+             } else {
+               scale_fill_gradient2(low = gradient_colors[1], mid = gradient_colors[2], high = gradient_colors[3], 
+                                    midpoint = 0, name = values_col_name)
+             }
+           } else {
+             message("gradient_colors is NULL or incorrectly specified. Falling back to viridis scale.")
+             scale_fill_viridis(option = "D", name = values_col_name)  # default fallback
+           },
+           scale_fill_viridis(option = get_color_option(color_scale), name = values_col_name)  # default to viridis
+    ) +
+
+    # Add annotations
+    geom_text(
+      data = pathways,
+      aes(
+        x = .data$x,
+        y = .data$y,
+        label = .data$Label,
+        color = .data$Color
+      ),
+      size = pathway_text_size,
+      show.legend = FALSE,
+      fontface = 'bold' #### MODIFIED PART ####
+    ) +
+    # # Set the x and y axis limits
+    # xlim(0, 10) +
+    # ylim(0, 10) +
+    theme_void() +
+    # Add a title and remove the x and y axis labels
+    ggtitle("") +
+    theme(plot.title = element_text(hjust = 0.5))
+
+    #### MODIFIED PART ####
+    # save_plot(network,
+    #           folder_name = folder_name,
+    #           folder_path = folder_path,
+    #           file_name = file_name,
+    #           width = width,
+    #           height = height,
+    #           units = units,
+    #           format = save_as,
+    #           overwrite = overwrite)
+  
+  return(list("Plot" = network, "Table" = nodes_collapsed))
+
+}
+
+#' @title Read Named Regions
+#'
+#' @description This function reads in the named regions of an excel file.
+read_named_region <- function(file_path, named_region) {
+  full_sheet <- openxlsx::read.xlsx(
+    file_path,
+    sheet = 1,
+    colNames = FALSE,
+    skipEmptyRows = FALSE,
+    skipEmptyCols = FALSE,
+  )
+  full_sheet[nrow(full_sheet) + 1, ] <- NA
+  header <- colnames(openxlsx::read.xlsx(
+    file_path,
+    namedRegion = named_region
+  ))
+  coordinates <- lapply(header, function(col_name) {
+    data.frame(which(full_sheet == col_name, arr.ind = TRUE))
+  }) %>%
+    dplyr::bind_rows() %>%
+    dplyr::arrange(row, col) %>%
+    dplyr::group_by(row) %>%
+    dplyr::mutate(n = n()) %>%
+    dplyr::filter(n == length(header))
+  
+  header_row <- unique(coordinates$row)
+  first_row <- header_row + 1
+  cols <- coordinates$col
+  df <- full_sheet[
+    first_row:nrow(full_sheet),
+    cols
+  ]
+  colnames(df) <- header
+  last_row <- min(which(rowSums(is.na(df)) == length(header))) - 1
+  df <- df[1:last_row, ]
+  
+  for (numeric_col in c("x", "y", "Radius")) {
+    if (numeric_col %in% header) {
+      df[, numeric_col] <- as.numeric(df[, numeric_col])
+    }
+  }
+  for (trim_col in c("Label", "Pathway", "Color", "Node1", "Node2")) {
+    if (trim_col %in% header) {
+      df[, trim_col] <- stringr::str_trim(df[, trim_col])
+    }
+  }
+  rownames(df) <- NULL
+  return(df)
+}
+
+#' Read and Validate Pathway Annotations
+#'
+#' Reads pathway data from a specified named region in the pathway file,
+#' validates entries, removes invalid ones, and sets row names.
+read_pathways <- function(network_file, region_name = "Pathways_Header") {
+  # Assuming MetAlyzer::pathway() provides the file path
+  # and read_named_region is available in the environment
+  pathways <- read_named_region(network_file, region_name)
+  
+  invalid_annotations <- which(
+    is.na(pathways$Label) |
+    duplicated(pathways$Label) |
+    is.na(pathways$x) |
+    is.na(pathways$y) |
+    is.na(pathways$Color)
+  )
+  if (length(invalid_annotations) > 0) {
+    cat("Warning: Removing", length(invalid_annotations), "invalid pathways.\n")
+    pathways <- pathways[-invalid_annotations, ]
+  }
+  if (nrow(pathways) > 0) {
+     rownames(pathways) <- pathways$Label
+  } else {
+     cat("Warning: No valid pathways found.\n")
+     # Return an empty data frame with expected columns if needed downstream
+     # return(data.frame(Label=character(), x=numeric(), y=numeric(), Color=character(), stringsAsFactors=FALSE))
+  }
+  return(pathways)
+}
+
+#' Read and Validate Network Nodes (Metabolites)
+#'
+#' Reads node data from a specified named region, validates entries against
+#' pathway information, cleans labels, removes invalid nodes, and sets row names.
+read_nodes <- function(network_file, pathways, region_name = "Metabolites_Header") {
+  nodes <- read_named_region(network_file, region_name)
+  nodes$Pathway[is.na(nodes$Pathway)] <- ""
+
+  valid_pathway_names <- character(0) # Initialize empty vector
+  if (nrow(pathways) > 0) {
+      valid_pathway_names <- c(rownames(pathways), "")
+  } else {
+      valid_pathway_names <- "" # Only allow unassigned pathway if no pathways exist
+  }
+
+  invalid_nodes <- which(
+    is.na(nodes$Label) |
+    duplicated(nodes$Label) |
+    is.na(nodes$x) |
+    is.na(nodes$y) |
+    !nodes$Pathway %in% valid_pathway_names
+  )
+
+  if (length(invalid_nodes) > 0) {
+    cat("Warning: Removing", length(invalid_nodes), "invalid nodes.\n")
+    nodes <- nodes[-invalid_nodes, ]
+  }
+
+  if (nrow(nodes) > 0) {
+    # Use the original label for rownames before cleaning
+    rownames(nodes) <- nodes$Label
+    # Remove #suffix from labels after setting rownames
+    nodes$Label <- gsub("#[0-9]+$", "", nodes$Label)
+  } else {
+     cat("Warning: No valid nodes found.\n")
+     # Return an empty data frame with expected columns if needed downstream
+     # return(data.frame(Label=character(), x=numeric(), y=numeric(), Pathway=character(), stringsAsFactors=FALSE))
+  }
+  return(nodes)
+}
+
+#' Read and Validate Network Edges (Connections)
+#'
+#' Reads edge data from a specified named region, validates that connected
+#' nodes exist and are not self-loops, and removes invalid edges.
+read_edges <- function(network_file, nodes, pathways, region_name = "Connections_Header") {
+  edges <- read_named_region(network_file, region_name)
+  
+  valid_node_names <- character(0) # Initialize empty vector
+   if (nrow(nodes) > 0) {
+       valid_node_names <- rownames(nodes)
+   } else {
+       # If there are no valid nodes, all edges are invalid
+       cat("Warning: No valid nodes exist, removing all connections.\n")
+       return(edges[0, ]) # Return empty dataframe with same columns
+   }
+
+  invalid_edges <- which(
+    is.na(edges$Node1) | # Check for NA node names first
+    is.na(edges$Node2) |
+    !edges$Node1 %in% valid_node_names |
+    !edges$Node2 %in% valid_node_names |
+    edges$Node1 == edges$Node2
+  )
+
+  if (length(invalid_edges) > 0) {
+    cat("Warning: Removing", length(invalid_edges), "invalid connections.\n")
+    edges <- edges[-invalid_edges, ]
+  }
+   if (nrow(edges) == 0) {
+     cat("Info: No valid edges found after validation.\n")
+  }
+
+  edges$x_start <- nodes[edges$Node1, "x"]
+  edges$y_start <- nodes[edges$Node1, "y"]
+  edges$x_end <- nodes[edges$Node2, "x"]
+  edges$y_end <- nodes[edges$Node2, "y"]
+  edges$Color <- sapply(rownames(edges), function(rowname) {
+    from <- edges[rowname, "Node1"]
+    to <- edges[rowname, "Node2"]
+    from_pathway <- nodes[from, "Pathway"]
+    to_pathway <- nodes[to, "Pathway"]
+    color <- NA
+    if (from_pathway == to_pathway & from_pathway != "") {
+      color <- pathways[from_pathway, "Color"]
+    }
+    return(color)
+  })
+  return(edges)
+}
+
+#' Get the color option based on the color scale
+#'
+#' This function maps a color scale name to a corresponding letter option.
+#' The function returns a letter representing the color scale from a predefined mapping.
+#' If the color scale provided is not recognized, the function fallsback to the viridis scale.
+get_color_option <- function(color_scale) {
+  color_map <- list(
+    magma = "A",
+    inferno = "B",
+    plasma = "C",
+    viridis = "D",
+    cividis = "E",
+    rocket = "F",
+    mako = "G",
+    turbo = "H"
+  )
+  
+  return(ifelse(color_scale %in% names(color_map), color_map[[color_scale]], "D"))
+}
+
+#' Calculate Node-Level Aggregate Statistics (Conditional on Significance)
+#'
+#' Calculates mean log2FC, p-value, and q-value for each node (Label),
+#' prioritizing significant metabolites (qval <= q_value). If none are significant,
+#' uses all measured metabolites for the node. Adds results to both dataframes.
+calculate_node_aggregates_conditional <- function(nodes_sep_df, 
+                                                  nodes_orig_df, 
+                                                  q_value, 
+                                                  values_col_name, 
+                                                  stat_col_name) {
+
+  # --- Input Validation ---
+  if (!"Label" %in% names(nodes_sep_df) || !"Label" %in% names(nodes_orig_df)) {
+    stop("Both dataframes must contain a 'Label' column for grouping.")
+  }
+  required_cols <- c(values_col_name, stat_col_name)
+  if (!all(required_cols %in% names(nodes_sep_df))) {
+    stop("nodes_sep_df must contain columns: ", paste(required_cols, collapse=", "))
+  }
+  if (missing(q_value) || !is.numeric(q_value) || length(q_value) != 1) {
+    stop("Please provide a single numeric value for q_value threshold.")
+  }
+
+  # --- 1. Calculate Node-Level Aggregates using Conditional Logic ---
+
+  # Group by Label and apply the conditional mean logic for each metric
+  node_summary <- nodes_sep_df %>%
+    dplyr::group_by(.data$Label) %>%
+    dplyr::summarise(
+      # Use the helper function for conditional mean calculation
+      node_values = calculate_conditional_mean(.data[[values_col_name]], .data[[stat_col_name]], q_value),
+      # Apply the same logic to qval itself: average significant qvals if present, else average measured qvals.
+      node_stat   = calculate_conditional_mean(.data[[stat_col_name]],   .data[[stat_col_name]], q_value),
+
+      .groups = "drop" # Drop grouping after summarise
+    )
+
+  # --- 2. Update nodes_separated Dataframe ---
+
+  nodes_sep_updated <- nodes_sep_df %>%
+    # Join the calculated node-level aggregates back
+    dplyr::left_join(node_summary, by = "Label")
+
+  # --- 3. Update Original Nodes Dataframe ---
+
+  nodes_orig_updated <- nodes_orig_df %>%
+      dplyr::select(-any_of(c("node_values", "node_stat"))) %>%
+      dplyr::left_join(node_summary, by = "Label") %>%
+      dplyr::rename(!!values_col_name := .data$node_values, !!stat_col_name := .data$node_stat)
+
+  # --- 4. Return Updated Dataframes ---
+  return(list(nodes_separated = nodes_sep_updated, nodes = nodes_orig_updated))
+}
+
+#' Helper function to calculate conditional mean based on significance
+#'
+#' Calculates mean of a metric vector based on q-values. Prioritizes values
+#' where qval <= q_thresh. If none exist, uses all non-NA values.
+calculate_conditional_mean <- function(metric_vec, qval_vec, q_thresh) {
+
+  # Validate inputs are reasonable (basic check)
+  if(length(metric_vec) != length(qval_vec)) {
+    stop("metric_vec and qval_vec must have the same length.")
+  }
+
+  # Identify rows that are BOTH significant AND measured for the specific metric
+  is_significant_and_measured <- !is.na(qval_vec) & qval_vec <= q_thresh & !is.na(metric_vec)
+
+  # Identify rows that are measured for the metric (regardless of significance)
+  is_measured <- !is.na(metric_vec)
+
+  if (any(is_significant_and_measured)) {
+    # Case 1: Significant & measured values exist -> Use mean of these values
+    mean_val <- mean(metric_vec[is_significant_and_measured], na.rm = FALSE) # NAs excluded by definition
+  } else if (any(is_measured)) {
+    # Case 2: No significant values, but measured values exist -> Use mean of all measured values
+    mean_val <- mean(metric_vec[is_measured], na.rm = FALSE) # NAs excluded by definition
+  } else {
+    # Case 3: No measured values exist for this metric in the group
+    mean_val <- NA_real_
+  }
+  return(mean_val)
+}
+```
+
+# Demo dataset from Biocrates
+
+Load biocrates-exported data
+```{r}
+# Load biocrates-exported data
+metabObj <- MetAlyzer::read_webidq('./inst/extdata/Metalyzer_demodataset_biocratesMxPQuant500XL_2025-04.xlsx',
+                                   sheet = 1, silent = T)
+# Remove metabolism indicators
+# metabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = 'Metabolism Indicators',
+#                                           drop_NA_concentration = F)
+```
+
+Make plots for data distribution and missing patterns of UNPROCESSED data, which were included in Figure 2A&B
+```{r message=F}
+# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
+metabAggreTbl <- metadata(metabObj)$aggregated_data %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+smpMetadatTbl <- colData(metabObj) %>%
+  tibble::as_tibble(rownames = 'ID') %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+# Use original column names whose spaces are not replaced with '.'
+colnames(smpMetadatTbl) <- c('ID', colnames(colData(metabObj)))
+# Prepare ID levels for displaying samples in order
+idLevels <- rownames(colData(metabObj))
+metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
+  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
+
+# Compute completeness level of each feature for doing filtering
+featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
+  # 0 is true zero in biocrates data
+  dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% NA ~ 1),
+                Miss = dplyr::case_when(Concentration %in% NA ~ 1)) %>%
+  dplyr::group_by(Metabolite) %>%
+  dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
+  dplyr::mutate(TotalCount = ncol(metabObj),
+                CompleteRatio = ObsCount / TotalCount)
+
+# Visualize data
+# Distribution
+dist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=`Sample Description`)) +
+  geom_boxplot(alpha = 1) +
+  scale_fill_brewer(palette = 'Set1') +
+  scale_y_log10() +
+  labs(x = 'Sample', y = 'Metabolite abundance') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Missingness
+smpCompleteCountTbl <- dplyr::mutate(metabAggreTbl,
+                                     Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed',
+                                                                     Concentration %in% NA ~ 'Missing')) %>%
+  dplyr::group_by(ID, Completeness) %>%
+  dplyr::summarise(Count = dplyr::n()) %>%
+  dplyr::ungroup()
+miss <- ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
+  geom_col(position = 'stack') +
+  scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
+  labs(x = 'Sample') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+```
+
+Preprocess data: 80% rule, half-minimum, and log2-transformation were performed.\
+**Supplementary Figure 1**
+```{r message=F}
+# Preprocess data
+# Feature filtering based on 80% rule
+rmMissFeats <- featCompleteLvTbl$Metabolite[featCompleteLvTbl$CompleteRatio < 0.8]
+processMetabObj <- MetAlyzer::filter_metabolites(metabObj, drop_metabolites = rmMissFeats)
+# Half-minimum imputation
+processMetabObj <- MetAlyzer:::data_imputation(processMetabObj)
+# Log2-transformation
+processMetabObj <- MetAlyzer:::data_normalization(processMetabObj, norm_method = 'log2')
+
+#### The following chunk is basically the same as the previous. ####
+# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
+metabAggreTbl <- metadata(processMetabObj)$aggregated_data %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+smpMetadatTbl <- colData(processMetabObj) %>%
+  tibble::as_tibble(rownames = 'ID') %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+# Use original column names whose spaces are not replaced with '.'
+colnames(smpMetadatTbl) <- c('ID', colnames(colData(processMetabObj)))
+# Prepare ID levels for displaying samples in order
+idLevels <- rownames(colData(processMetabObj))
+metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
+  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)))
+
+# Visualize data
+# Distribution
+processDist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=`Sample Description`)) +
+  geom_boxplot(alpha = 1) +
+  scale_fill_brewer(palette = 'Set1') +
+  labs(x = 'Sample', y = 'Metabolite abundance') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+processDist
+# Save plot
+# ggsave(filename = 'path_to_save', device = 'png', dpi = 600, units = 'cm', width = 38, height = 12)
+```
+
+Do differential analysis and visualize results via volcano, scatter, and network plots\
+**Figure 2A-D**
+```{r fig.height=20}
+# Compute log2(FC)
+processMetabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = processMetabObj,
+                                           group = 'Sample Description',
+                                           group_level = c('Group 1', 'Group 2'))
+
+# Volcano plot
+vulcano <- MetAlyzer:::plot_vulcano(log2FC(processMetabObj), x_cutoff = 1, y_cutoff = 0.05) +
+  theme(axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Scatter plot
+scatter <- local_plot_scatter(log2FC(processMetabObj)) +
+  scale_y_continuous(breaks = c(seq(-4, 2, 1))) +
+  theme(axis.title = element_text(face = 'bold', size = 16), axis.text.y = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Make figure2
+topRow <- cowplot::plot_grid(dist, miss, cols = 2, labels = 'AUTO', label_size = 22,
+                             hjust = 0, vjust = 1.1)
+demoRes_ABCD <- cowplot::plot_grid(topRow, vulcano, scatter, ncol = 1, rel_heights = c(3, 5, 5),
+                                   labels = c('', 'C', 'D'), label_size = 22, hjust = 0, vjust = 1.1)
+demoRes_ABCD
+# ggsave(filename = 'path_to_save', plot = demoRes_ABCD, device = 'png', dpi = 600, units = 'cm', width = 38, height = 52)
+```
+
+**Figure 2E**
+```{r fig.height=8}
+# Network diagram
+spsUtil::quiet({
+  network <- local_plot_network(log2FC(processMetabObj), metabolite_text_size = 3.5,
+                                connection_width = 1.8, pathway_text_size = 6, pathway_width = 5)
+  network_p <- network$Plot +
+    scale_fill_viridis(name = 'Log2(FC)') +
+    theme(legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+})
+# Add label
+demoRes_E <- cowplot::plot_grid(network_p, labels = 'E', label_size = 22, hjust = 0, vjust = 1.1)
+demoRes_E
+# ggsave(filename = 'path_to_save', plot = demoRes_E, device = 'png', dpi = 600, units = 'cm', width = 38, height = 32)
+```
+
+**Supplementary Figure 2**
+```{r fig.width=14}
+# Prepare metabolites to highlight
+hilight <- dplyr::filter(network$Table, Label %in% c('T14', 'T16', 'T18'))
+hilight_metabs <- stringr::str_split(hilight$Metabolites, ';') %>%
+  unlist() %>%
+  stringr::str_remove('^ ')
+rm_metabs <- stringr::str_split(hilight$values, ';') %>%
+  unlist() %>%
+  stringr::str_remove('^ ') %>%
+  as.numeric() %>%
+  is.na()
+hilight_metabs <- unique(hilight_metabs[!rm_metabs])
+
+
+# Customize plot_vulcano for labeling (just run it)
+plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels_for = NULL,
+                         #### MODIFIED PART ####
+                         label_name = NULL, label_color = NULL) {
+  # Prepare labels
+  Log2FCTab$Label <- NA
+  if (!is.null(show_labels_for)) {
+    metabLabels <- Log2FCTab$Metabolite %in% show_labels_for
+    metabClassLabels <- as.character(Log2FCTab$Class) %in% show_labels_for
+    if (sum(metabLabels) > 0 || sum(metabClassLabels) > 0) {
+      Log2FCTab$Label[metabLabels] <- Log2FCTab$Metabolite[metabLabels]
+      Log2FCTab$Label[metabClassLabels] <- Log2FCTab$Metabolite[metabClassLabels]
+    }
+    
+    # Report missing specified labels
+    missLabels <- show_labels_for[!show_labels_for %in% c(Log2FCTab$Metabolite[metabLabels],
+                                                          as.character(Log2FCTab$Class)[metabClassLabels])]
+    if (length(missLabels) > 0) {
+      print(paste("Warning: The following Metabolites/Classes were not found in the data:",
+                  paste(missLabels, collapse = ", ")))
+    }
+  }
+  
+  # Create static vulcano ggplot object
+  # Arrange order of metabolites in row based on significance, so that significant
+  # metabolites are shown on top of insignificant ones
+  #### MODIFIED PART ####
+  Log2FCTab <- dplyr::mutate(Log2FCTab, Label = dplyr::case_when(!is.na(Label) ~ label_name,
+                                                                 is.na(Label) ~ 'Other Metabolites'))
+  Log2FCTab <- Log2FCTab[c(which(Log2FCTab$Label %in% 'Other Metabolites'),
+                           which(Log2FCTab$Label %in% label_name)),]
+  vulcano <- ggplot(Log2FCTab, aes(x=log2FC, y=-log10(qval), color=Label)) +
+    geom_point(size = 4) +
+    geom_vline(xintercept = c(-x_cutoff, x_cutoff), col = "black", linetype = "dashed") +
+    geom_hline(yintercept = -log10(y_cutoff), col = "black", linetype = "dashed") +
+    #### MODIFIED PART ####
+    scale_color_manual(NULL,
+                       breaks = c(label_name, 'Other Metabolites'),
+                       values = c(label_color, 'grey80')) +
+    labs(x = 'Log2(FC)', y = "-Log10(q-value)") +
+    theme_bw()
+  
+  return(vulcano)
+}
+
+# Make volcano plot
+vulcano_TAGs <- plot_vulcano(log2FC(processMetabObj), x_cutoff = 1, y_cutoff = 0.05,
+                             show_labels_for = hilight_metabs, label_name = 'Triacylglycerols',
+                             label_color = '#440154FF') +
+  theme(axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+
+# Prepare metabolites to highlight
+hilight <- dplyr::filter(network$Table, Label %in% c('D14', 'D16', 'D18'))
+hilight_metabs <- stringr::str_split(hilight$Metabolites, ';') %>%
+  unlist() %>%
+  stringr::str_remove('^ ')
+rm_metabs <- stringr::str_split(hilight$values, ';') %>%
+  unlist() %>%
+  stringr::str_remove('^ ') %>%
+  as.numeric() %>%
+  is.na()
+hilight_metabs <- unique(hilight_metabs[!rm_metabs])
+# Make volcano plot
+vulcano_DAGs <- plot_vulcano(log2FC(processMetabObj), x_cutoff = 1, y_cutoff = 0.05,
+                             show_labels_for = hilight_metabs, label_name = 'Diacylglycerols',
+                             label_color = '#22A884FF') +
+  theme(axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Make supplementary plots
+suppl_hilightVulcano <- cowplot::plot_grid(vulcano_TAGs, vulcano_DAGs, ncol = 1, labels = c('A', 'B'),
+                                           label_size = 22, hjust = 0, vjust = 1.1)
+suppl_hilightVulcano
+# ggsave(filename = 'path_to_save', plot = suppl_hilightVulcano, device = 'png', dpi = 600, units = 'cm', width = 38, height = 40)
+```
+
+
+
+
+# Lung datasets from Gegner et al., 2024
+
+Load biocrates-exported data
+```{r}
+# Load biocrates-exported data
+metabObj <- MetAlyzer::read_webidq('./inst/extdata/2025-10-30_SmartCare_004-TP_008_009-AK.xlsx',
+                                   sheet = 1, silent = T)
+```
+
+Make plots for data distribution and missing patterns of UNPROCESSED data, which were included in Supplementary Figure 3A&B
+```{r message=F}
+# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
+metabAggreTbl <- metadata(metabObj)$aggregated_data %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+smpMetadatTbl <- colData(metabObj) %>%
+  tibble::as_tibble(rownames = 'ID') %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+# Use original column names whose spaces are not replaced with '.'
+colnames(smpMetadatTbl) <- c('ID', colnames(colData(metabObj)))
+# Prepare ID levels for displaying samples in order
+idLevels <- c(rownames(colData(metabObj))[colData(metabObj)$Group %in% 'Tumor'],
+              rownames(colData(metabObj))[colData(metabObj)$Group %in% 'Non-Tumor'])
+metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
+  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)),
+                Group = factor(Group, levels = c('Tumor', 'Non-Tumor')))
+
+# Compute completeness level of each feature for doing filtering
+featCompleteLvTbl <- dplyr::select(metabAggreTbl, Metabolite, Concentration) %>%
+  # 0 is true zero in biocrates data
+  dplyr::mutate(Obs = dplyr::case_when(!Concentration %in% NA ~ 1),
+                Miss = dplyr::case_when(Concentration %in% NA ~ 1)) %>%
+  dplyr::group_by(Metabolite) %>%
+  dplyr::summarise(ObsCount = sum(Obs, na.rm = T), MissCount = sum(Miss, na.rm = T)) %>%
+  dplyr::mutate(TotalCount = ncol(metabObj),
+                CompleteRatio = ObsCount / TotalCount)
+
+# Visualize data
+# Distribution
+dist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=Group)) +
+  geom_boxplot(alpha = 1) +
+  scale_fill_brewer(palette = 'Set1') +
+  scale_y_log10() +
+  labs(x = 'Sample', y = 'Metabolite abundance') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Missingness
+smpCompleteCountTbl <- dplyr::mutate(metabAggreTbl,
+                                     Completeness = dplyr::case_when(!Concentration %in% NA ~ 'Observed',
+                                                                     Concentration %in% NA ~ 'Missing')) %>%
+  dplyr::group_by(ID, Completeness) %>%
+  dplyr::summarise(Count = dplyr::n()) %>%
+  dplyr::ungroup()
+miss <- ggplot(smpCompleteCountTbl, aes(x=ID, y=Count, fill=Completeness)) +
+  geom_col(position = 'stack') +
+  scale_fill_manual(values = c(Missing = 'grey', Observed = 'black')) +
+  labs(x = 'Sample') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+```
+
+Preprocess data: Half-minimum and log2-transformation were performed.
+```{r message=F}
+# Preprocess data
+# Half-minimum imputation
+processMetabObj <- MetAlyzer:::data_imputation(metabObj)
+# Log2-transformation
+processMetabObj <- MetAlyzer:::data_normalization(processMetabObj, norm_method = 'log2')
+
+#### The following chunk is basically the same as the previous. ####
+# Prepare long table containing data (concentrations) and metadata (metabolites and samples)
+metabAggreTbl <- metadata(processMetabObj)$aggregated_data %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+smpMetadatTbl <- colData(processMetabObj) %>%
+  tibble::as_tibble(rownames = 'ID') %>%
+  dplyr::mutate(ID = paste0('Smp', ID))
+# Use original column names whose spaces are not replaced with '.'
+colnames(smpMetadatTbl) <- c('ID', colnames(colData(processMetabObj)))
+# Prepare ID levels for displaying samples in order
+idLevels <- c(rownames(colData(processMetabObj))[colData(processMetabObj)$Group %in% 'Tumor'],
+              rownames(colData(processMetabObj))[colData(processMetabObj)$Group %in% 'Non-Tumor'])
+metabAggreTbl <- dplyr::left_join(metabAggreTbl, smpMetadatTbl, by = 'ID') %>%
+  dplyr::mutate(ID = factor(ID, levels = paste0('Smp', idLevels)),
+                Group = factor(Group, levels = c('Tumor', 'Non-Tumor')))
+
+# Visualize data
+# Distribution
+# processDist <- ggplot(metabAggreTbl, aes(x=ID, y=Concentration, fill=Group)) +
+#   geom_boxplot(alpha = 1) +
+#   scale_fill_brewer(palette = 'Set1') +
+#   labs(x = 'Sample', y = 'Metabolite abundance') +
+#   theme_bw() +
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+#         axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+#         legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+# processDist
+```
+
+Do differential analysis and visualize results via volcano, scatter, and network plots\
+**Supplementary Figure 3A-D**
+```{r fig.height=20}
+# Compute log2(FC)
+processMetabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = processMetabObj,
+                                           group = 'Group',
+                                           group_level = c('Tumor', 'Non-Tumor'))
+
+# Volcano plot
+vulcano <- MetAlyzer:::plot_vulcano(log2FC(processMetabObj), x_cutoff = 1, y_cutoff = 0.05) +
+  theme(axis.title = element_text(face = 'bold', size = 16), axis.text = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Scatter plot
+scatter <- local_plot_scatter(log2FC(processMetabObj)) +
+  scale_y_continuous(breaks = c(seq(-4, 2, 1))) +
+  theme(axis.title = element_text(face = 'bold', size = 16), axis.text.y = element_text(face = 'bold', size = 14),
+        legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+
+# Make figure2
+topRow <- cowplot::plot_grid(dist, miss, cols = 2, labels = 'AUTO', label_size = 22,
+                             hjust = 0, vjust = 1.1)
+demoRes_ABCD <- cowplot::plot_grid(topRow, vulcano, scatter, ncol = 1, rel_heights = c(3, 5, 5),
+                                   labels = c('', 'C', 'D'), label_size = 22, hjust = 0, vjust = 1.1)
+demoRes_ABCD
+# ggsave(filename = 'path_to_save', plot = demoRes_ABCD, device = 'png', dpi = 600, units = 'cm', width = 38, height = 52)
+```
+
+**Supplementary Figure 3E**
+```{r fig.height=8}
+# Network diagram
+spsUtil::quiet({
+  network <- local_plot_network(log2FC(processMetabObj), metabolite_text_size = 3.5,
+                                connection_width = 1.8, pathway_text_size = 6, pathway_width = 5)
+  network_p <- network$Plot +
+    scale_fill_viridis(name = 'Log2(FC)') +
+    theme(legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
+})
+# Add label
+demoRes_E <- cowplot::plot_grid(network_p, labels = 'E', label_size = 22, hjust = 0, vjust = 1.1)
+demoRes_E
+# ggsave(filename = 'path_to_save', plot = demoRes_E, device = 'png', dpi = 600, units = 'cm', width = 38, height = 32)
+```

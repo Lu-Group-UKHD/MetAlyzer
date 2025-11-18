@@ -24,14 +24,6 @@ Authors@R: c(
     person(given = "Alice",
            family = "Limonciel",
            role = c("aut")),       
-    person(given = "Carolin",
-           family = "Andresen",
-           role = c("aut"),
-           comment = c(ORCID = "0000-0002-8960-7719")),
-    person(given = "Daniel",
-           family = "Huebschmann",
-           role = c("aut"),
-           comment = c(ORCID = "0000-0002-6041-7049")),
     person(given = "Julio", 
            family = "Saez-Rodriguez", 
            role = "aut",
@@ -59,6 +51,7 @@ Imports:
     tidyr,
     ggplot2,
     ggrepel,
+    ggpubr,
     utils,
     rlang,
     data.table,
@@ -88,10 +81,9 @@ Description: The 'MetAlyzer' S4 object provides methods to read and reformat met
 License: GPL-3
 Encoding: UTF-8
 Language: en-US
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Suggests:
-    MetaProViz,
-    vsn
+    MetaProViz
 Remotes: 
     saezlab/MetaProViz
 VignetteBuilder: knitr

@@ -12,7 +12,7 @@
 #' @param pathway_text_size The text size of pathway annotations
 #' @param pathway_width The line width of pathway-specific connection coloring
 #' @param exclude_pathways Pathway names that are exluded from plotting
-#' @param color_scale A string specifying the color scale to use. Options include `"viridis"`, `"plasma"`, `"magma"`, `"inferno"`, `"cividis"`, `"rocket"`, `"mako"`, and `"turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.
+#' @param color_scale A string specifying the color scale to use. Options include `"Viridis"`, `"Plasma"`, `"Magma"`, `"Inferno"`, `"Cividis"`, `"Rocket"`, `"Mako"`, and `"Turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.
 #' @param gradient_colors A vector of length 2 or 3 specifying the colors for a custom gradient. If two colors are provided (`c(low, high)`), `scale_fill_gradient()` is used. If three colors are provided (`c(low, mid, high)`), `scale_fill_gradient2()` is used. If `NULL` or incorrectly specified, the viridis color scale is applied.
 #' @param save_as \emph{Optional: } Select the file type of output plots. Options are svg, pdf, png or NULL. \strong{Default = "NULL"}
 #' @param folder_name Name of the folder where the plot will be saved. Special characters will be removed automatically. \strong{Default = date}
@@ -51,7 +51,7 @@ plot_network <- function(log2fc_df,
                          pathway_text_size = 6,
                          pathway_width = 3,
                          exclude_pathways = NULL,
-                         color_scale = "viridis",
+                         color_scale = "Viridis",
                          gradient_colors = NULL,
                          save_as = NULL,
                          folder_name = format(Sys.Date(), "%Y-%m-%d"),
@@ -86,24 +86,25 @@ plot_network <- function(log2fc_df,
   network_file <- MetAlyzer::pathway()
 
   ### Read in Excel file
-  pathways <- read_pathways(network_file)
-  nodes <- read_nodes(network_file, pathways)
-  edges <- read_edges(network_file, nodes, pathways)
+  pathways <- MetAlyzer:::read_pathways(network_file)
+  nodes <- MetAlyzer:::read_nodes(network_file, pathways)
+  edges <- MetAlyzer:::read_edges(network_file, nodes, pathways)
   
+  pathways <- dplyr::filter(pathways, !Pathway %in% exclude_pathways)
   nodes <- dplyr::filter(nodes, !Pathway %in% exclude_pathways)
+  edges <- dplyr::filter(edges, Node1 %in% nodes$Label | Node2 %in% nodes$Label)
   
   nodes_separated <- tidyr::separate_rows(nodes, Metabolites, sep = "\\s*;\\s*")
   
   nodes_joined <- dplyr::left_join(nodes_separated, log2fc_df, by = c("Metabolites" = metabolite_col_name))
 
-  updated_nodes_list <- calculate_node_aggregates_conditional(nodes_joined, nodes, q_value, values_col_name, stat_col_name)
+  updated_nodes_list <- MetAlyzer:::calculate_node_aggregates_conditional(nodes_sep_df = nodes_joined, nodes_orig_df = nodes, q_value = q_value, stat_col_name = stat_col_name, c(values_col_name))
 
   # --- Create the dataframe for excel export ---
   nodes_separated_processed <- updated_nodes_list$nodes_separated
 
   nodes_separated_shortend <- nodes_separated_processed %>%
-    dplyr::filter(!is.na(values_col_name)) %>%  
-    dplyr::select(c("Metabolites", "Pathway", "Label", "node_values", "node_stat", all_of(values_col_name), all_of(stat_col_name)))  
+    dplyr::filter(!is.na(values_col_name)) 
   
   summary_log2fc <- nodes_separated_shortend %>%
     dplyr::group_by(Label) %>%
@@ -116,19 +117,19 @@ plot_network <- function(log2fc_df,
   cols_to_summarise_unique <- setdiff(names(nodes_separated_shortend), c("Label", values_col_name, stat_col_name))
 
   summary_others <- nodes_separated_shortend %>%
-    dplyr::group_by(Label) %>%
+    dplyr::group_by(.data$Label) %>%
     dplyr::summarise(
       collapsed_count = dplyr::n(),
       dplyr::across(
         .cols = all_of(cols_to_summarise_unique), # Use the identified columns
-        .fns = ~ paste(unique(.), collapse = "; ")
+        .fns = ~ paste(., collapse = "; ")
       ),
       .groups = 'drop'
     )
 
   nodes_collapsed <- left_join(summary_others, summary_log2fc, by = "Label") %>%
-    rename(values = values_collapsed, stat = stat_collapsed,) %>%
-    mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
+    dplyr::rename(values = values_collapsed, stat = stat_collapsed,) %>%
+    dplyr::mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
     
   # --- The dataframe for plotting ---
   nodes_original_processed <- updated_nodes_list$nodes
@@ -196,7 +197,7 @@ plot_network <- function(log2fc_df,
              message("gradient_colors is NULL or incorrectly specified. Falling back to viridis scale.")
              scale_fill_viridis(option = "D", name = values_col_name)  # default fallback
            },
-           scale_fill_viridis(option = get_color_option(color_scale), name = values_col_name)  # default to viridis
+           scale_fill_viridis(option = MetAlyzer:::create_viridis_style(color_scale, type = "initial"), name = values_col_name)  # default to viridis
     ) +
 
     # Add annotations
@@ -220,7 +221,7 @@ plot_network <- function(log2fc_df,
     theme(plot.title = element_text(hjust = 0.5))
 
 
-    save_plot(network,
+    MetAlyzer:::save_plot(network,
               folder_name = folder_name,
               folder_path = folder_path,
               file_name = file_name,
@@ -425,32 +426,75 @@ read_edges <- function(network_file, nodes, pathways, region_name = "Connections
   return(edges)
 }
 
-#' Get the color option based on the color scale
+#' Creates a viridis color style for Plotly plots.
 #'
-#' This function maps a color scale name to a corresponding letter option.
-#' The function returns a letter representing the color scale from a predefined mapping.
-#' If the color scale provided is not recognized, the function fallsback to the viridis scale.
+#' This function can generate either a Plotly-compatible colorscale for a
+#' color bar or a vector of hex color codes for manual coloring.
 #'
-#' @param color_scale A character string representing the name of the color scale.
-#'        It should be one of: "magma", "inferno", "plasma", "viridis", 
-#'        "cividis", "rocket", "mako", or "turbo".
+#' @param color_scale The name of the palette (e.g., "Magma", "Viridis").
+#' @param type The desired output type: "scale" (for a color bar), "hex" or "inital"
+#'   (for a color scalde, a vector of hex codes, or the correct scale for viridis package). Defaults to "scale".
+#' @param data The data frame containing the values. Only required if type = "hex".
+#' @param values_col_name The name of the column with numeric values. Only
+#'   required if type = "hex".
 #'
-#' @return A character string representing the color option corresponding to the 
-#'         provided color scale. If the color scale is not recognized, it returns `NA`.
-#'
-get_color_option <- function(color_scale) {
-  color_map <- list(
-    magma = "A",
-    inferno = "B",
-    plasma = "C",
-    viridis = "D",
-    cividis = "E",
-    rocket = "F",
-    mako = "G",
-    turbo = "H"
+#' @return A data frame if type is "scale", or a character vector if type is "hex".
+create_viridis_style <- function(color_scale,
+                                 type = "scale",
+                                 data = NULL,
+                                 values_col_name = NULL) {
+  option <- switch(color_scale,
+                   "Magma"   = "A",
+                   "Inferno" = "B",
+                   "Plasma"  = "C",
+                   "Viridis" = "D",
+                   "Cividis" = "E",
+                   "Rocket"  = "F",
+                   "Mako"    = "G",
+                   "Turbo"   = "H",
+                   "D"
   )
-  
-  return(ifelse(color_scale %in% names(color_map), color_map[[color_scale]], "D"))
+  if (type == "scale") {
+    n_colors <- 11 # A small number of steps is efficient for a Plotly scale
+    palette_colors <- viridis(n_colors, option = option)
+    stop_points <- seq(0, 1, length.out = n_colors)
+    return(data.frame(stop = stop_points, color = palette_colors))
+
+  } else if (type == "hex") {
+    if (is.null(data) || is.null(values_col_name)) {
+      stop("For type = 'hex', you must provide 'data' and 'values_col_name'.")
+    }
+
+    n_colors <- 256
+    palette <- viridis(n_colors, option = option)
+
+    values <- data[[values_col_name]]
+    valid_values <- na.omit(as.numeric(values))
+
+    if (length(valid_values) == 0) return(rep("grey", length(values)))
+
+    value_range <- range(valid_values)
+
+    if (diff(value_range) == 0) {
+      middle_color <- palette[n_colors / 2]
+      return(ifelse(is.na(values), "grey", middle_color))
+    }
+
+    breaks <- seq(value_range[1], value_range[2], length.out = n_colors + 1)
+
+    return(sapply(values, function(val) {
+      if (is.na(val)) {
+        "grey"
+      } else {
+        color_index <- findInterval(val, breaks, all.inside = TRUE)
+        palette[color_index]
+      }
+    }))
+  } else if (type == "initial") {
+    return(option)
+  } else {
+    stop("Invalid 'type' specified. Please choose 'scale' or 'hex'.")
+  }
 }
 
 #' Calculate Node-Level Aggregate Statistics (Conditional on Significance)
@@ -477,50 +521,61 @@ get_color_option <- function(color_scale) {
 #'   $nodes: Input nodes_orig_df with 2 new columns:
 #'     node_values, node_stat
 #'
-calculate_node_aggregates_conditional <- function(nodes_sep_df, 
-                                                  nodes_orig_df, 
-                                                  q_value, 
-                                                  values_col_name, 
-                                                  stat_col_name) {
+calculate_node_aggregates_conditional <- function(nodes_sep_df,
+                                                  nodes_orig_df,
+                                                  q_value,
+                                                  stat_col_name,
+                                                  ...) {
+  # --- Capture the dynamic column names ---
+  value_col_names <- c(...)
 
   # --- Input Validation ---
   if (!"Label" %in% names(nodes_sep_df) || !"Label" %in% names(nodes_orig_df)) {
     stop("Both dataframes must contain a 'Label' column for grouping.")
   }
-  required_cols <- c(values_col_name, stat_col_name)
-  if (!all(required_cols %in% names(nodes_sep_df))) {
-    stop("nodes_sep_df must contain columns: ", paste(required_cols, collapse=", "))
+  # Combine all columns that need processing and check if they exist
+  all_cols_to_process <- c(value_col_names, stat_col_name)
+  if (length(all_cols_to_process) == 0) {
+    stop("Please provide at least one column name to be processed.")
+  }
+  if (!all(all_cols_to_process %in% names(nodes_sep_df))) {
+    stop("nodes_sep_df must contain all specified columns: ", paste(all_cols_to_process, collapse=", "))
   }
   if (missing(q_value) || !is.numeric(q_value) || length(q_value) != 1) {
     stop("Please provide a single numeric value for q_value threshold.")
   }
 
-  # --- 1. Calculate Node-Level Aggregates using Conditional Logic ---
+  # --- 1. Calculate Node-Level Aggregates using `across()` ---
 
-  # Group by Label and apply the conditional mean logic for each metric
   node_summary <- nodes_sep_df %>%
     dplyr::group_by(.data$Label) %>%
+    # Use across() to apply the same function to multiple columns
     dplyr::summarise(
-      # Use the helper function for conditional mean calculation
-      node_values = calculate_conditional_mean(.data[[values_col_name]], .data[[stat_col_name]], q_value),
-      # Apply the same logic to qval itself: average significant qvals if present, else average measured qvals.
-      node_stat   = calculate_conditional_mean(.data[[stat_col_name]],   .data[[stat_col_name]], q_value),
-
-      .groups = "drop" # Drop grouping after summarise
+      dplyr::across(
+        # Target all specified value columns and the stat column
+        dplyr::all_of(all_cols_to_process),
+        # Apply the calculation to each column (.x)
+        ~ MetAlyzer:::calculate_conditional_mean(.x, .data[[stat_col_name]], q_value)
+      ),
+      .groups = "drop"
     )
 
   # --- 2. Update nodes_separated Dataframe ---
 
+  # Create a prefixed version of the summary for joining, to avoid name clashes
+  node_summary_prefixed <- node_summary %>%
+    dplyr::rename_with(~ paste0("node_", .), .cols = -Label)
+
   nodes_sep_updated <- nodes_sep_df %>%
-    # Join the calculated node-level aggregates back
-    dplyr::left_join(node_summary, by = "Label")
+    dplyr::left_join(node_summary_prefixed, by = "Label")
 
   # --- 3. Update Original Nodes Dataframe ---
-
+  
   nodes_orig_updated <- nodes_orig_df %>%
-      dplyr::select(-any_of(c("node_values", "node_stat"))) %>%
-      dplyr::left_join(node_summary, by = "Label") %>%
-      dplyr::rename(!!values_col_name := .data$node_values, !!stat_col_name := .data$node_stat)
+      # Remove original columns to prevent name clashes before joining the new aggregated values
+      dplyr::select(-any_of(all_cols_to_process)) %>%
+      # Join the new summary data; columns are already correctly named
+      dplyr::left_join(node_summary, by = "Label")
 
   # --- 4. Return Updated Dataframes ---
   return(list(nodes_separated = nodes_sep_updated, nodes = nodes_orig_updated))

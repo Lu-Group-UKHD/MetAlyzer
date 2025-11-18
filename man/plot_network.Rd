@@ -15,7 +15,7 @@ plot_network(
   pathway_text_size = 6,
   pathway_width = 3,
   exclude_pathways = NULL,
-  color_scale = "viridis",
+  color_scale = "Viridis",
   gradient_colors = NULL,
   save_as = NULL,
   folder_name = format(Sys.Date(), "\%Y-\%m-\%d"),
@@ -49,7 +49,7 @@ plot_network(
 
 \item{exclude_pathways}{Pathway names that are exluded from plotting}
 
-\item{color_scale}{A string specifying the color scale to use. Options include `"viridis"`, `"plasma"`, `"magma"`, `"inferno"`, `"cividis"`, `"rocket"`, `"mako"`, and `"turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.}
+\item{color_scale}{A string specifying the color scale to use. Options include `"Viridis"`, `"Plasma"`, `"Magma"`, `"Inferno"`, `"Cividis"`, `"Rocket"`, `"Mako"`, and `"Turbo"`, which use the `viridis` color scales. If `"gradient"` is selected, a custom gradient is applied based on `gradient_colors`.}
 
 \item{gradient_colors}{A vector of length 2 or 3 specifying the colors for a custom gradient. If two colors are provided (`c(low, high)`), `scale_fill_gradient()` is used. If three colors are provided (`c(low, mid, high)`), `scale_fill_gradient2()` is used. If `NULL` or incorrectly specified, the viridis color scale is applied.}
 

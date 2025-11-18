@@ -1,5 +1,5 @@
 ---
-title: "User Guide"
+title: "R-package User Guide"
 author:
   - name: Luis Herfurth
     affiliation:
@@ -15,7 +15,7 @@ output:
     toc_depth: 5
     code_folding: show
 vignette: >
-  %\VignetteIndexEntry{User Guide}
+  %\VignetteIndexEntry{R-package User Guide}
   %\VignetteEncoding{UTF-8}
   %\VignetteEngine{knitr::rmarkdown}
 bibliography: bibliography.bib
@@ -47,7 +47,7 @@ library(dplyr)
 
 ::: {style="text-align: justify"}
 The ***MetAlyzer*** R-package provides a robust toolkit for importing, handling, and analyzing metabolomics data generated 
-using either the Biocrates Quant500L™ or Quant500XL™ kit and the Biocrates MetIDQ™ software (BIOCRATES Life Sciences AG, Innsbruck, Austria). It structures the data into a 
+using either the Biocrates Quant500L™ or Quant500XL™ kit and the Biocrates WebIDQ™ software (BIOCRATES Life Sciences AG, Innsbruck, Austria). It structures the data into a 
 SummarizedExperiment (SE) [@Morgan2025SummarizedExperiment] object, facilitating integration with Bioconductor workflows and enabling downstream statistical 
 analysis and visualization. To aid in biological interpretation, ***MetAlyzer*** offers functions to generate key visualizations. 
 These include scatter plots with information about the metabolite classes as assigned by BIOCRATES Life Sciences AG and a network plot, which readily visualizes the whole 
@@ -57,16 +57,16 @@ helping to find pathway-level alterations and providing a systems perspective on
 :::
 
 # Loading and Exploring Data
-## Import data from MetIDQ™
+## Import data from WebIDQ™
 ::: {style="text-align: justify"}
-***MetAlyzer's*** primary entry point is the `MetAlyzer::read_metidq()` function, which reads MetIDQ™ .xlsx output files (Fig. 1). In detail, you can export those files by using @ADD button/MetIDQ path info!\ 
+***MetAlyzer's*** primary entry point is the `MetAlyzer::read_webidq()` function, which reads WebIDQ™ .xlsx output files (Fig. 1).\
 As the output files contain layered information, inform of concentration values and color-coded quantification status (e.g., "Valid", "LOD", "LOQ"), 
 it is a tedious task to reliably process this data computationally, as the mix of numerical values and status codes hinders direct machine readability by standard analysis tools.
-To conveniently read the data in we provide the function `MetAlyzer::read_metidq()`, structuring the data into a SummarizedExperiment (SE) object [@Morgan2025SummarizedExperiment] for easy downstream analysis.
+To conveniently read the data in we provide the function `MetAlyzer::read_webidq()`, structuring the data into a SummarizedExperiment (SE) object [@Morgan2025SummarizedExperiment] for easy downstream analysis.
 For further demonstration we'll use a demo dataset kindly provided by BIOCRATES Life Sciences AG, featuring metabolite measurements across two groups (MxP®Quant 500 kit). This dataset is included in the ***MetAlyzer*** R package as the example data.
 :::
 
-```{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates MetIDQ™.", out.width="90%", fig.align="center"}
+```{r echo=FALSE, fig.cap="Figure 1: Output of Biocrates WebIDQ™.", out.width="90%", fig.align="center"}
 knitr::include_graphics("images/biocrates_output.png")
 ```
 
@@ -76,7 +76,7 @@ knitr::include_graphics("images/biocrates_output.png")
 fpath <- MetAlyzer::load_demodata_biocrates()
 
 # Load the data into a SummarizedExperiment object
-metalyzer_se <- MetAlyzer::read_metidq(file_path = fpath, 
+metalyzer_se <- MetAlyzer::read_webidq(fpath,
                                        silent = TRUE)
 
 # Display the object summary
@@ -112,8 +112,7 @@ head(SummarizedExperiment::colData(metalyzer_se)) %>%
 
 ::: {style="text-align: justify"}
 The ***MetAlyzer*** R package does not include processing or differential analysis itself, as it's aim is to import Biocrates files and visualize the results. Given the many tools and 
-R packages dedicated for quality control and differential analysis, we decided to not focus on this. Never the less, we will showcase how you can easily perform differential analysis using 
-the ***MetaProViz*** R package [@Schmidt2025]. If you are not familiar with using R, you can use our shiny app, which will do the whole process from start to finish (@ADD LINK).\
+R packages dedicated for quality control and differential analysis, we decided to not focus on this within the R package. You can either use the MetAlyzer shiny app, the MetAlyzer helper functions used in the shiny app or other dedicated R-packages specifically designed to support those analysis such as the ***MetaProViz*** R package [@Schmidt2025]. If you are not familiar with using R, you can use our shiny app, which will do the whole process from start to finish [(Link to MetAlyzer Shiny App)](https://metalyzer.shinyapps.io/MetAlyzer_ShinyApp/).\
 If you already have differential analysis results, you can skip this section and just load our internal example data of differential analysis results `MetAlyzer::toy_diffres()`. 
 :::
 ```{r import, message=FALSE, warning=FALSE}
@@ -131,62 +130,6 @@ This table contains columns for metabolite names (`Metabolite`), their class (`C
 We can directly use this dataframe as input to the to the ***MetAlyzer*** visualization functions.
 
 :::
-
-```{r diffres, eval=FALSE,echo=TRUE, results='hide'}
-## -------------------------------------------------------------------------- ##
-##  Skip this part if you already have generated differential analysis results ##
-## -------------------------------------------------------------------------- ##
-
-# Ensure that you have performed all needed processing, normalisation and QC steps in MetIDQ™ or 
-# using external R-packages like MetaProViz (https://saezlab.github.io/MetaProViz/articles/standard-metabolomics.html#run-metaproviz-analysis) 
-# before running the differential analysis.
-
-##----- Create InputDF
-assay_matrix <- metalyzer_se %>%
-  assay() %>%         # Extract the "counts" assay
-  `colnames<-`(colnames(metalyzer_se))%>%
-  t()%>%
-  as.data.frame()
-
-sample_info <- metalyzer_se %>%
-  SummarizedExperiment::colData() %>%
-  as.data.frame() %>%
-  dplyr::rename("Conditions" = "Sample.Description")
-
-feature_info <- metalyzer_se %>%
-  rowData() %>%
-  as.data.frame()
-  
-##----- Processing
-# For function details visit MetaProViz: https://saezlab.github.io/MetaProViz/reference/processing.html
-processing_res <- MetaProViz::processing(data= assay_matrix, 
-                                         metadata_sample= sample_info, 
-                                         metadata_info = c(Conditions = "Conditions"))
-
-processedDF <- processing_res[["DF"]][["Preprocessing_output"]]%>%
-  dplyr::select(-c(1:14))
-
-##------ Differential Analysis 
-# For function details visit MetaProViz: https://saezlab.github.io/MetaProViz/reference/dma.html
-dma_res <- MetaProViz::dma(data=processedDF , #we need to remove columns that do not include metabolite measurements
-                           metadata_sample=sample_info, #only maintain the information about condition and replicates
-                           metadata_info = c(Conditions="Conditions", 
-                                             Numerator="Group 1", 
-                                             Denominator = "Group 2"),
-                           metadata_feature = data.frame(SummarizedExperiment::rowData(metalyzer_se)), # Adds metadata for the metabolites such as metabolite classes
-                           pval ="lmFit",
-                           padj="fdr")
-
-dma_group1_vs_group2 <- dma_res[["dma"]][["Group 1_vs_Group 2"]]%>%
-  dplyr::select(
-    Metabolite = Metabolite,
-    Class = metabolic_classes,
-    log2FC = Log2FC,
-    pval = p.val,
-    qval = p.adj,
-    tval= t.val
-  )
-```
 
 ::: {style="text-align: justify"}
 # MetAlyzer Plots
@@ -253,7 +196,7 @@ Some nodes, such as 'T14' which might group related species like 'T 14:0_32:2', 
 3.  **NA:** If no metabolites mapping to the node were measured or included in the dataset, the node value is NA (often represented as grey or uncolored, like some nodes in Figure X).\
 \
 This summarization approach provides a concise overview within the network, highlighting significant changes where present, while still providing context from measured data if significance is not reached.
-Due to the changing naming convention of Biocrates, we include old names in the excel file, which will show up as NA for later generated MetIDQ™ outputs (e.g. TG(14:0_32.2)), but this enables the analysis of older files as well. @ADD we need a date here, like from which year the exports work, and guidance how someone can export the required old names form MetIDQ as we know how that works
+Due to the changing naming convention of Biocrates, we include old names in the excel file, which will show up as NA for later generated WebIDQ™ outputs (e.g. TG(14:0_32.2)), but this enables the analysis of older files as well. @ADD we need a date here, like from which year the exports work, and guidance how someone can export the required old names form WebIDQ as we know how that works
 :::
 
 ```{r networkTable, message=FALSE, warning=FALSE}

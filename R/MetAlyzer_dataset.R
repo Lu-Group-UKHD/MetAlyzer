@@ -1,7 +1,7 @@
 #' @title Open file and read data
 #'
 #' @description This function creates a SummarizedExperiment (SE) from the given
-#' 'MetIDQ' output Excel sheet: metabolites (rowData), meta data (colData),
+#' 'webidq' output Excel sheet: metabolites (rowData), meta data (colData),
 #' concentration data (assay), quantification status(assay)
 #' The column "Sample Type" and the row "Class" are used as anchor cells in the
 #' Excel sheet and are therefore a requirement.
@@ -15,8 +15,8 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
-read_metidq <- function(
+#' metalyzer_se <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())
+read_webidq <- function(
     file_path,
     sheet = 1,
     status_list = list(
@@ -51,14 +51,14 @@ read_metidq <- function(
 
   # Rest of the function code would go here...
   if (!silent) {
-    message("Input checks passed. Proceeding with reading MetIDQ file.")
+    message("Input checks passed. Proceeding with reading webidq file.")
   }
   # Print MetAlyzer logo
   if (silent == FALSE) {
     metalyzer_ascii_logo()
   }
 
-  # Open MetIDQ Excel sheet
+  # Open webidq Excel sheet
   starter_list <- list(
     "file_path" = as.character(file_path),
     "sheet" = as.numeric(sheet)
@@ -170,7 +170,7 @@ metalyzer_ascii_logo <- function() {
 
 #' @title Open Excel file
 #'
-#' @description This function opens the given MetIDQ output Excel file and reads the full
+#' @description This function opens the given webidq output Excel file and reads the full
 #' given sheet.
 #'
 #' @param starter_list contains the file path and the sheet index
@@ -241,22 +241,55 @@ get_data_range <- function(full_sheet) {
 #' @title Slice metabolites
 #'
 #' @description This function extracts metabolites with their corresponding
-#' metabolite class from .full_sheet into metabolites.
+#' metabolite class from .full_sheet into metabolites. It robustly finds the
+#' metabolite row by searching upwards from the "Class" row and skipping
+#' any known intermediate rows (e.g., "Synonym").
 #'
 #' @param full_sheet full_sheet
 #' @param data_ranges data_ranges
 #'
 #' @keywords internal
 slice_metabolites <- function(full_sheet, data_ranges) {
-  ## metabolites are a row above classes
+  # Add any other potential junk row headers to this vector.
+  junk_patterns <- c("^\\s*Synonym(s)?\\s*$") # Matches "Synonym" or "Synonyms"
+  current_row_idx <- data_ranges$class_row - 1
+
+  while (current_row_idx > 0) {
+    cell_to_check <- full_sheet[current_row_idx, data_ranges$class_col]
+    if (is.na(cell_to_check)) {
+      cell_to_check <- ""
+    }
+    is_junk <- any(sapply(junk_patterns, grepl, x = cell_to_check, ignore.case = TRUE))
+    if (is_junk) {
+      current_row_idx <- current_row_idx - 1
+    } else {
+      break
+    }
+  }
+  metabolite_row_idx <- current_row_idx
+  if (metabolite_row_idx <= 0) {
+    stop(paste(
+      "Could not find metabolite names row.",
+      "Searched upwards from 'Class' row (", data_ranges$class_row, ")",
+      "and found no valid row."
+    ), call. = FALSE)
+  }
   metabolites <- full_sheet[
-    data_ranges$class_row - 1,
+    metabolite_row_idx,
     data_ranges$data_cols
   ]
   classes <- full_sheet[
     data_ranges$class_row,
     data_ranges$data_cols
   ]
+  if (any(is.na(metabolites))) {
+    warning(paste0(
+      "NA values found in the identified metabolite names row (Row ",
+      metabolite_row_idx,
+      "). This may indicate an incorrect row was parsed."
+    ), call. = FALSE)
+  }
+
   names(metabolites) <- classes
   return(metabolites)
 }
@@ -484,5 +517,5 @@ aggregate_data <- function(
 #' @description This function was deprecated in version v2.0.0
 #' 
 MetAlyzer_dataset <- function(...) {
-  cat("This function was deprecated in v2.0.0, please use read_metidq()\n")
+  cat("This function was deprecated in v2.0.0, please use read_webidq()\n")
 }

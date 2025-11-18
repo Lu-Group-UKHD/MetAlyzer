@@ -10,7 +10,7 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' MetAlyzer::summarize_conc_values(metalyzer_se)
 summarize_conc_values <- function(metalyzer_se) {
@@ -40,7 +40,7 @@ summarize_conc_values <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' MetAlyzer::summarize_quant_data(metalyzer_se)
 summarize_quant_data <- function(metalyzer_se) {
@@ -91,7 +91,7 @@ summarize_quant_data <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' metalyzer_se <- MetAlyzer::filter_meta_data(metalyzer_se, `Sample Description` %in% 1:6)
 filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
@@ -155,7 +155,7 @@ filter_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' metalyzer_se <- MetAlyzer::update_meta_data(
 #'   metalyzer_se,
@@ -205,7 +205,7 @@ update_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' metalyzer_se <- MetAlyzer::rename_meta_data(
 #'   metalyzer_se,
@@ -270,7 +270,7 @@ rename_meta_data <- function(metalyzer_se, ..., inplace = FALSE) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' drop_metabolites <- c("C0", "C2", "C3", "Metabolism Indicators",
 #'   inplace = TRUE
@@ -459,7 +459,7 @@ filter_metabolites <- function(metalyzer_se,
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #'
 #' MetAlyzer::aggregated_data(metalyzer_se)
 aggregated_data <- function(metalyzer_se) {
@@ -481,7 +481,7 @@ aggregated_data <- function(metalyzer_se) {
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #' 
 #' output_file <- file.path(tempdir(), "metabolomics_data.csv")
 #' MetAlyzer::export_conc_values(metalyzer_se,
@@ -519,133 +519,9 @@ export_conc_values <- function(metalyzer_se,
 #' @export
 #' 
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_metidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
 #' metalyzer_se@metadata$log2FC <- readRDS(MetAlyzer::toy_diffres())
 #' MetAlyzer::log2FC(metalyzer_se)
 log2FC <- function(metalyzer_se) {
   return(metalyzer_se@metadata$log2FC)
-}
-
-#' save_plot is a helper function to save plots
-#'
-#' @description This function saves a given ggplot object to a specified folder and file format.
-#' It ensures that the folder structure exists and cleans the folder name to remove special characters.
-#'
-#' @param plot A ggplot object to be saved.
-#' @param folder_name Name of the folder where the plot will be saved. Special characters will be removed automatically. \strong{Default = date}
-#' @param folder_path \emph{Optional: } User-defined path where the folder should be created. 
-#' If not provided, results will be saved in `MetAlyzer_results` within the working directory. \strong{Default = NULL}
-#' @param file_name Name of the output file (without extension). \strong{Default = "network"}
-#' @param format File format for saving the plot (e.g., "png", "pdf", "svg"). \strong{Default = "pdf"}
-#' @param width Width of the saved plot in specified units. \strong{Default = 29.7}
-#' @param height Height of the saved plot in specified units. \strong{Default = 21.0}
-#' @param units Units for width and height (e.g., "in", "cm", "mm"). \strong{Default = "cm"}
-#' @param overwrite Logical: If `TRUE`, overwrite existing files without asking. If `FALSE`, prompt user before overwriting. \strong{Default = FALSE}
-#'
-#' @return The function does not return anything but saves the plot to the specified directory.
-#'
-#' @keywords save, plot, ggplot
-#' @import ggplot2
-
-save_plot <- function(plot,
-                      folder_name = format(Sys.Date(), "%Y-%m-%d"),
-                      folder_path = NULL,
-                      file_name = "network",
-                      format = "pdf",
-                      units = "cm",
-                      height = 21.0,
-                      width = 29.7,
-                      overwrite = FALSE) {
-  
-  # Don't save plot 
-  if(is.null(format)) {
-    return(invisible(NULL))
-  }
-  ##############
-  ### CHECKS ###
-  ##############
-  # Check for invalid folder names (NULL, TRUE, FALSE)
-  if (is.null(folder_name) || folder_name == "" || is.logical(folder_name)) {
-    message("Invalid folder_name provided. Using today's date as folder name.")
-    folder_name <- format(Sys.Date(), "%Y-%m-%d")
-  }
-
-  # Set default path if none is provided
-  if (is.null(folder_path)) {
-    folder_path <- file.path(getwd(), "MetAlyzer_results")
-    if (!dir.exists(folder_path)) {
-      dir.create(folder_path)
-    }
-  } else if (!dir.exists(folder_path)) {
-    message("Provided `folder_path` does not exist. Using default: ", folder_path)
-    folder_path <- getwd()
-  }
-
-  # Check for invalid file names (NULL, TRUE, FALSE)
-  if (is.null(file_name) || file_name == "" || is.logical(file_name)) {
-    message("Invalid folder_name provided. Using default folder name: 'network'")
-    file_name <- "network"
-  }
-
-  # Check for valid format
-  valid_formats <- c("pdf", "png", "svg")
-  if (!(format %in% valid_formats)) {
-    message("Invalid format provided. Please choose from: 'pdf', 'png', 'svg'. Fallback to default 'pdf'.")
-    format <- "pdf"
-  }
-
-  # Check for valid units
-  valid_units <- c("cm", "in", "mm", "px")
-  if (!(units %in% valid_units)) {
-    message("Invalid units provided. Please choose from: 'cm', 'in', 'mm', 'px'. Fallback to default: 'cm'.")
-    units <- "cm"
-  }
-
-  # Check for valid height and width (should be numeric and greater than 0)
-  if (!is.numeric(height) || height <= 0) {
-    message("Invalid height provided. Height must be a positive numeric value. Fallback to default: 21.0.")
-    height <- 21.0
-  }
-  if (!is.numeric(width) || width <= 0) {
-    message("Invalid width provided. Width must be a positive numeric value. Fallback to default: 29.7.")
-    width <- 29.7
-  }
-
-  # Check for valid overwrite value
-  if(!is.logical(overwrite)) {
-    message("Invalid overwrite value provided. Overwrite must be a boolean value. Fallback to default: FALSE")
-    overwrite <- FALSE
-  }
-  ##############
-  # Remove special characters from folder name
-  cleaned_folder_name <- gsub("[^a-zA-Z0-9 ]", "", folder_name)
-  if (folder_name != cleaned_folder_name) {
-    message("Special characters were removed from `folder_name`.")
-  }
-
-  # Create subdirectory for results
-  results_folder <- file.path(folder_path, cleaned_folder_name)
-  if (!dir.exists(results_folder)) {
-    dir.create(results_folder)
-  }
-
-  # Construct file path
-  file_path <- file.path(results_folder, paste0(file_name, ".", format))
-
-  # Check if the file already exists
-  if (file.exists(file_path)) {
-    if (!overwrite) {
-      response <- readline(prompt = paste("File", file_path, "already exists. Overwrite? (y/n): "))
-      if (tolower(response) != "y") {
-        message("File was not overwritten. Saving process canceled.")
-        return(invisible(NULL))  # Exit function without saving
-      }
-    }
-    message("Overwriting existing file: ", file_path)
-  }
-
-  # Save the plot
-  ggplot2::ggsave(filename = file_path, plot = plot, width = width, height = height, units = units)
-  
-  message("Plot saved at: ", file_path)
 }
