@@ -2,7 +2,7 @@ MetAlyzer
 ========
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/nilsmechtel/MetAlyzer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Lu-Group-UKHD/MetAlyzer/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/Lu-Group-UKHD/MetAlyzer/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Lu-Group-UKHD/MetAlyzer/actions/workflows/R-CMD-check.yaml)
 [![license](https://img.shields.io/badge/license-GPL--3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![metacran downloads](https://cranlogs.r-pkg.org/badges/grand-total/MetAlyzer)](https://cran.r-project.org/package=MetAlyzer)
 <!-- badges: end -->
@@ -29,7 +29,7 @@ install_github("Lu-Group-UKHD/MetAlyzer")
 
 The package takes metabolomic measurements and the quantification status (e.g. "Valid", "LOQ", "LOD") as ".xlsx" files generated from the WebIDQ&trade; software. Additionally, meta data for each sample can be provided for further analysis.
 
-This is an extract from one of the provided example data sets.
+This is an extract from one of the provided example data sets.\
 ![Example_Data](vignettes/images/biocrates_output.png)
 
 #### Create MetAlyzer object:
@@ -98,9 +98,9 @@ network <- MetAlyzer::plot_network(
 network$Plot
 ```
 
-![Network](vignettes/images/network_demodata.png)
+![](vignettes/images/network_demodata.png)
 
 ## Detailed instructions
-**For a comprehensive tutorial, please check out the MetAlyzer Vignettes**.\
+**For a comprehensive tutorial, please check out the MetAlyzer Vignettes on our [GitHub pages](https://lu-group-ukhd.github.io/MetAlyzer/)**.\
 **Please also check out [MetAlyzer on CRAN](https://CRAN.R-project.org/package=MetAlyzer
 ).**
