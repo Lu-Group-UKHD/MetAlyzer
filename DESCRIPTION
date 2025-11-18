@@ -82,10 +82,6 @@ License: GPL-3
 Encoding: UTF-8
 Language: en-US
 RoxygenNote: 7.3.3
-Suggests:
-    MetaProViz
-Remotes: 
-    saezlab/MetaProViz
 VignetteBuilder: knitr
 URL: https://github.com/nilsmechtel/MetAlyzer
 BugReports: https://github.com/nilsmechtel/MetAlyzer/issues
