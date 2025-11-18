@@ -15,7 +15,8 @@
 #' @export
 #'
 #' @examples
-#' metalyzer_se <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())
+#' Path <- MetAlyzer::load_demodata_biocrates()
+#' metalyzer_se <- MetAlyzer::read_webidq(file_path = Path)
 read_webidq <- function(
     file_path,
     sheet = 1,
@@ -384,7 +385,7 @@ unify_hex <- function(hex) {
 
 #' @title Read quantification status
 #'
-#' @description This function gets the background color of each cell in 
+#' @description This function gets the background color of each cell in
 #' full_sheet and assigns it to the corresponding quantification status.
 #'
 #' @param starter_list starter_list
@@ -515,7 +516,7 @@ aggregate_data <- function(
 #' @param ... Declare this function as out of date
 #'
 #' @description This function was deprecated in version v2.0.0
-#' 
+#'
 MetAlyzer_dataset <- function(...) {
   cat("This function was deprecated in v2.0.0, please use read_webidq()\n")
 }
