@@ -66,15 +66,53 @@
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">metalyzer_se</span> <span class="op">&lt;-</span> <span class="fu">MetAlyzer</span><span class="fu">::</span><span class="fu"><a href="read_webidq.html">read_webidq</a></span><span class="op">(</span>conc_file_path <span class="op">=</span> <span class="fu">MetAlyzer</span><span class="fu">::</span><span class="fu"><a href="load_demodata_biocrates.html">load_demodata_biocrates</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates()):</span> unused argument (conc_file_path = MetAlyzer::load_demodata_biocrates())</span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">metalyzer_se</span> <span class="op">&lt;-</span> <span class="fu">MetAlyzer</span><span class="fu">::</span><span class="fu"><a href="read_webidq.html">read_webidq</a></span><span class="op">(</span>file_path <span class="op">=</span> <span class="fu">MetAlyzer</span><span class="fu">::</span><span class="fu"><a href="load_demodata_biocrates.html">load_demodata_biocrates</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Input checks passed. Proceeding with reading webidq file.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  _____ ______   _______  _________  ________  ___           ___    ___ ________  _______   ________</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> |\   _ \  _   \|\  ___ \|\___   ___\\   __  \|\  \         |\  \  /  /|\_____  \|\  ___ \ |\   __  \</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> \ \  \\\__\ \  \ \   __/\|___ \  \_\ \  \|\  \ \  \        \ \  \/  / /\|___/  /\ \   __/|\ \  \|\  \</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  \ \  \\|__| \  \ \  \_|/__  \ \  \ \ \   __  \ \  \        \ \    / /     /  / /\ \  \_|/_\ \   _  _\</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   \ \  \    \ \  \ \  \_|\ \  \ \  \ \ \  \ \  \ \  \____    \/   / /     /  /_/__\ \  \_|\ \ \  \\  \| </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    \ \__\    \ \__\ \_______\  \ \__\ \ \__\ \__\ \_______\__/   / /     |\________\ \_______\ \__\\ _\ </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     \|__|     \|__|\|_______|   \|__|  \|__|\|__|\|_______|\____/ /       \|_______|\|_______|\|__|\|__|</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                           \|____|/</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FFCBD2D7" as "#CBD2D7"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FFB9DE83" as "#B9DE83"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FFB9DE83" as "#B9DE83"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FFA28BA3" as "#A28BA3"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FFA28BA3" as "#A28BA3"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FFB2D1DC" as "#B2D1DC"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FF7FB2C5" as "#7FB2C5"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FFB2D1DC" as "#B2D1DC"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Reading color code "FF7FB2C5" as "#7FB2C5"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Measured concentration values:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           0%          25%          50%          75%         100% </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     0.000000     0.286299     1.289381     6.308854 12522.000000 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NAs: 762 (3.74%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Measured quantification status:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -------------------------------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Valid: 15419 (75.66%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> LOQ: 983 (4.82%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> LOD: 3978 (19.52%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NAs: 0 (0%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">output_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"metabolomics_data.csv"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">MetAlyzer</span><span class="fu">::</span><span class="fu">export_conc_values</span><span class="op">(</span><span class="va">metalyzer_se</span>,</span></span>
 <span class="r-in"><span>                              <span class="va">`Sample Description`</span>,</span></span>
 <span class="r-in"><span>                              file_path <span class="op">=</span> <span class="va">output_file</span></span></span>
 <span class="r-in"><span>                              <span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in h(simpleError(msg, call)):</span> error in evaluating the argument 'x' in selecting a method for function 'as.data.frame': error in evaluating the argument 'x' in selecting a method for function 'colData': object 'metalyzer_se' not found</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Number of samples: 20 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Info: Number of Metabolites: 1019 </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">output_file</span><span class="op">)</span></span></span>
 </code></pre></div>
     </div>

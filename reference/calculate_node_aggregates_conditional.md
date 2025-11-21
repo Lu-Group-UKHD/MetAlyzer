@@ -37,10 +37,6 @@ calculate_node_aggregates_conditional(
 
   p value column name
 
-- values_col_name:
-
-  plotted column
-
 ## Value
 
 A list containing two dataframes: \$nodes_separated: Input nodes_sep_df

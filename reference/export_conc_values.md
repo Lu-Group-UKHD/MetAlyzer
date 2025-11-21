@@ -25,14 +25,52 @@ export_conc_values(metalyzer_se, ..., file_path = "metabolomics_data.csv")
 ## Examples
 
 ``` r
-metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
-#> Error in MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates()): unused argument (conc_file_path = MetAlyzer::load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())
+#> Input checks passed. Proceeding with reading webidq file.
+#> 
+#> 
+#>  _____ ______   _______  _________  ________  ___           ___    ___ ________  _______   ________
+#> |\   _ \  _   \|\  ___ \|\___   ___\\   __  \|\  \         |\  \  /  /|\_____  \|\  ___ \ |\   __  \
+#> \ \  \\\__\ \  \ \   __/\|___ \  \_\ \  \|\  \ \  \        \ \  \/  / /\|___/  /\ \   __/|\ \  \|\  \
+#>  \ \  \\|__| \  \ \  \_|/__  \ \  \ \ \   __  \ \  \        \ \    / /     /  / /\ \  \_|/_\ \   _  _\
+#>   \ \  \    \ \  \ \  \_|\ \  \ \  \ \ \  \ \  \ \  \____    \/   / /     /  /_/__\ \  \_|\ \ \  \\  \| 
+#>    \ \__\    \ \__\ \_______\  \ \__\ \ \__\ \__\ \_______\__/   / /     |\________\ \_______\ \__\\ _\ 
+#>     \|__|     \|__|\|_______|   \|__|  \|__|\|__|\|_______|\____/ /       \|_______|\|_______|\|__|\|__|
+#>                                                           \|____|/
+#> 
+#> 
+#> Info: Reading color code "FFCBD2D7" as "#CBD2D7"
+#> Info: Reading color code "FFB9DE83" as "#B9DE83"
+#> Info: Reading color code "FFB9DE83" as "#B9DE83"
+#> Info: Reading color code "FFA28BA3" as "#A28BA3"
+#> Info: Reading color code "FFA28BA3" as "#A28BA3"
+#> Info: Reading color code "FFB2D1DC" as "#B2D1DC"
+#> Info: Reading color code "FF7FB2C5" as "#7FB2C5"
+#> Info: Reading color code "FFB2D1DC" as "#B2D1DC"
+#> Info: Reading color code "FF7FB2C5" as "#7FB2C5"
+#> 
+#> Measured concentration values:
+#> ------------------------------
+#>           0%          25%          50%          75%         100% 
+#>     0.000000     0.286299     1.289381     6.308854 12522.000000 
+#> 
+#> NAs: 762 (3.74%)
+#> 
+#> 
+#> Measured quantification status:
+#> -------------------------------
+#> Valid: 15419 (75.66%)
+#> LOQ: 983 (4.82%)
+#> LOD: 3978 (19.52%)
+#> NAs: 0 (0%)
+#> 
 
 output_file <- file.path(tempdir(), "metabolomics_data.csv")
 MetAlyzer::export_conc_values(metalyzer_se,
                               `Sample Description`,
                               file_path = output_file
                               )
-#> Error in h(simpleError(msg, call)): error in evaluating the argument 'x' in selecting a method for function 'as.data.frame': error in evaluating the argument 'x' in selecting a method for function 'colData': object 'metalyzer_se' not found
+#> Info: Number of samples: 20 
+#> Info: Number of Metabolites: 1019 
 unlink(output_file)
 ```

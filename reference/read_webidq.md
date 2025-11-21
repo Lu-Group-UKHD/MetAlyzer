@@ -44,7 +44,8 @@ A Summarized Experiment object
 ## Examples
 
 ``` r
-metalyzer_se <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())
+Path <- MetAlyzer::load_demodata_biocrates()
+metalyzer_se <- MetAlyzer::read_webidq(file_path = Path)
 #> Input checks passed. Proceeding with reading webidq file.
 #> 
 #> 
