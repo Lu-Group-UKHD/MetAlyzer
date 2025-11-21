@@ -27,7 +27,7 @@ read_quant_status(
 \item{silent}{silent}
 }
 \description{
-This function gets the background color of each cell in 
+This function gets the background color of each cell in
 full_sheet and assigns it to the corresponding quantification status.
 }
 \keyword{internal}

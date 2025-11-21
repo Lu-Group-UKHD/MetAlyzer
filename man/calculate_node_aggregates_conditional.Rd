@@ -22,8 +22,6 @@ Must contain Label.}
 \item{q_value}{Significance threshold for q-values (e.g., 0.05).}
 
 \item{stat_col_name}{p value column name}
-
-\item{values_col_name}{plotted column}
 }
 \value{
 A list containing two dataframes:

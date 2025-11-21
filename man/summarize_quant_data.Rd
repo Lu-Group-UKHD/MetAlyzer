@@ -14,7 +14,7 @@ This function lists the number of each quantification status and
 its percentage.
 }
 \examples{
-metalyzer_se <- MetAlyzer::read_webidq(conc_file_path = MetAlyzer::load_demodata_biocrates())
+metalyzer_se <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())
 
 MetAlyzer::summarize_quant_data(metalyzer_se)
 }

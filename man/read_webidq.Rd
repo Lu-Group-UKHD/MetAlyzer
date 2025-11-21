@@ -33,5 +33,6 @@ The column "Sample Type" and the row "Class" are used as anchor cells in the
 Excel sheet and are therefore a requirement.
 }
 \examples{
-metalyzer_se <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates())
+Path <- MetAlyzer::load_demodata_biocrates()
+metalyzer_se <- MetAlyzer::read_webidq(file_path = Path)
 }
