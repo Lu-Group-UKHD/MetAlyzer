@@ -20,7 +20,7 @@ plot_vulcano(
   A data frame containing the differential analysis results table
   accessible via \`metalyzer_se@metadata\$log2FC\` where
   \`metalyzer_se\` is an SE object output from
-  [`read_webidq()`](read_webidq.md) and has gone through
+  [`read_webidq`](read_webidq.md) and has gone through
   \`calc_log2FC()\`.
 
 - x_cutoff, y_cutoff:

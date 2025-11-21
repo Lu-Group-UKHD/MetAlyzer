@@ -37,6 +37,11 @@ calculate_node_aggregates_conditional(
 
   p value column name
 
+- ...:
+
+  Column names of numeric values to be processed (e.g., log2FC, pval,
+  qval).
+
 ## Value
 
 A list containing two dataframes: \$nodes_separated: Input nodes_sep_df

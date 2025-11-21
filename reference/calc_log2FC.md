@@ -17,7 +17,7 @@ calc_log2FC(metalyzer_se, group, group_level = NULL)
 
 - metalyzer_se:
 
-  An SE object output from [`read_webidq()`](read_webidq.md).
+  An SE object output from [`read_webidq`](read_webidq.md).
 
 - group:
 

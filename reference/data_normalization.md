@@ -15,7 +15,7 @@ data_normalization(metalyzer_se, norm_method = "log2")
 
 - metalyzer_se:
 
-  An SE object output from [`read_webidq()`](read_webidq.md).
+  An SE object output from [`read_webidq`](read_webidq.md).
 
 - norm_method:
 

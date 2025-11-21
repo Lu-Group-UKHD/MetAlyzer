@@ -13,7 +13,7 @@ expand_aggregated_data(metalyzer_se, metadata_col)
 
 - metalyzer_se:
 
-  An SE object output from [`read_webidq()`](read_webidq.md).
+  An SE object output from [`read_webidq`](read_webidq.md).
 
 - metadata_col:
 
