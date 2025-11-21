@@ -508,7 +508,6 @@ create_viridis_style <- function(color_scale,
 #' @param nodes_orig_df Original dataframe with potentially semi-colon separated metabolites.
 #'   Must contain Label.
 #' @param q_value Significance threshold for q-values (e.g., 0.05).
-#' @param values_col_name plotted column
 #' @param stat_col_name p value column name
 #'
 #' @import dplyr
