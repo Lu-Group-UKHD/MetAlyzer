@@ -22,6 +22,8 @@ Must contain Label.}
 \item{q_value}{Significance threshold for q-values (e.g., 0.05).}
 
 \item{stat_col_name}{p value column name}
+
+\item{...}{Column names of numeric values to be processed (e.g., log2FC, pval, qval).}
 }
 \value{
 A list containing two dataframes:

@@ -9,7 +9,7 @@ plotly_vulcano(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05)
 \arguments{
 \item{Log2FCTab}{A data frame containing the differential analysis results table
 accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
-output from \code{\link[MetAlyzer]{read_webidq()}} and has gone through `calc_log2FC()`.}
+output from \code{\link{read_webidq}} and has gone through `calc_log2FC()`.}
 
 \item{x_cutoff, y_cutoff}{Numerical values specifying the cutoffs for log2 fold
 changes and q-values. Default is 1.5 and 0.05, respectively.}

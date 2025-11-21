@@ -509,6 +509,7 @@ create_viridis_style <- function(color_scale,
 #'   Must contain Label.
 #' @param q_value Significance threshold for q-values (e.g., 0.05).
 #' @param stat_col_name p value column name
+#' @param ... Column names of numeric values to be processed (e.g., log2FC, pval, qval).
 #'
 #' @import dplyr
 #' @importFrom rlang .data 

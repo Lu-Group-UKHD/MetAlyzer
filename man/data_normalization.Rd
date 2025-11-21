@@ -7,7 +7,7 @@
 data_normalization(metalyzer_se, norm_method = "log2")
 }
 \arguments{
-\item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.}
+\item{metalyzer_se}{An SE object output from \code{\link{read_webidq}}.}
 
 \item{norm_method}{A character specifying the normalization method to use, which
 should be one of 'log2' (default), 'median', or 'TIC'.}

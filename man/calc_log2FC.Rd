@@ -7,7 +7,7 @@
 calc_log2FC(metalyzer_se, group, group_level = NULL)
 }
 \arguments{
-\item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.}
+\item{metalyzer_se}{An SE object output from \code{\link{read_webidq}}.}
 
 \item{group}{A character specifying the sample metadata column containing two
 groups that will be compared.}

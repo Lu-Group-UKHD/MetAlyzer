@@ -127,7 +127,7 @@ save_plot <- function(plot,
 #' `Concentration` column in the aggregated data in the input `SummarizedExperiment`
 #' (SE) object. If all values of a feature are NA, they stay NA.
 #'
-#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.
+#' @param metalyzer_se An SE object output from \code{\link{read_webidq}}.
 #' @returns An SE object with the imputed `Concentration` column in the aggregated
 #' data accessible via `metalyzer_se@metadata$aggregated_data`.
 #' 
@@ -168,7 +168,7 @@ glog2 <- function(x) {
 #' median normalization, or total ion count (TIC) normalization and update the `Concentration`
 #' column in the aggregated data in the input `SummarizedExperiment` (SE) object.
 #'
-#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.
+#' @param metalyzer_se An SE object output from \code{\link{read_webidq}}.
 #' @param norm_method A character specifying the normalization method to use, which
 #' should be one of 'log2' (default), 'median', or 'TIC'.
 #' @returns An SE object with the normalized `Concentration` column in the aggregated
@@ -271,7 +271,7 @@ get_sample_labels <- function(smpMetadatTbl) {
 #' the input data must already be log2 transformed, and should be subset if the
 #' variable of interest contains more than two groups.
 #' 
-#' @param metalyzer_se An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.
+#' @param metalyzer_se An SE object output from \code{\link{read_webidq}}.
 #' @param group A character specifying the sample metadata column containing two
 #' groups that will be compared.
 #' @param group_level A length-2 vector of characters specifying the group members
@@ -333,7 +333,7 @@ calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
 #' 
 #' @param Log2FCTab A data frame containing the differential analysis results table
 #' accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
-#' output from \code{\link[MetAlyzer]{read_webidq()}} and has gone through `calc_log2FC()`.
+#' output from \code{\link{read_webidq}} and has gone through `calc_log2FC()`.
 #' @param x_cutoff,y_cutoff Numerical values specifying the cutoffs for log2 fold
 #' changes and q-values. Default is 1.5 and 0.05, respectively.
 #' @returns A `plotly` object.
@@ -414,7 +414,7 @@ plotly_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05) {
 #'
 #' @param Log2FCTab A data frame containing the differential analysis results table
 #' accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
-#' output from \code{\link[MetAlyzer]{read_webidq()}} and has gone through `calc_log2FC()`.
+#' output from \code{\link{read_webidq}} and has gone through `calc_log2FC()`.
 #' @param x_cutoff,y_cutoff Numerical values specifying the cutoffs for log2 fold
 #' changes and q-values. Default is 1.5 and 0.05, respectively.
 #' @param show_labels_for A vector of characters specifying the names of metabolites
@@ -495,7 +495,7 @@ plot_vulcano <- function(Log2FCTab, x_cutoff = 1.5, y_cutoff = 0.05, show_labels
 #' 
 #' @param Log2FCTab A data frame containing the differential analysis results table
 #' accessible via `metalyzer_se@metadata$log2FC` where `metalyzer_se` is an SE object
-#' output from \code{\link[MetAlyzer]{read_webidq()}} and has gone through `calc_log2FC()`.
+#' output from \code{\link{read_webidq}} and has gone through `calc_log2FC()`.
 #' @returns A list containing a `plotly` (plot) and `ggplot` (legend) object.
 #' 
 #' @importFrom ggplot2 ggplot
