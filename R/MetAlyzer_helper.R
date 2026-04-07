@@ -277,11 +277,13 @@ get_sample_labels <- function(smpMetadatTbl) {
 #' @param group_level A length-2 vector of characters specifying the group members
 #' in `group`, which decides the direction of comparisons. For example, c('A', 'B')
 #' compares Group A to B, and vice versa. Default is NULL (alphabetically).
+#' @param paired A character specifying the sample metadata column (e.g., patient IDs)
+#' indicating matched samples, which is used to perform paired t-tests. Default is NULL 
 #' @returns An SE object with an added table of differential analysis results, accessible
 #' via `metalyzer_se@metadata$log2FC`.
 #' 
 #' @keywords internal
-calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
+calc_log2FC <- function(metalyzer_se, group, group_level = NULL, paired = NULL) {
   aggregated_data <- metalyzer_se@metadata$aggregated_data
   # Prepare abundance data
   #### Do not know why Metabolite column is grouped by MetAlyzer
@@ -293,10 +295,14 @@ calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
     tibble::as_tibble(rownames = 'ID')
   # Use original column names whose spaces are not replaced with '.'
   colnames(smp_metadata) <- c('ID', colnames(colData(metalyzer_se)))
-  smp_metadata <- dplyr::select(smp_metadata, ID, all_of(group))
+  if (is.null(paired)) {
+    smp_metadata <- dplyr::select(smp_metadata, ID, all_of(group))
+  } else {
+    smp_metadata <- dplyr::select(smp_metadata, ID, all_of(group), all_of(paired))
+  }
   # Combine abundance data and sample metadata to ensure matched information
   combined_data <- dplyr::left_join(feat_data, smp_metadata, by = 'ID')
-  # Retrieve data matrix and sample metadata from combined data to conduct limma
+  # Retrieve data matrix and binary grouping variable from combined data to conduct limma
   data_mat <- combined_data[, seq_len(ncol(feat_data))] %>%
     tibble::column_to_rownames('ID') %>%
     t()
@@ -309,9 +315,17 @@ calc_log2FC <- function(metalyzer_se, group, group_level = NULL) {
   if (!is.null(group_level)) {
     group_vec <- relevel(factor(group_vec), ref = group_level[2])
   }
+  # Retrieve sample pairing information
+  if (!is.null(paired)) {
+    paired_vec <- combined_data[, ncol(feat_data)+2, drop = T]
+  }
   
   # Compute log2(FC), p-values, and adjusted p-values using limma
-  design <- model.matrix(~ group_vec)
+  if (is.null(paired)) {
+    design <- model.matrix(~ group_vec)
+  } else {
+    design <- model.matrix(~ group_vec + paired_vec)
+  }
   fit <- limma::lmFit(data_mat, design = design)
   fit <- limma::eBayes(fit)
   log2FCRes <- limma::topTable(fit, coef = 2, number = Inf) %>%

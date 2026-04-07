@@ -4,7 +4,7 @@
 \alias{calc_log2FC}
 \title{Differential analysis}
 \usage{
-calc_log2FC(metalyzer_se, group, group_level = NULL)
+calc_log2FC(metalyzer_se, group, group_level = NULL, paired = NULL)
 }
 \arguments{
 \item{metalyzer_se}{An SE object output from \code{\link[MetAlyzer]{read_webidq()}}.}
@@ -15,6 +15,9 @@ groups that will be compared.}
 \item{group_level}{A length-2 vector of characters specifying the group members
 in `group`, which decides the direction of comparisons. For example, c('A', 'B')
 compares Group A to B, and vice versa. Default is NULL (alphabetically).}
+
+\item{paired}{A character specifying the sample metadata column (e.g., patient IDs)
+indicating matched samples, which is used to perform paired t-tests. Default is NULL}
 }
 \value{
 An SE object with an added table of differential analysis results, accessible
