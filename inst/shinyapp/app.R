@@ -209,14 +209,14 @@ ui <- fluidPage(
                                                       ),
                              shinyBS::bsCollapsePanel('PCA', style = 'primary',
                                                       fluidRow(
-                                                        column(width = 4, uiOutput('updateColorByPCA')),
-                                                        column(width = 4, uiOutput('updateShapeByPCA')),
+                                                        style = 'display:flex; align-items: center;',
                                                         column(width = 2,
                                                                numericInput('pcxPCA', 'PC (x-axis)',
                                                                             value = 1, min = 1, max = 10, step = 1)),
                                                         column(width = 2,
                                                                numericInput('pcyPCA', 'PC (y-axis)',
-                                                                            value = 2, min = 1, max = 10, step = 1))
+                                                                            value = 2, min = 1, max = 10, step = 1)),
+                                                        column(width = 4, offset = 4, uiOutput('updateColorByPCA'))
                                                       ),
                                                       uiOutput('pcaDuplicateWarning'),
                                                       plotly::plotlyOutput('plotPCA') %>%
@@ -1558,16 +1558,6 @@ server <- function(input, output, session) {
       selectInput('colorByPCA', NULL, choices = c('None', metaCols), selected = 'None', multiple = F)
     )
   })
-  # Update shape by choices for PCA
-  output$updateShapeByPCA <- renderUI({
-    req(smpChoicePack()$smpChoiceList)
-    metaCols <- names(smpChoicePack()$smpChoiceList)
-    div(
-      style = "display: flex; align-items: center;",
-      tags$label("Shape by:", style = "margin-right: 10px; margin-bottom: 15px;"),
-      selectInput('shapeByPCA', NULL, choices = c('None', metaCols), selected = 'None', multiple = F)
-    )
-  })
   # Create reactive object for PCA plot (for downloading)
   reactPCAPlot <- reactiveVal(NULL)
   # Show warning when both PC axes are the same
@@ -1582,20 +1572,16 @@ server <- function(input, output, session) {
   output$plotPCA <- plotly::renderPlotly({
     req(reactMetabObj$metabObj)
     color_by <- if (!is.null(input$colorByPCA) && input$colorByPCA != 'None') input$colorByPCA else NULL
-    shape_by <- if (!is.null(input$shapeByPCA) && input$shapeByPCA != 'None') input$shapeByPCA else NULL
     pcx_val <- if (!is.null(input$pcxPCA) && input$pcxPCA >= 1) as.integer(input$pcxPCA) else 1L
     pcy_val <- if (!is.null(input$pcyPCA) && input$pcyPCA >= 1) as.integer(input$pcyPCA) else 2L
 
     # Prevent rendering when both axes use the same PC
     validate(need(pcx_val != pcy_val, ""))
 
-    metadata_info_vec <- c()
-    if (!is.null(color_by)) metadata_info_vec <- c(metadata_info_vec, color = color_by)
-    if (!is.null(shape_by)) metadata_info_vec <- c(metadata_info_vec, shape = shape_by)
-    if (length(metadata_info_vec) == 0) metadata_info_vec <- NULL
-    # viz_pca's process_se() converts colData to data.frame (spaces → dots); match that here
-    if (!is.null(metadata_info_vec)) {
-      metadata_info_vec <- gsub(' ', '.', metadata_info_vec)
+    metadata_info_vec <- NULL
+    if (!is.null(color_by)) {
+      # viz_pca's process_se() converts colData to data.frame (spaces → dots); match that here
+      metadata_info_vec <- c(color = gsub(' ', '.', color_by))
     }
 
     # Remove zero-variance metabolites (all-NA rows become constant after MetaProViz's
@@ -1615,7 +1601,16 @@ server <- function(input, output, session) {
     )
     pca_plot <- result$Plot[["Plot"]]
     reactPCAPlot(pca_plot)
-    plotly::ggplotly(pca_plot)
+    p <- plotly::ggplotly(pca_plot)
+    # Clean legend: remove parenthesised trace names like "(Group, 1)" → "Group"
+    for (i in seq_along(p$x$data)) {
+      nm <- p$x$data[[i]]$name
+      if (!is.null(nm)) {
+        p$x$data[[i]]$name <- gsub("^\\((.+),\\d+\\)$", "\\1", nm)
+        p$x$data[[i]]$legendgroup <- p$x$data[[i]]$name
+      }
+    }
+    p
   })
   
   # Export abundance matrix
