@@ -1468,7 +1468,7 @@ server <- function(input, output, session) {
     req(reactOriSmpMetadatTbl())
     DT::datatable(reactOriSmpMetadatTbl(), rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
-                  options = list(pageLength = 5))
+                  options = list(pageLength = 5, scrollX = TRUE))
     
     # Reactive
     # req(datOverviewPack()$smpMetadatTbl)
