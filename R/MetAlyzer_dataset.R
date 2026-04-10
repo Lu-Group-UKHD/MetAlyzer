@@ -223,7 +223,7 @@ get_data_range <- function(full_sheet) {
     dim(full_sheet)
   )[, 2]
 
-  rows_data <- which(full_sheet[, col_sample_type] == "Sample") # rows
+  rows_data <- which(grepl("^\\s*Sample\\s*$", full_sheet[, col_sample_type], ignore.case = TRUE)) # rows
   names(rows_data) <- NULL
   cols_data <- (col_class + 1):ncol(full_sheet) # columns
 

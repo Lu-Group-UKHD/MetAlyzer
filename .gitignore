@@ -9,3 +9,6 @@
 *_cache
 docs
 environment.yml
+Pathway_info/
+.github
+tests/

@@ -89,5 +89,5 @@ polarity <- function() {
 #' @examples
 #' fpath <- MetAlyzer::pathway()
 pathway <- function() {
-  system.file("extdata", "Pathway_120325.xlsx", package = "MetAlyzer")
+  system.file("extdata", "Pathway_new.xlsx", package = "MetAlyzer")
 }
