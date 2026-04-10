@@ -142,9 +142,6 @@ ui <- fluidPage(
                              multiple = T,
                              shinyBS::bsCollapsePanel('Sample metadata (All)', style = 'primary',
                                                       DT::dataTableOutput('tblSmpMetadat') %>%
-                                                      #### Collapsed panel: Workaround (SHOULD WORK BUT NOT WORK)
-                                                      # Render table outside collapsed panel and display it
-                                                      # uiOutput('uiTblSmpMetadat') %>%
                                                         shinycssloaders::withSpinner(color="#56070C")),
                              shinyBS::bsCollapsePanel('Data distribution', style = 'primary',
                                                       fluidRow(
@@ -693,11 +690,6 @@ server <- function(input, output, session) {
       ))
       reactMetabObj$metabObj <- NULL
     }
-  })
-  #### Collapsed panel: Workaround
-  # Close expanded panels (due to rendering) right after output is rendered
-  observeEvent(reactOriSmpMetadatTbl(), {
-    shinyBS::updateCollapse(session, 'panelDatOverviewViz', close = 'Sample metadata (All)')
   })
   
   # Retrieve abundance data and sample metadata and compute feature completeness
@@ -1477,12 +1469,7 @@ server <- function(input, output, session) {
     #               selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
     #               options = list(pageLength = 5))
   })
-  outputOptions(output, 'tblSmpMetadat', suspendWhenHidden = F)
-  #### Collapsed panel: Workaround (SHOULD WORK BUT NOT WORK)
-  # Render table outside collapsed panel and display it
-  # output$uiTblSmpMetadat <- renderUI({
-  #   DT::dataTableOutput('tblSmpMetadat')
-  # })
+  
   
   # Data completeness
   output$summDatComplete <- renderText({
