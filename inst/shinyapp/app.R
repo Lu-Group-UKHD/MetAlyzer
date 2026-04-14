@@ -227,6 +227,12 @@ ui <- fluidPage(
                                                            choices = character(0), multiple = F))
                            ),
                            fluidRow(
+                             column(width = 5, selectInput('smpChoiceGpsLog2FC_pair', 'Pair samples by:',
+                                                           choices = 'Not available', multiple = F)),
+                             shinyBS::bsTooltip('smpChoiceGpsLog2FC_pair', 'The variable identifies matched samples for paired analysis (e.g., patient IDs).',
+                                                placement = 'top')
+                           ),
+                           fluidRow(
                              style = "display: flex; align-items: center;",
                              column(width = 5, actionButton('computeLog2FC', 'Perform', width = '100%')),
                              column(width = 6, offset = 1,
@@ -1182,6 +1188,26 @@ server <- function(input, output, session) {
     updateSelectInput(session, 'smpChoicesLog2FC_1', choices = smpChoices)
     updateSelectInput(session, 'smpChoicesLog2FC_2', choices = smpChoices, selected = smpChoices[2])
   })
+  # Update variable choices that may hold pairing information for paired analysis
+  observe({
+    req(smpChoicePack()$smpChoiceList)
+    smpChoiceList <- smpChoicePack()$smpChoiceList
+    # Remove choice groups whose level sizes are one or equal to sample size
+    choiceGpSizes <- sapply(smpChoiceList, length)
+    rmChoiceGps <- which(choiceGpSizes == 1 | choiceGpSizes == ncol(reactMetabObj$metabObj))
+    if (length(rmChoiceGps) != 0) {
+      smpChoiceList <- smpChoiceList[-rmChoiceGps]
+    }
+    smpChoiceGps <- names(smpChoiceList)
+    if (!length(smpChoiceGps) <= 1) {
+      # Exclude selected grouping variable
+      smpChoiceGps <- smpChoiceGps[!smpChoiceGps %in% input$smpChoiceGpsLog2FC]
+      smpChoiceGps <- c('None', smpChoiceGps)
+      updateSelectInput(session, 'smpChoiceGpsLog2FC_pair', choices = smpChoiceGps, selected = 'None')
+    } else {
+      updateSelectInput(session, 'smpChoiceGpsLog2FC_pair', choices = 'Not available')
+    }
+  })
   # Compute log2(FC)
   observeEvent(input$computeLog2FC, {
     if (input$smpChoicesLog2FC_1 != input$smpChoicesLog2FC_2) {
@@ -1200,9 +1226,16 @@ server <- function(input, output, session) {
         metabObj <- MetAlyzer::filter_meta_data(metabObj, is.na(.data[[selectedChoiceGp]]) |
                                                 .data[[selectedChoiceGp]] %in% selectedChoices)
       }
-      metabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = metabObj,
-                                          group = selectedChoiceGp,
-                                          group_level = selectedChoices)
+      if (input$smpChoiceGpsLog2FC_pair %in% c('Not available', 'None')) {
+        metabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = metabObj,
+                                            group = selectedChoiceGp,
+                                            group_level = selectedChoices)
+      } else {
+        metabObj <- MetAlyzer:::calc_log2FC(metalyzer_se = metabObj,
+                                            group = selectedChoiceGp,
+                                            group_level = selectedChoices,
+                                            paired = input$smpChoiceGpsLog2FC_pair)
+      }
       reactLog2FCTbl(MetAlyzer:::log2FC(metabObj))
       
       # Record commands executed

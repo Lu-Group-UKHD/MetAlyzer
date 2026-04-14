@@ -75,6 +75,8 @@ local_plot_scatter <- function(log2fc_df,
   ## Background: Set class colors
 
   class_colors <- MetAlyzer:::metalyzer_colors()
+  # class_colors <- pals::glasbey(32)
+  # class_colors <- Polychrome::createPalette(32, seedcolors = c("#ff0000", "#00ff00", "#0000ff"))
 
   names(class_colors) <- levels(polarity_df$Class)
 
