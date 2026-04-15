@@ -16,6 +16,7 @@ library(bslib)
 library(viridis)
 library(viridisLite)
 library(gridExtra)
+library(MetaProViz)
 
 ui <- fluidPage(
   # Define notification styles for 'Process' and 'Revert/Default' buttons
@@ -137,7 +138,7 @@ ui <- fluidPage(
                            shinyBS::bsCollapse(
                              id = 'panelDatOverviewViz',
                              # Note that collapsed panel does not render output until it is expanded
-                             open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'),
+                             open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)', 'PCA'),
                              multiple = T,
                              shinyBS::bsCollapsePanel('Sample metadata (All)', style = 'primary',
                                                       DT::dataTableOutput('tblSmpMetadat') %>%
@@ -204,6 +205,30 @@ ui <- fluidPage(
                                                                                   choices = c("html", "png", "pdf", "svg"),
                                                                                   selected = "html")),
                                                                column(width = 2, downloadButton("downloadQuanStatus",
+                                                                                                "Download")))
+                                                      ),
+                             shinyBS::bsCollapsePanel('PCA', style = 'primary',
+                                                      fluidRow(
+                                                        style = 'display:flex; align-items: center;',
+                                                        column(width = 2,
+                                                               selectInput('pcxPCA', 'PC (x-axis)',
+                                                                           choices = paste0('PC', 1:10),
+                                                                           selected = 'PC1')),
+                                                        column(width = 2,
+                                                               selectInput('pcyPCA', 'PC (y-axis)',
+                                                                           choices = paste0('PC', 1:10),
+                                                                           selected = 'PC2')),
+                                                        column(width = 4, offset = 4, uiOutput('updateColorByPCA'))
+                                                      ),
+                                                      uiOutput('pcaDuplicateWarning'),
+                                                      plotly::plotlyOutput('plotPCA') %>%
+                                                        shinycssloaders::withSpinner(color="#56070C"),
+                                                      fluidRow(style="display:flex; justify-content:right; margin-top:1rem;",
+                                                               column(width = 2,
+                                                                      selectInput("formatPCA", label = NULL,
+                                                                                  choices = c("html", "png", "pdf", "svg"),
+                                                                                  selected = "html")),
+                                                               column(width = 2, downloadButton("downloadPCA",
                                                                                                 "Download")))
                                                       )
                            )
@@ -1478,7 +1503,7 @@ server <- function(input, output, session) {
     req(reactOriSmpMetadatTbl())
     DT::datatable(reactOriSmpMetadatTbl(), rownames = F, filter = list(position = 'top', clear = T, plain = F),
                   selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
-                  options = list(pageLength = 5))
+                  options = list(pageLength = 5, scrollX = TRUE))
     
     # Reactive
     # req(datOverviewPack()$smpMetadatTbl)
@@ -1493,6 +1518,7 @@ server <- function(input, output, session) {
   # output$uiTblSmpMetadat <- renderUI({
   #   DT::dataTableOutput('tblSmpMetadat')
   # })
+  
   
   # Data completeness
   output$summDatComplete <- renderText({
@@ -1556,6 +1582,82 @@ server <- function(input, output, session) {
     
     plotly::ggplotly(g)
 })
+  
+  # === PCA ===
+  # Update color by choices for PCA
+  output$updateColorByPCA <- renderUI({
+    req(smpChoicePack()$smpChoiceList)
+    metaCols <- names(smpChoicePack()$smpChoiceList)
+    div(
+      style = "display: flex; align-items: center;",
+      tags$label("Color by:", style = "margin-right: 10px; margin-bottom: 15px;"),
+      selectInput('colorByPCA', NULL, choices = c('None', metaCols), selected = 'None', multiple = F)
+    )
+  })
+  # Create reactive object for PCA plot (for downloading)
+  reactPCAPlot <- reactiveVal(NULL)
+  # Show warning when both PC axes are the same
+  output$pcaDuplicateWarning <- renderUI({
+    req(input$pcxPCA, input$pcyPCA)
+    pcx_val <- as.integer(gsub('PC', '', input$pcxPCA))
+    pcy_val <- as.integer(gsub('PC', '', input$pcyPCA))
+    if (pcx_val == pcy_val) {
+      tags$p(style = "color: red; font-weight: bold; margin-top: 0.5rem;",
+             "Please select two different principal components.")
+    }
+  })
+
+  # Separate PCA computation from visualization to avoid rerunning prcomp on PC change
+  reactPCAResult <- reactive({
+    req(reactMetabObj$metabObj)
+    color_by <- if (!is.null(input$colorByPCA) && input$colorByPCA != 'None') input$colorByPCA else NULL
+
+    metadata_info_vec <- NULL
+    if (!is.null(color_by)) {
+      # viz_pca's process_se() converts colData to data.frame (spaces → dots); match that here
+      metadata_info_vec <- c(color = gsub(' ', '.', color_by))
+    }
+
+    # Remove zero-variance metabolites (all-NA rows become constant after MetaProViz's
+    # internal NA→0 imputation and would cause prcomp to fail with scale.=TRUE)
+    se_pca <- reactMetabObj$metabObj
+    conc_mat <- SummarizedExperiment::assay(se_pca, 'conc_values')
+    row_vars <- apply(conc_mat, 1, function(x) var(x, na.rm = TRUE))
+    se_pca <- se_pca[!is.na(row_vars) & row_vars > 0, ]
+
+    list(se_pca = se_pca, metadata_info_vec = metadata_info_vec)
+  })
+
+  # Render PCA plot – only reruns viz_pca when PC selection changes
+  output$plotPCA <- plotly::renderPlotly({
+    pca_data <- reactPCAResult()
+    pcx_val <- as.integer(gsub('PC', '', input$pcxPCA))
+    pcy_val <- as.integer(gsub('PC', '', input$pcyPCA))
+
+    # Prevent rendering when both axes use the same PC
+    validate(need(pcx_val != pcy_val, ""))
+
+    result <- MetaProViz::viz_pca(
+      data = pca_data$se_pca,
+      metadata_info = pca_data$metadata_info_vec,
+      save_plot = NULL,
+      print_plot = FALSE,
+      pcx = pcx_val,
+      pcy = pcy_val
+    )
+    pca_plot <- result$Plot[["Plot"]]
+    reactPCAPlot(pca_plot)
+    p <- plotly::ggplotly(pca_plot)
+    # Clean legend: remove parenthesised trace names like "(Group, 1)" → "Group"
+    for (i in seq_along(p$x$data)) {
+      nm <- p$x$data[[i]]$name
+      if (!is.null(nm)) {
+        p$x$data[[i]]$name <- gsub("^\\((.+),\\d+\\)$", "\\1", nm)
+        p$x$data[[i]]$legendgroup <- p$x$data[[i]]$name
+      }
+    }
+    p
+  })
   
   # Export abundance matrix
   output$downloadRawAbunExport <- downloadHandler(
@@ -1806,6 +1908,23 @@ server <- function(input, output, session) {
         final_plot <- reactOverviewPlots$quanStatus
         ggsave(filename = file, plot = final_plot, device = input$formatQuanStatus,
                dpi = 400, units = "cm", width = 32.0, height = 21.0)
+      }
+    }
+  )
+  
+  # PCA plot
+  output$downloadPCA <- downloadHandler(
+    filename = function() {
+      paste0("pca_plot_", Sys.Date(), '.', input$formatPCA)
+    },
+    content = function(file) {
+      req(reactPCAPlot())
+      if (input$formatPCA == "html") {
+        final_plot <- plotly::ggplotly(reactPCAPlot())
+        htmlwidgets::saveWidget(final_plot, file, selfcontained = TRUE)
+      } else {
+        ggsave(filename = file, plot = reactPCAPlot(), device = input$formatPCA,
+               dpi = 400, units = "cm", width = 29.7, height = 21.0)
       }
     }
   )
