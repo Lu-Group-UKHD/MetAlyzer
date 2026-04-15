@@ -138,10 +138,13 @@ ui <- fluidPage(
                            shinyBS::bsCollapse(
                              id = 'panelDatOverviewViz',
                              # Note that collapsed panel does not render output until it is expanded
-                             open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'),
+                             open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)', 'PCA'),
                              multiple = T,
                              shinyBS::bsCollapsePanel('Sample metadata (All)', style = 'primary',
                                                       DT::dataTableOutput('tblSmpMetadat') %>%
+                                                      #### Collapsed panel: Workaround (SHOULD WORK BUT NOT WORK)
+                                                      # Render table outside collapsed panel and display it
+                                                      # uiOutput('uiTblSmpMetadat') %>%
                                                         shinycssloaders::withSpinner(color="#56070C")),
                              shinyBS::bsCollapsePanel('Data distribution', style = 'primary',
                                                       fluidRow(
@@ -208,11 +211,13 @@ ui <- fluidPage(
                                                       fluidRow(
                                                         style = 'display:flex; align-items: center;',
                                                         column(width = 2,
-                                                               numericInput('pcxPCA', 'PC (x-axis)',
-                                                                            value = 1, min = 1, max = 10, step = 1)),
+                                                               selectInput('pcxPCA', 'PC (x-axis)',
+                                                                           choices = paste0('PC', 1:10),
+                                                                           selected = 'PC1')),
                                                         column(width = 2,
-                                                               numericInput('pcyPCA', 'PC (y-axis)',
-                                                                            value = 2, min = 1, max = 10, step = 1)),
+                                                               selectInput('pcyPCA', 'PC (y-axis)',
+                                                                           choices = paste0('PC', 1:10),
+                                                                           selected = 'PC2')),
                                                         column(width = 4, offset = 4, uiOutput('updateColorByPCA'))
                                                       ),
                                                       uiOutput('pcaDuplicateWarning'),
@@ -690,6 +695,11 @@ server <- function(input, output, session) {
       ))
       reactMetabObj$metabObj <- NULL
     }
+  })
+  #### Collapsed panel: Workaround
+  # Close expanded panels (due to rendering) right after output is rendered
+  observeEvent(reactOriSmpMetadatTbl(), {
+    shinyBS::updateCollapse(session, 'panelDatOverviewViz', close = 'Sample metadata (All)')
   })
   
   # Retrieve abundance data and sample metadata and compute feature completeness
@@ -1469,6 +1479,12 @@ server <- function(input, output, session) {
     #               selection = list(mode = 'single', target = 'row'), style = 'bootstrap',
     #               options = list(pageLength = 5))
   })
+  outputOptions(output, 'tblSmpMetadat', suspendWhenHidden = F)
+  #### Collapsed panel: Workaround (SHOULD WORK BUT NOT WORK)
+  # Render table outside collapsed panel and display it
+  # output$uiTblSmpMetadat <- renderUI({
+  #   DT::dataTableOutput('tblSmpMetadat')
+  # })
   
   
   # Data completeness
@@ -1550,20 +1566,18 @@ server <- function(input, output, session) {
   # Show warning when both PC axes are the same
   output$pcaDuplicateWarning <- renderUI({
     req(input$pcxPCA, input$pcyPCA)
-    if (as.integer(input$pcxPCA) == as.integer(input$pcyPCA)) {
+    pcx_val <- as.integer(gsub('PC', '', input$pcxPCA))
+    pcy_val <- as.integer(gsub('PC', '', input$pcyPCA))
+    if (pcx_val == pcy_val) {
       tags$p(style = "color: red; font-weight: bold; margin-top: 0.5rem;",
              "Please select two different principal components.")
     }
   })
-  # Render PCA plot using MetaProViz::viz_pca
-  output$plotPCA <- plotly::renderPlotly({
+
+  # Separate PCA computation from visualization to avoid rerunning prcomp on PC change
+  reactPCAResult <- reactive({
     req(reactMetabObj$metabObj)
     color_by <- if (!is.null(input$colorByPCA) && input$colorByPCA != 'None') input$colorByPCA else NULL
-    pcx_val <- if (!is.null(input$pcxPCA) && input$pcxPCA >= 1) as.integer(input$pcxPCA) else 1L
-    pcy_val <- if (!is.null(input$pcyPCA) && input$pcyPCA >= 1) as.integer(input$pcyPCA) else 2L
-
-    # Prevent rendering when both axes use the same PC
-    validate(need(pcx_val != pcy_val, ""))
 
     metadata_info_vec <- NULL
     if (!is.null(color_by)) {
@@ -1578,9 +1592,21 @@ server <- function(input, output, session) {
     row_vars <- apply(conc_mat, 1, function(x) var(x, na.rm = TRUE))
     se_pca <- se_pca[!is.na(row_vars) & row_vars > 0, ]
 
+    list(se_pca = se_pca, metadata_info_vec = metadata_info_vec)
+  })
+
+  # Render PCA plot – only reruns viz_pca when PC selection changes
+  output$plotPCA <- plotly::renderPlotly({
+    pca_data <- reactPCAResult()
+    pcx_val <- as.integer(gsub('PC', '', input$pcxPCA))
+    pcy_val <- as.integer(gsub('PC', '', input$pcyPCA))
+
+    # Prevent rendering when both axes use the same PC
+    validate(need(pcx_val != pcy_val, ""))
+
     result <- MetaProViz::viz_pca(
-      data = se_pca,
-      metadata_info = metadata_info_vec,
+      data = pca_data$se_pca,
+      metadata_info = pca_data$metadata_info_vec,
       save_plot = NULL,
       print_plot = FALSE,
       pcx = pcx_val,
