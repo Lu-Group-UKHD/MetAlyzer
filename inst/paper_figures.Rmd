@@ -15,6 +15,7 @@ Load libraries
 library(MetAlyzer)
 library('SummarizedExperiment')
 library('tidyverse')
+library('viridis')
 
 # Set plot theme
 th <- theme_bw(base_size = 15) +
@@ -352,7 +353,7 @@ local_plot_network <- function(log2fc_df,
     )
 
   nodes_collapsed <- left_join(summary_others, summary_log2fc, by = "Label") %>%
-    rename(values = values_collapsed, stat = stat_collapsed,) %>%
+    rename(values = values_collapsed, stat = stat_collapsed) %>%
     mutate(Pathway = if_else(Pathway == "", NA_character_, Pathway))
     
   # --- The dataframe for plotting ---
@@ -866,7 +867,7 @@ scatter <- local_plot_scatter(log2FC(processMetabObj)) +
         legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
 
 # Make figure2
-topRow <- cowplot::plot_grid(dist, miss, cols = 2, labels = 'AUTO', label_size = 22,
+topRow <- cowplot::plot_grid(dist, miss, ncol = 2, labels = 'AUTO', label_size = 22,
                              hjust = 0, vjust = 1.1)
 demoRes_ABCD <- cowplot::plot_grid(topRow, vulcano, scatter, ncol = 1, rel_heights = c(3, 5, 5),
                                    labels = c('', 'C', 'D'), label_size = 22, hjust = 0, vjust = 1.1)
@@ -879,9 +880,8 @@ demoRes_ABCD
 # Network diagram
 spsUtil::quiet({
   network <- local_plot_network(log2FC(processMetabObj), metabolite_text_size = 3.5,
-                                connection_width = 1.8, pathway_text_size = 6, pathway_width = 5)
+                                connection_width = 1.8, pathway_text_size = 6, pathway_width = 5, color_scale = "gradient", gradient_colors = c("blue", "white", "red"))
   network_p <- network$Plot +
-    scale_fill_viridis(name = 'Log2(FC)') +
     theme(legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
 })
 # Add label
@@ -1110,7 +1110,7 @@ scatter <- local_plot_scatter(log2FC(processMetabObj)) +
         legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
 
 # Make figure2
-topRow <- cowplot::plot_grid(dist, miss, cols = 2, labels = 'AUTO', label_size = 22,
+topRow <- cowplot::plot_grid(dist, miss, ncol = 2, labels = 'AUTO', label_size = 22,
                              hjust = 0, vjust = 1.1)
 demoRes_ABCD <- cowplot::plot_grid(topRow, vulcano, scatter, ncol = 1, rel_heights = c(3, 5, 5),
                                    labels = c('', 'C', 'D'), label_size = 22, hjust = 0, vjust = 1.1)
@@ -1123,9 +1123,8 @@ demoRes_ABCD
 # Network diagram
 spsUtil::quiet({
   network <- local_plot_network(log2FC(processMetabObj), metabolite_text_size = 3.5,
-                                connection_width = 1.8, pathway_text_size = 6, pathway_width = 5)
+                                connection_width = 1.8, pathway_text_size = 6, pathway_width = 5, color_scale = "gradient", gradient_colors = c("blue", "white", "red"))
   network_p <- network$Plot +
-    scale_fill_viridis(name = 'Log2(FC)') +
     theme(legend.title = element_text(face = 'bold', size = 16), legend.text = element_text(face = 'bold', size = 14))
 })
 # Add label
