@@ -2047,7 +2047,7 @@ server <- function(input, output, session) {
   })
 
   # Disclaimer for Uploading Data
-  #if (Sys.getenv("SHINY_PORT") != "") {
+  if (Sys.getenv("SHINY_PORT") != "") {
   
     showModal(modalDialog(
         title = tags$b("Data Privacy Disclaimer", style = "color: #d9534f;"),
@@ -2071,7 +2071,7 @@ server <- function(input, output, session) {
         easyClose = FALSE
     ))
   
-  #}
+  }
 }
 
 shinyApp(ui = ui, server = server)
