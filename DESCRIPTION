@@ -1,7 +1,7 @@
 Package: MetAlyzer
 Type: Package
 Title: Read and Analyze 'MetIDQ&trade;' Software Output Files
-Version: 1.1.0
+Version: 1.2.0
 Authors@R: c(
     person(given = "Qian-Wu",
            family = "Liao",

@@ -4,7 +4,6 @@ library(shiny)
 library(shinyBS)
 library(shinyWidgets)
 library(plotly)
-library(agricolae)
 library(DT)
 library(shinycssloaders)
 library(MetAlyzer)
@@ -546,7 +545,13 @@ server <- function(input, output, session) {
     # shinyBS::updateCollapse(session, 'panelDatOverviewViz',
     #                         open = c('Data distribution', 'Data completeness', 'Quantification status', 'Sample metadata (All)'))
     
-    metabObj <- MetAlyzer::read_webidq(file_path = MetAlyzer::load_demodata_biocrates(), silent = T)
+    # Resolve demo data path; system.file() returns "" in standalone Shiny
+    # deployments (e.g. shinyapps.io) where MetAlyzer is not installed as a
+    # package with its inst/extdata/ directory accessible. Fall back to the
+    # copy bundled in the app's own data/ folder.
+    demo_path <- MetAlyzer::load_demodata_biocrates()
+    if (demo_path == "") demo_path <- file.path("data", "Metalyzer_demodataset_biocratesMxPQuant500XL_2025-04.xlsx")
+    metabObj <- MetAlyzer::read_webidq(file_path = demo_path, silent = T)
     # Exclude 'Metabolism Indicators' from subsequent processing and analysis
     metabObj <- MetAlyzer::filter_metabolites(metabObj,
                                               drop_metabolites = 'Metabolism Indicators',
