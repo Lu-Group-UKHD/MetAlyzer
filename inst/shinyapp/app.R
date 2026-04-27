@@ -4,6 +4,7 @@ library(shiny)
 library(shinyBS)
 library(shinyWidgets)
 library(plotly)
+library(agricolae)
 library(DT)
 library(shinycssloaders)
 library(MetAlyzer)
@@ -1308,6 +1309,9 @@ server <- function(input, output, session) {
   # Update choices for feature identifiers to include in exported annotation csv file
   featIdTbl <- reactive({
     app_data_dir <- system.file("shinyapp", "data", package = "MetAlyzer")
+    # Fallback for standalone Shiny deployment (e.g. shinyapps.io), where the
+    # package is not installed and system.file() returns "".
+    if (app_data_dir == "") app_data_dir <- "data"
     readr::read_csv(file.path(app_data_dir, 'BiocratesFeatureTable.csv'))
   })
   output$loadFeatIdChoicesExport <- renderUI({
